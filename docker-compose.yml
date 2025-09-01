@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  trips-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_FABRIC_API_URL=${NEXT_PUBLIC_FABRIC_API_URL}
+        - NEXT_PUBLIC_FABRIC_WORKSPACE=${NEXT_PUBLIC_FABRIC_WORKSPACE}
+        - NEXT_PUBLIC_FABRIC_LAKEHOUSE=${NEXT_PUBLIC_FABRIC_LAKEHOUSE}
+        - NEXT_PUBLIC_OPENAI_API_KEY=${NEXT_PUBLIC_OPENAI_API_KEY}
+        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+        - NEXT_PUBLIC_COMPANY_DOMAIN=${NEXT_PUBLIC_COMPANY_DOMAIN}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - FABRIC_ACCESS_TOKEN=${FABRIC_ACCESS_TOKEN}
+      - EMAIL_API_KEY=${EMAIL_API_KEY}
+      - SSO_CLIENT_ID=${SSO_CLIENT_ID}
+      - SSO_CLIENT_SECRET=${SSO_CLIENT_SECRET}
+      - SSO_TENANT_ID=${SSO_TENANT_ID}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - trips-app
+    restart: unless-stopped
