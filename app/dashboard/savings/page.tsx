@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 
+
 export default function SavingsPage() {
   const router = useRouter()
   const [savings, setSavings] = useState({
