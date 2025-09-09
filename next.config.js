@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  reactStrictMode: true,
+  reactStrictMode: false, // Disable strict mode to prevent double renders
   images: {
     remotePatterns: [
       {
@@ -44,7 +44,7 @@ const nextConfig = {
       {
         source: '/admin',
         destination: '/admin/dashboard',
-        permanent: true,
+        permanent: false, // Changed to false to prevent caching issues
       },
     ]
   },

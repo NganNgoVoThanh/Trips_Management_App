@@ -31,7 +31,7 @@ import {
   History
 } from "lucide-react"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/fabric-service"
+import { fabricService, Trip } from "@/lib/supabase-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"

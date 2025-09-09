@@ -1,5 +1,5 @@
 // lib/email-service.ts
-import { Trip } from './fabric-service';
+import { Trip } from './supabase-service';
 import { config, getLocationName, formatCurrency } from './config';
 
 export interface EmailTemplate {

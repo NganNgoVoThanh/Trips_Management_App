@@ -1,5 +1,5 @@
 // lib/join-request-service.ts
-import { fabricService } from './fabric-service';
+import { fabricService } from './supabase-service';
 import { authService } from './auth-service';
 import { emailService } from './email-service';
 

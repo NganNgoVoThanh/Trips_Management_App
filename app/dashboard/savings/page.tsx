@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Download, TrendingDown, DollarSign, Car, Leaf } from "lucide-react"
-import { fabricService } from "@/lib/fabric-service"
+import { fabricService } from "@/lib/supabase-service"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"

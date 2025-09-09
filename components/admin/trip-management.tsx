@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Calendar, Clock, MapPin, Mail, Search, Loader2, Car, User } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fabricService, Trip } from "@/lib/fabric-service"
+import { fabricService, Trip } from "@/lib/supabase-service"
 import { emailService } from "@/lib/email-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
 import {

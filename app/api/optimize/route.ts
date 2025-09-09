@@ -1,6 +1,6 @@
 // app/api/optimize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/fabric-service';
+import { fabricService } from '@/lib/supabase-service';
 import { aiOptimizer } from '@/lib/ai-optimizer';
 
 export async function POST(request: NextRequest) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,13 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast"
 import { Calendar, Clock, MapPin, Car, Loader2 } from "lucide-react"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/fabric-service"
+import { fabricService, Trip } from "@/lib/supabase-service"
 import { config, getLocationName, calculateDistance, formatCurrency } from "@/lib/config"
 
 export function TripRegistration() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [estimatedCost, setEstimatedCost] = useState(0)
   const [availableTrips, setAvailableTrips] = useState<Trip[]>([])
   
   const [formData, setFormData] = useState({
@@ -29,44 +28,84 @@ export function TripRegistration() {
     notes: ""
   })
 
-  useEffect(() => {
-    loadAvailableTrips()
-  }, [formData.departureDate, formData.departureLocation, formData.destination])
-
-  useEffect(() => {
-    calculateEstimatedCost()
-  }, [formData.departureLocation, formData.destination, formData.vehicleType])
-
-  const loadAvailableTrips = async () => {
-    if (formData.departureDate) {
-      try {
-        const trips = await fabricService.getTrips({
-          status: 'confirmed'
-        })
-        
-        const filtered = trips.filter(trip => 
-          trip.departureDate === formData.departureDate &&
-          trip.departureLocation === formData.departureLocation &&
-          trip.destination === formData.destination
-        )
-        
-        setAvailableTrips(filtered)
-      } catch (error) {
-        console.error('Error loading available trips:', error)
-      }
-    }
-  }
-
-  const calculateEstimatedCost = () => {
-    if (formData.departureLocation && formData.destination) {
+  // Memoize estimated cost calculation
+  const estimatedCost = useMemo(() => {
+    if (formData.departureLocation && formData.destination && formData.departureLocation !== formData.destination && formData.vehicleType) {
       const distance = calculateDistance(formData.departureLocation, formData.destination)
       const vehicle = config.vehicles[formData.vehicleType as keyof typeof config.vehicles]
-      setEstimatedCost(distance * 2 * vehicle.costPerKm) // Round trip
+      if (vehicle) {
+        return distance * 2 * vehicle.costPerKm // Round trip
+      }
     }
-  }
+    return 0
+  }, [formData.departureLocation, formData.destination, formData.vehicleType])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Load available trips with debounce
+  const loadAvailableTrips = useCallback(async () => {
+    if (!formData.departureDate || !formData.departureLocation || !formData.destination) {
+      setAvailableTrips([])
+      return
+    }
+
+    try {
+      const trips = await fabricService.getTrips({
+        status: 'confirmed'
+      })
+      
+      const filtered = trips.filter(trip => 
+        trip.departureDate === formData.departureDate &&
+        trip.departureLocation === formData.departureLocation &&
+        trip.destination === formData.destination
+      )
+      
+      setAvailableTrips(filtered)
+    } catch (error) {
+      console.error('Error loading available trips:', error)
+      setAvailableTrips([])
+    }
+  }, [formData.departureDate, formData.departureLocation, formData.destination])
+
+  // Debounced effect for loading trips
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadAvailableTrips()
+    }, 500) // Debounce 500ms
+
+    return () => clearTimeout(timeoutId)
+  }, [loadAvailableTrips])
+
+  // Memoized input change handler
+  const handleInputChange = useCallback((field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault() // CRITICAL: Prevent default form submission
+    
+    // Validate form data
+    if (!formData.departureLocation || !formData.destination || 
+        !formData.departureDate || !formData.departureTime ||
+        !formData.returnDate || !formData.returnTime) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (formData.departureLocation === formData.destination) {
+      toast({
+        title: "Validation Error", 
+        description: "Departure location and destination cannot be the same",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -74,30 +113,49 @@ export function TripRegistration() {
       
       if (!user) {
         toast({
-          title: "Error",
+          title: "Authentication Error",
           description: "Please sign in to register a trip",
           variant: "destructive"
         })
+        setIsLoading(false)
         return
       }
 
-      // Create trip in database
-      const trip = await fabricService.createTrip({
+      console.log('=== TRIP SUBMISSION DEBUG ===')
+      console.log('User:', user)
+      console.log('Form Data:', formData)
+      console.log('Estimated Cost:', estimatedCost)
+
+      // Create trip object with all required fields
+      const tripData = {
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
-        ...formData,
-        status: 'pending',
+        departureLocation: formData.departureLocation,
+        destination: formData.destination,
+        departureDate: formData.departureDate,
+        departureTime: formData.departureTime,
+        returnDate: formData.returnDate,
+        returnTime: formData.returnTime,
+        vehicleType: formData.vehicleType,
+        status: 'pending' as const,
         notified: false,
-        estimatedCost
-      })
+        estimatedCost: estimatedCost > 0 ? estimatedCost : 0
+      }
 
+      console.log('Trip Data to Save:', tripData)
+
+      // Save to database
+      const savedTrip = await fabricService.createTrip(tripData)
+      console.log('Saved Trip:', savedTrip)
+
+      // Success notification
       toast({
         title: "Trip Registered Successfully",
-        description: "Your trip request has been submitted for approval",
+        description: `Trip ${savedTrip.id} has been submitted for approval`,
       })
 
-      // Reset form
+      // Reset form after successful submission
       setFormData({
         departureLocation: "",
         destination: "",
@@ -108,10 +166,14 @@ export function TripRegistration() {
         vehicleType: "car-4",
         notes: ""
       })
+      
+      setAvailableTrips([])
+      
     } catch (error: any) {
+      console.error('=== TRIP SUBMISSION ERROR ===', error)
       toast({
         title: "Registration Failed",
-        description: error.message || "Failed to register trip",
+        description: error.message || "Failed to register trip. Please try again.",
         variant: "destructive"
       })
     } finally {
@@ -140,12 +202,12 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="departure">
                 <MapPin className="inline h-4 w-4 mr-1" />
-                Departure Location
+                Departure Location *
               </Label>
               <Select 
                 value={formData.departureLocation} 
-                onValueChange={(value) => setFormData({...formData, departureLocation: value})}
-                required
+                onValueChange={(value) => handleInputChange('departureLocation', value)}
+                disabled={isLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select departure location" />
@@ -164,12 +226,12 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="destination">
                 <MapPin className="inline h-4 w-4 mr-1" />
-                Destination
+                Destination *
               </Label>
               <Select 
                 value={formData.destination} 
-                onValueChange={(value) => setFormData({...formData, destination: value})}
-                required
+                onValueChange={(value) => handleInputChange('destination', value)}
+                disabled={isLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select destination" />
@@ -192,14 +254,15 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="departureDate">
                 <Calendar className="inline h-4 w-4 mr-1" />
-                Departure Date
+                Departure Date *
               </Label>
               <Input
                 id="departureDate"
                 type="date"
                 min={getTomorrowDate()}
                 value={formData.departureDate}
-                onChange={(e) => setFormData({...formData, departureDate: e.target.value})}
+                onChange={(e) => handleInputChange('departureDate', e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -208,13 +271,14 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="departureTime">
                 <Clock className="inline h-4 w-4 mr-1" />
-                Departure Time
+                Departure Time *
               </Label>
               <Input
                 id="departureTime"
                 type="time"
                 value={formData.departureTime}
-                onChange={(e) => setFormData({...formData, departureTime: e.target.value})}
+                onChange={(e) => handleInputChange('departureTime', e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -223,14 +287,15 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="returnDate">
                 <Calendar className="inline h-4 w-4 mr-1" />
-                Return Date
+                Return Date *
               </Label>
               <Input
                 id="returnDate"
                 type="date"
                 min={formData.departureDate || getTomorrowDate()}
                 value={formData.returnDate}
-                onChange={(e) => setFormData({...formData, returnDate: e.target.value})}
+                onChange={(e) => handleInputChange('returnDate', e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -239,13 +304,14 @@ export function TripRegistration() {
             <div className="space-y-2">
               <Label htmlFor="returnTime">
                 <Clock className="inline h-4 w-4 mr-1" />
-                Return Time
+                Return Time *
               </Label>
               <Input
                 id="returnTime"
                 type="time"
                 value={formData.returnTime}
-                onChange={(e) => setFormData({...formData, returnTime: e.target.value})}
+                onChange={(e) => handleInputChange('returnTime', e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -258,7 +324,8 @@ export function TripRegistration() {
               </Label>
               <Select 
                 value={formData.vehicleType} 
-                onValueChange={(value) => setFormData({...formData, vehicleType: value})}
+                onValueChange={(value) => handleInputChange('vehicleType', value)}
+                disabled={isLoading}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -280,7 +347,8 @@ export function TripRegistration() {
                 id="notes"
                 placeholder="Optional notes or special requirements"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -290,6 +358,11 @@ export function TripRegistration() {
             <div className="bg-muted p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">Estimated Cost (Round Trip):</p>
               <p className="text-2xl font-bold">{formatCurrency(estimatedCost)}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Distance: {formData.departureLocation && formData.destination ? 
+                  `${calculateDistance(formData.departureLocation, formData.destination) * 2} km` : 
+                  'N/A'}
+              </p>
             </div>
           )}
 
@@ -297,13 +370,13 @@ export function TripRegistration() {
           {availableTrips.length > 0 && (
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
               <p className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">
-                Similar trips on this date:
+                Similar trips on this date ({availableTrips.length}):
               </p>
-              <div className="space-y-1">
+              <div className="space-y-1 max-h-32 overflow-y-auto">
                 {availableTrips.map((trip) => (
                   <div key={trip.id} className="text-sm">
                     • {trip.userName} - {trip.departureTime} 
-                    ({trip.status === 'optimized' ? 'Optimized' : 'Pending'})
+                    ({trip.status === 'optimized' ? 'Optimized' : 'Confirmed'})
                   </div>
                 ))}
               </div>
@@ -313,15 +386,16 @@ export function TripRegistration() {
             </div>
           )}
 
+          {/* Submit Button */}
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={isLoading}
+            disabled={isLoading || !formData.departureLocation || !formData.destination}
           >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
+                Submitting Trip...
               </>
             ) : (
               'Submit Trip Request'

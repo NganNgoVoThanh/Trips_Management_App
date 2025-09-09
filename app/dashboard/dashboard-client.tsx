@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TripRegistration } from "@/components/trip-registration"
-import { UpcomingTrips } from "@/components/upcoming-trips"
-import { AvailableTrips } from "@/components/available-trips"
+import { TripRegistration } from "@/components/dashboard/trip-registration"
+import { UpcomingTrips } from "@/components/dashboard/upcoming-trips"
+import { AvailableTrips } from "@/components/dashboard/available-trips"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/fabric-service"
+import { fabricService, Trip } from "@/lib/supabase-service"
 import { formatCurrency } from "@/lib/config"
 import { 
   Car, 

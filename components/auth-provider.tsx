@@ -1,28 +1,37 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { authService } from '@/lib/auth-service'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const isChecking = useRef(false)
 
   useEffect(() => {
-    // Check authentication status
+    // Prevent multiple simultaneous checks
+    if (isChecking.current) return
+    
     const checkAuth = () => {
-      const user = authService.getCurrentUser()
+      isChecking.current = true
       
-      // If on protected route without auth
-      if (!user && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
-        router.push('/')
-        return
-      }
-      
-      // If admin route without admin role
-      if (pathname.startsWith('/admin') && user?.role !== 'admin') {
-        router.push('/dashboard')
-        return
+      try {
+        const user = authService.getCurrentUser()
+        
+        // If on protected route without auth
+        if (!user && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+          router.push('/')
+          return
+        }
+        
+        // If admin route without admin role
+        if (pathname.startsWith('/admin') && user?.role !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+      } finally {
+        isChecking.current = false
       }
     }
     
@@ -41,22 +50,14 @@ export function useAuth() {
       const user = await authService.loginWithSSO(email)
       
       // Set cookie for middleware
-      document.cookie = `session=${JSON.stringify(user)}; path=/; max-age=86400`
+      document.cookie = `session=${JSON.stringify(user)}; path=/; max-age=86400; SameSite=Lax`
       
-      // Navigate based on role
+      // Use replace instead of push to prevent back button issues
       if (user.role === 'admin') {
-        await router.push('/admin/dashboard')
+        router.replace('/admin/dashboard')
       } else {
-        await router.push('/dashboard')
+        router.replace('/dashboard')
       }
-      
-      // Force a hard navigation if soft navigation fails
-      setTimeout(() => {
-        const currentPath = window.location.pathname
-        if (currentPath === '/') {
-          window.location.href = user.role === 'admin' ? '/admin/dashboard' : '/dashboard'
-        }
-      }, 100)
       
       return user
     } catch (error) {
@@ -68,7 +69,7 @@ export function useAuth() {
   const logout = async () => {
     await authService.logout()
     document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-    router.push('/')
+    router.replace('/')
   }
   
   const user = authService.getCurrentUser()

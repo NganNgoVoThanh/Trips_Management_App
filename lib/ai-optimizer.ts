@@ -1,6 +1,6 @@
 // lib/ai-optimizer.ts
 import { config, calculateDistance, calculateCost } from './config';
-import { Trip } from './fabric-service';
+import { Trip } from './supabase-service';
 
 export interface OptimizationProposal {
   id: string;

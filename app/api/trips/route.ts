@@ -1,6 +1,6 @@
 // app/api/trips/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/fabric-service';
+import { fabricService } from '@/lib/supabase-service';
 import { authService } from '@/lib/auth-service';
 
 export async function GET(request: NextRequest) {

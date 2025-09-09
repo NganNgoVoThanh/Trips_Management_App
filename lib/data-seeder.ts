@@ -1,5 +1,5 @@
 // lib/data-seeder.ts
-import { fabricService, Trip } from './fabric-service';
+import { fabricService, Trip } from './supabase-service';
 import { config } from './config';
 
 export class DataSeeder {
