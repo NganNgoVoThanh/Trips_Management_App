@@ -398,7 +398,7 @@ export function TripRegistration() {
                 Submitting Trip...
               </>
             ) : (
-              'Submit Trip Request'
+              'Submit'
             )}
           </Button>
         </form>

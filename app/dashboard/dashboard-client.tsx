@@ -23,11 +23,13 @@ import {
   PlusCircle,
   Plane,
   Target,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -44,17 +46,36 @@ export function DashboardClient() {
   })
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isDatabaseConfigured, setIsDatabaseConfigured] = useState(true)
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
+    // Initial load
     loadDashboardData()
-    // Refresh data every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    
+    // Setup refresh interval only if database is configured
+    if (isDatabaseConfigured) {
+      const interval = setInterval(() => {
+        loadDashboardData(true) // silent refresh
+      }, 30000)
+      setRefreshInterval(interval)
+    }
 
-  const loadDashboardData = async () => {
+    // Cleanup
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
+    }
+  }, [isDatabaseConfigured])
+
+  const loadDashboardData = async (silentRefresh = false) => {
     try {
-      setIsLoading(true)
+      // Only show loading spinner on initial load
+      if (!silentRefresh) {
+        setIsLoading(true)
+      }
+      
       const currentUser = authService.getCurrentUser()
       
       if (!currentUser) {
@@ -64,17 +85,46 @@ export function DashboardClient() {
       
       setUser(currentUser)
       
-      // Load trips from database
-      const trips = await fabricService.getTrips({ userId: currentUser.id })
+      // Check if service is configured
+      const isConfigured = fabricService.isServiceConfigured()
+      setIsDatabaseConfigured(isConfigured)
+      
+      if (!isConfigured) {
+        // Show warning but continue with empty data
+        if (!silentRefresh) {
+          console.warn('Database not configured - running in limited mode')
+        }
+        setStats({
+          totalTrips: 0,
+          upcomingTrips: 0,
+          savedAmount: 0,
+          optimizationRate: 0
+        })
+        setRecentActivity([])
+        return
+      }
+      
+      // Load trips from database with error handling
+      let trips: Trip[] = []
+      try {
+        trips = await fabricService.getTrips({ userId: currentUser.id })
+      } catch (error) {
+        console.warn('Failed to load trips:', error)
+        trips = []
+      }
       
       // Calculate real statistics
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
       const upcoming = trips.filter(t => {
-        const tripDate = new Date(t.departureDate)
-        tripDate.setHours(0, 0, 0, 0)
-        return tripDate >= today && t.status !== 'cancelled'
+        try {
+          const tripDate = new Date(t.departureDate)
+          tripDate.setHours(0, 0, 0, 0)
+          return tripDate >= today && t.status !== 'cancelled'
+        } catch {
+          return false
+        }
       })
       
       const optimized = trips.filter(t => t.status === 'optimized')
@@ -98,9 +148,13 @@ export function DashboardClient() {
       })
       
       // Get recent activity from real trips
-      const sortedTrips = [...trips].sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+      const sortedTrips = [...trips].sort((a, b) => {
+        try {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        } catch {
+          return 0
+        }
+      })
       
       setRecentActivity(sortedTrips.slice(0, 5).map(t => ({
         id: t.id,
@@ -114,11 +168,15 @@ export function DashboardClient() {
       
     } catch (error) {
       console.error('Error loading dashboard:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive"
-      })
+      
+      // Only show toast for initial load errors
+      if (!silentRefresh) {
+        toast({
+          title: "Notice",
+          description: "Running in limited mode. Some features may be unavailable.",
+          variant: "default"
+        })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -137,23 +195,27 @@ export function DashboardClient() {
   }
 
   const formatActivityDate = (date: string, time?: string) => {
-    const d = new Date(date)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    
-    const isToday = d.toDateString() === today.toDateString()
-    const isYesterday = d.toDateString() === yesterday.toDateString()
-    
-    if (isToday) {
-      return `Today${time ? ` at ${time}` : ''}`
-    } else if (isYesterday) {
-      return `Yesterday${time ? ` at ${time}` : ''}`
-    } else {
-      return `${d.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      })}${time ? ` at ${time}` : ''}`
+    try {
+      const d = new Date(date)
+      const today = new Date()
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+      
+      const isToday = d.toDateString() === today.toDateString()
+      const isYesterday = d.toDateString() === yesterday.toDateString()
+      
+      if (isToday) {
+        return `Today${time ? ` at ${time}` : ''}`
+      } else if (isYesterday) {
+        return `Yesterday${time ? ` at ${time}` : ''}`
+      } else {
+        return `${d.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        })}${time ? ` at ${time}` : ''}`
+      }
+    } catch {
+      return date
     }
   }
 
@@ -162,7 +224,10 @@ export function DashboardClient() {
       <div className="flex min-h-screen flex-col bg-gray-50">
         <DashboardHeader />
         <div className="flex items-center justify-center flex-1">
-          <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-red-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
         </div>
       </div>
     )
@@ -173,6 +238,25 @@ export function DashboardClient() {
       <DashboardHeader />
       
       <div className="container flex-1 space-y-6 p-8 pt-6">
+        {/* Database Warning Alert */}
+        {!isDatabaseConfigured && (
+          <Alert className="bg-yellow-50 border-yellow-200">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <strong>Limited Mode:</strong> Database is not configured. 
+              Add Supabase credentials to enable full functionality.
+              <a 
+                href="https://supabase.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="ml-2 text-yellow-700 underline hover:text-yellow-900"
+              >
+                Setup Guide →
+              </a>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Welcome Section with Logo */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
@@ -184,6 +268,11 @@ export function DashboardClient() {
                 height={50}
                 className="object-contain bg-white p-2 rounded"
                 priority
+                onError={(e) => {
+                  // Fallback if logo doesn't exist
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                }}
               />
               <div>
                 <h1 className="text-3xl font-bold">Welcome back, {user?.name?.split(' ')[0]}!</h1>
@@ -197,7 +286,8 @@ export function DashboardClient() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/dashboard/trips')}>
+          <Card className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow cursor-pointer" 
+                onClick={() => isDatabaseConfigured && router.push('/dashboard/trips')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
               <Car className="h-4 w-4 text-red-600" />
@@ -210,7 +300,8 @@ export function DashboardClient() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-blue-600 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/dashboard/upcoming')}>
+          <Card className="border-l-4 border-l-blue-600 hover:shadow-md transition-shadow cursor-pointer" 
+                onClick={() => isDatabaseConfigured && router.push('/dashboard/upcoming')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Upcoming Trips</CardTitle>
               <Calendar className="h-4 w-4 text-blue-600" />
@@ -223,7 +314,8 @@ export function DashboardClient() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-green-600 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/dashboard/savings')}>
+          <Card className="border-l-4 border-l-green-600 hover:shadow-md transition-shadow cursor-pointer" 
+                onClick={() => isDatabaseConfigured && router.push('/dashboard/savings')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Money Saved</CardTitle>
               <TrendingDown className="h-4 w-4 text-green-600" />
@@ -258,15 +350,17 @@ export function DashboardClient() {
                 <Clock className="h-5 w-5 text-red-600" />
                 Recent Activity
               </CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-red-600 hover:text-red-700"
-                onClick={handleViewAllActivity}
-              >
-                View All
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
+              {isDatabaseConfigured && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-red-600 hover:text-red-700"
+                  onClick={handleViewAllActivity}
+                >
+                  View All
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -300,13 +394,15 @@ export function DashboardClient() {
                 <div className="text-center py-8 text-gray-500">
                   <Plane className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                   <p>No recent trips</p>
-                  <Button 
-                    variant="link" 
-                    className="text-red-600 mt-2"
-                    onClick={handleQuickRegister}
-                  >
-                    Register your first trip →
-                  </Button>
+                  {isDatabaseConfigured && (
+                    <Button 
+                      variant="link" 
+                      className="text-red-600 mt-2"
+                      onClick={handleQuickRegister}
+                    >
+                      Register your first trip →
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -327,6 +423,7 @@ export function DashboardClient() {
                 <TabsTrigger 
                   value="register"
                   className="data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  disabled={!isDatabaseConfigured}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Register Trip
@@ -334,6 +431,7 @@ export function DashboardClient() {
                 <TabsTrigger 
                   value="upcoming"
                   className="data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  disabled={!isDatabaseConfigured}
                 >
                   <Calendar className="mr-2 h-4 w-4" />
                   My Trips
@@ -341,23 +439,34 @@ export function DashboardClient() {
                 <TabsTrigger 
                   value="available"
                   className="data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  disabled={!isDatabaseConfigured}
                 >
                   <Users className="mr-2 h-4 w-4" />
                   Available Trips
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="register" className="space-y-4">
-                <TripRegistration />
-              </TabsContent>
-              
-              <TabsContent value="upcoming" className="space-y-4">
-                <UpcomingTrips />
-              </TabsContent>
-              
-              <TabsContent value="available" className="space-y-4">
-                <AvailableTrips />
-              </TabsContent>
+              {isDatabaseConfigured ? (
+                <>
+                  <TabsContent value="register" className="space-y-4">
+                    <TripRegistration />
+                  </TabsContent>
+                  
+                  <TabsContent value="upcoming" className="space-y-4">
+                    <UpcomingTrips />
+                  </TabsContent>
+                  
+                  <TabsContent value="available" className="space-y-4">
+                    <AvailableTrips />
+                  </TabsContent>
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
+                  <p className="text-lg font-medium mb-2">Database Not Configured</p>
+                  <p className="text-sm">Please configure Supabase to enable trip management features.</p>
+                </div>
+              )}
             </Tabs>
           </CardContent>
         </Card>

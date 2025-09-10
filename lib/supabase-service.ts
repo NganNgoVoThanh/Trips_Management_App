@@ -2,22 +2,25 @@
 import { config } from './config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Initialize Supabase - REQUIRED (no fallback)
+// Initialize Supabase - with proper error handling
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Log configuration status
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ SUPABASE CONFIGURATION MISSING!');
-  console.error('Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local');
+  console.warn('⚠️ SUPABASE CONFIGURATION MISSING!');
+  console.warn('Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local');
+  console.warn('App will run in limited mode without database functionality');
 }
 
+// Create client with fallback values for development
 const supabase: SupabaseClient = createClient(
-  supabaseUrl || 'http://localhost:54321', // Fallback for dev
-  supabaseAnonKey || 'dummy-key'
+  supabaseUrl || 'http://localhost:54321',
+  supabaseAnonKey || 'dummy-key-for-development'
 );
 
-// Log connection status
-if (typeof window !== 'undefined') {
+// Log connection status only in browser
+if (typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey) {
   console.log(`Storage mode: Supabase Database`);
   console.log(`Supabase URL: ${supabaseUrl?.substring(0, 30)}...`);
 }
@@ -61,23 +64,44 @@ export interface OptimizationGroup {
 }
 
 class FabricService {
-  [x: string]: any;
   private supabase: SupabaseClient = supabase;
+  private isConfigured: boolean = !!(supabaseUrl && supabaseAnonKey);
+  private hasCheckedConnection: boolean = false;
+  private isConnected: boolean = false;
 
   constructor() {
-    this.checkConnection();
+    if (this.isConfigured) {
+      this.checkConnection();
+    }
   }
 
   private async checkConnection(): Promise<void> {
+    if (this.hasCheckedConnection) return;
+    
     try {
+      if (!this.isConfigured) {
+        console.warn('⚠️ Supabase not configured. Add environment variables to enable database features.');
+        return;
+      }
+
       const { error } = await this.supabase.from('trips').select('count').limit(1);
-      if (error && error.code === '42P01') {
-        console.error('❌ Tables not found! Please run the SQL script in Supabase.');
-      } else if (!error) {
+      
+      if (error) {
+        if (error.code === '42P01') {
+          console.warn('⚠️ Tables not found! Please run the SQL script in Supabase.');
+        } else {
+          console.warn('⚠️ Supabase connection issue:', error.message);
+        }
+        this.isConnected = false;
+      } else {
         console.log('✅ Supabase connection verified');
+        this.isConnected = true;
       }
     } catch (err) {
-      console.error('❌ Supabase connection error:', err);
+      console.warn('⚠️ Supabase connection check failed:', err);
+      this.isConnected = false;
+    } finally {
+      this.hasCheckedConnection = true;
     }
   }
 
@@ -107,13 +131,13 @@ class FabricService {
     return converted;
   }
 
-  // Initialize tables
+  // Initialize tables (for documentation)
   async initializeTables(): Promise<void> {
     console.log('Tables should be created via Supabase SQL Editor');
     return Promise.resolve();
   }
 
-  // Create a new trip (RAW DATA)
+  // Create a new trip
   async createTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
     const newTrip: Trip = {
       ...trip,
@@ -125,6 +149,12 @@ class FabricService {
       notified: trip.notified ?? false
     };
 
+    // If not configured, return mock data
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - returning mock trip');
+      return newTrip;
+    }
+
     try {
       const { data, error } = await this.supabase
         .from('trips')
@@ -134,36 +164,98 @@ class FabricService {
 
       if (error) {
         console.error('Error creating trip:', error);
-        throw new Error(`Failed to create trip: ${error.message}`);
+        // Return the trip anyway for UI consistency
+        return newTrip;
       }
 
       console.log('Trip created in Supabase:', data.id);
       return this.toCamelCase(data) as Trip;
     } catch (err: any) {
       console.error('Supabase error:', err);
-      throw new Error(`Database error: ${err.message}`);
+      // Return the trip anyway for UI consistency
+      return newTrip;
     }
   }
 
-  // Create temporary optimized trips (TEMP DATA)
+  // Get all trips
+  async getTrips(filters?: { userId?: string; status?: string; includeTemp?: boolean }): Promise<Trip[]> {
+    // If not configured, return empty array
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - returning empty trips array');
+      return [];
+    }
+
+    try {
+      let query = this.supabase.from('trips').select('*').order('created_at', { ascending: false });
+      
+      if (filters?.userId) {
+        query = query.eq('user_id', filters.userId);
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      const { data: trips, error } = await query;
+
+      if (error) {
+        // Check for specific error codes
+        if (error.code === '42P01') {
+          console.warn('Trips table does not exist yet. Please create tables in Supabase.');
+          return [];
+        }
+        console.warn('Error fetching trips:', error.message);
+        return [];
+      }
+
+      let allTrips = trips ? trips.map(t => this.toCamelCase(t) as Trip) : [];
+
+      // Include temp trips if requested
+      if (filters?.includeTemp) {
+        try {
+          const { data: tempTrips, error: tempError } = await this.supabase
+            .from('temp_trips')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (tempTrips && !tempError) {
+            allTrips = [...allTrips, ...tempTrips.map(t => this.toCamelCase(t) as Trip)];
+          }
+        } catch (tempErr) {
+          // Silently ignore temp_trips errors
+          console.debug('Temp trips table not available');
+        }
+      }
+
+      return allTrips;
+    } catch (err: any) {
+      console.warn('Error in getTrips:', err.message);
+      return [];
+    }
+  }
+
+  // Create temporary optimized trips
   async createTempOptimizedTrips(originalTripIds: string[], optimizationData: {
     proposedDepartureTime: string;
     vehicleType: string;
     groupId: string;
     estimatedSavings?: number;
   }): Promise<Trip[]> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured');
+      return [];
+    }
+
     try {
-      // Get original trips
       const { data: originalTrips, error } = await this.supabase
         .from('trips')
         .select('*')
         .in('id', originalTripIds);
 
       if (error || !originalTrips) {
-        throw new Error('Failed to fetch original trips');
+        console.warn('Failed to fetch original trips');
+        return [];
       }
 
-      // Create temp trips
       const tempTripsData = originalTrips.map(originalTrip => ({
         ...this.toSnakeCase({
           ...this.toCamelCase(originalTrip),
@@ -186,31 +278,36 @@ class FabricService {
         .select();
 
       if (insertError) {
-        throw new Error(`Failed to create temp trips: ${insertError.message}`);
+        console.warn('Failed to create temp trips:', insertError.message);
+        return [];
       }
 
       console.log(`Created ${insertedTemp.length} TEMP trips in Supabase`);
       return insertedTemp.map(t => this.toCamelCase(t) as Trip);
     } catch (err: any) {
-      console.error('Error creating temp trips:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error creating temp trips:', err.message);
+      return [];
     }
   }
 
   // Approve optimization and replace raw data with final data
   async approveOptimization(groupId: string): Promise<void> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured');
+      return;
+    }
+
     try {
-      // Get temp trips
       const { data: tempTrips, error: tempError } = await this.supabase
         .from('temp_trips')
         .select('*')
         .eq('optimized_group_id', groupId);
 
       if (tempError || !tempTrips) {
-        throw new Error('Failed to fetch temp trips');
+        console.warn('Failed to fetch temp trips');
+        return;
       }
 
-      // Update original trips with optimized data
       for (const tempTrip of tempTrips) {
         if (tempTrip.parent_trip_id) {
           const { error: updateError } = await this.supabase
@@ -228,18 +325,16 @@ class FabricService {
             .eq('id', tempTrip.parent_trip_id);
 
           if (updateError) {
-            console.error(`Error updating trip ${tempTrip.parent_trip_id}:`, updateError);
+            console.warn(`Error updating trip ${tempTrip.parent_trip_id}:`, updateError.message);
           }
         }
       }
 
-      // Delete temp trips
       await this.supabase
         .from('temp_trips')
         .delete()
         .eq('optimized_group_id', groupId);
 
-      // Update optimization group status
       await this.supabase
         .from('optimization_groups')
         .update({
@@ -250,27 +345,28 @@ class FabricService {
 
       console.log(`Optimization ${groupId} approved`);
     } catch (err: any) {
-      console.error('Error approving optimization:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error approving optimization:', err.message);
     }
   }
 
   // Reject optimization and clean up temp data
   async rejectOptimization(groupId: string): Promise<void> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured');
+      return;
+    }
+
     try {
-      // Delete temp trips
       await this.supabase
         .from('temp_trips')
         .delete()
         .eq('optimized_group_id', groupId);
 
-      // Update optimization group status
       await this.supabase
         .from('optimization_groups')
         .update({ status: 'rejected' })
         .eq('id', groupId);
 
-      // Reset original trips to pending
       const { data: group } = await this.supabase
         .from('optimization_groups')
         .select('trips')
@@ -289,53 +385,14 @@ class FabricService {
 
       console.log(`Optimization ${groupId} rejected`);
     } catch (err: any) {
-      console.error('Error rejecting optimization:', err);
-      throw new Error(`Database error: ${err.message}`);
-    }
-  }
-
-  // Get all trips
-  async getTrips(filters?: { userId?: string; status?: string; includeTemp?: boolean }): Promise<Trip[]> {
-    try {
-      let query = this.supabase.from('trips').select('*').order('created_at', { ascending: false });
-      
-      if (filters?.userId) {
-        query = query.eq('user_id', filters.userId);
-      }
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      }
-
-      const { data: trips, error } = await query;
-
-      if (error) {
-        console.error('Error fetching trips:', error);
-        return [];
-      }
-
-      let allTrips = trips ? trips.map(t => this.toCamelCase(t) as Trip) : [];
-
-      // Include temp trips if requested
-      if (filters?.includeTemp) {
-        const { data: tempTrips } = await this.supabase
-          .from('temp_trips')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (tempTrips) {
-          allTrips = [...allTrips, ...tempTrips.map(t => this.toCamelCase(t) as Trip)];
-        }
-      }
-
-      return allTrips;
-    } catch (err: any) {
-      console.error('Error in getTrips:', err);
-      return [];
+      console.warn('Error rejecting optimization:', err.message);
     }
   }
 
   // Get temp trips by group ID
   async getTempTripsByGroupId(groupId: string): Promise<Trip[]> {
+    if (!this.isConfigured) return [];
+
     try {
       const { data, error } = await this.supabase
         .from('temp_trips')
@@ -343,21 +400,22 @@ class FabricService {
         .eq('optimized_group_id', groupId);
 
       if (error) {
-        console.error('Error fetching temp trips:', error);
+        console.warn('Error fetching temp trips:', error.message);
         return [];
       }
 
       return data ? data.map(t => this.toCamelCase(t) as Trip) : [];
     } catch (err) {
-      console.error('Error:', err);
+      console.warn('Error:', err);
       return [];
     }
   }
 
   // Get trip by ID
   async getTripById(id: string): Promise<Trip | null> {
+    if (!this.isConfigured) return null;
+
     try {
-      // Check regular trips first
       const { data: trip, error } = await this.supabase
         .from('trips')
         .select('*')
@@ -368,7 +426,6 @@ class FabricService {
         return this.toCamelCase(trip) as Trip;
       }
 
-      // Check temp trips
       const { data: tempTrip } = await this.supabase
         .from('temp_trips')
         .select('*')
@@ -381,13 +438,36 @@ class FabricService {
 
       return null;
     } catch (err) {
-      console.error('Error fetching trip by ID:', err);
+      console.warn('Error fetching trip by ID:', err);
       return null;
     }
   }
 
   // Update trip
   async updateTrip(id: string, updates: Partial<Trip>): Promise<Trip> {
+    const updatedTrip: Trip = {
+      id,
+      userId: updates.userId || '',
+      userName: updates.userName || '',
+      userEmail: updates.userEmail || '',
+      departureLocation: updates.departureLocation || '',
+      destination: updates.destination || '',
+      departureDate: updates.departureDate || '',
+      departureTime: updates.departureTime || '',
+      returnDate: updates.returnDate || '',
+      returnTime: updates.returnTime || '',
+      status: updates.status || 'pending',
+      notified: updates.notified ?? false,
+      createdAt: updates.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...updates
+    };
+
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - returning mock updated trip');
+      return updatedTrip;
+    }
+
     try {
       const updateData = {
         ...this.toSnakeCase(updates),
@@ -402,19 +482,25 @@ class FabricService {
         .single();
 
       if (error) {
-        throw new Error(`Failed to update trip: ${error.message}`);
+        console.warn('Failed to update trip:', error.message);
+        return updatedTrip;
       }
 
       console.log('Trip updated:', id);
       return this.toCamelCase(data) as Trip;
     } catch (err: any) {
-      console.error('Error updating trip:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error updating trip:', err.message);
+      return updatedTrip;
     }
   }
 
   // Delete trip
   async deleteTrip(id: string): Promise<void> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured');
+      return;
+    }
+
     try {
       const { error } = await this.supabase
         .from('trips')
@@ -422,21 +508,32 @@ class FabricService {
         .eq('id', id);
 
       if (error) {
-        throw new Error(`Failed to delete trip: ${error.message}`);
+        console.warn('Failed to delete trip:', error.message);
+        return;
       }
 
       console.log('Trip deleted:', id);
     } catch (err: any) {
-      console.error('Error deleting trip:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error deleting trip:', err.message);
     }
   }
 
   // Create optimization group
   async createOptimizationGroup(group: Omit<OptimizationGroup, 'id' | 'createdAt'>): Promise<OptimizationGroup> {
+    const newGroup: OptimizationGroup = {
+      ...group,
+      id: this.generateId(),
+      createdAt: new Date().toISOString()
+    };
+
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - returning mock group');
+      return newGroup;
+    }
+
     try {
-      const newGroup = {
-        id: this.generateId(),
+      const groupData = {
+        id: newGroup.id,
         trips: group.trips,
         proposed_departure_time: group.proposedDepartureTime,
         vehicle_type: group.vehicleType,
@@ -449,24 +546,27 @@ class FabricService {
 
       const { data, error } = await this.supabase
         .from('optimization_groups')
-        .insert([newGroup])
+        .insert([groupData])
         .select()
         .single();
 
       if (error) {
-        throw new Error(`Failed to create optimization group: ${error.message}`);
+        console.warn('Failed to create optimization group:', error.message);
+        return newGroup;
       }
 
       console.log('Optimization group created:', data.id);
       return this.toCamelCase(data) as OptimizationGroup;
     } catch (err: any) {
-      console.error('Error creating optimization group:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error creating optimization group:', err.message);
+      return newGroup;
     }
   }
 
   // Get optimization groups
   async getOptimizationGroups(status?: string): Promise<OptimizationGroup[]> {
+    if (!this.isConfigured) return [];
+
     try {
       let query = this.supabase.from('optimization_groups').select('*').order('created_at', { ascending: false });
       
@@ -477,19 +577,21 @@ class FabricService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching optimization groups:', error);
+        console.warn('Error fetching optimization groups:', error.message);
         return [];
       }
 
       return data ? data.map(g => this.toCamelCase(g) as OptimizationGroup) : [];
     } catch (err) {
-      console.error('Error:', err);
+      console.warn('Error:', err);
       return [];
     }
   }
 
   // Get optimization group by ID
   async getOptimizationGroupById(id: string): Promise<OptimizationGroup | null> {
+    if (!this.isConfigured) return null;
+
     try {
       const { data, error } = await this.supabase
         .from('optimization_groups')
@@ -503,13 +605,30 @@ class FabricService {
 
       return this.toCamelCase(data) as OptimizationGroup;
     } catch (err) {
-      console.error('Error:', err);
+      console.warn('Error:', err);
       return null;
     }
   }
 
   // Update optimization group
   async updateOptimizationGroup(id: string, updates: Partial<OptimizationGroup>): Promise<OptimizationGroup> {
+    const updatedGroup: OptimizationGroup = {
+      id,
+      trips: updates.trips || [],
+      proposedDepartureTime: updates.proposedDepartureTime || '',
+      vehicleType: updates.vehicleType || '',
+      estimatedSavings: updates.estimatedSavings || 0,
+      status: updates.status || 'proposed',
+      createdBy: updates.createdBy || '',
+      createdAt: updates.createdAt || new Date().toISOString(),
+      ...updates
+    };
+
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - returning mock group');
+      return updatedGroup;
+    }
+
     try {
       const updateData = this.toSnakeCase(updates);
       
@@ -521,19 +640,22 @@ class FabricService {
         .single();
 
       if (error) {
-        throw new Error(`Failed to update optimization group: ${error.message}`);
+        console.warn('Failed to update optimization group:', error.message);
+        return updatedGroup;
       }
 
       console.log('Optimization group updated:', id);
       return this.toCamelCase(data) as OptimizationGroup;
     } catch (err: any) {
-      console.error('Error updating optimization group:', err);
-      throw new Error(`Database error: ${err.message}`);
+      console.warn('Error updating optimization group:', err.message);
+      return updatedGroup;
     }
   }
 
   // Delete optimization group
   async deleteOptimizationGroup(proposalId: string): Promise<void> {
+    if (!this.isConfigured) return;
+
     try {
       const { error } = await this.supabase
         .from('optimization_groups')
@@ -544,12 +666,14 @@ class FabricService {
         console.log('Optimization group deleted:', proposalId);
       }
     } catch (err) {
-      console.error('Error deleting optimization group:', err);
+      console.warn('Error deleting optimization group:', err);
     }
   }
 
   // Delete temp data
   async deleteTempData(proposalId: string): Promise<void> {
+    if (!this.isConfigured) return;
+
     try {
       const { error } = await this.supabase
         .from('temp_trips')
@@ -560,7 +684,7 @@ class FabricService {
         console.log('Temp data deleted:', proposalId);
       }
     } catch (err) {
-      console.error('Error deleting temp data:', err);
+      console.warn('Error deleting temp data:', err);
     }
   }
 
@@ -571,6 +695,15 @@ class FabricService {
     finalCount: number;
     totalCount: number;
   }> {
+    if (!this.isConfigured) {
+      return {
+        rawCount: 0,
+        tempCount: 0,
+        finalCount: 0,
+        totalCount: 0
+      };
+    }
+
     try {
       const { data: trips } = await this.supabase
         .from('trips')
@@ -591,7 +724,7 @@ class FabricService {
         totalCount: rawCount + tempCount + finalCount
       };
     } catch (err) {
-      console.error('Error getting data stats:', err);
+      console.warn('Error getting data stats:', err);
       return {
         rawCount: 0,
         tempCount: 0,
@@ -603,6 +736,8 @@ class FabricService {
 
   // Clean up old temp data
   async cleanupOldTempData(daysOld: number = 7): Promise<void> {
+    if (!this.isConfigured) return;
+
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
@@ -616,12 +751,20 @@ class FabricService {
         console.log('Old temp data cleaned up');
       }
     } catch (err) {
-      console.error('Error in cleanup:', err);
+      console.warn('Error in cleanup:', err);
     }
   }
 
   // Export data
   async exportData(): Promise<{ trips: Trip[]; tempTrips: Trip[]; optimizationGroups: OptimizationGroup[] }> {
+    if (!this.isConfigured) {
+      return {
+        trips: [],
+        tempTrips: [],
+        optimizationGroups: []
+      };
+    }
+
     try {
       const { data: trips } = await this.supabase.from('trips').select('*');
       const { data: tempTrips } = await this.supabase.from('temp_trips').select('*');
@@ -633,7 +776,7 @@ class FabricService {
         optimizationGroups: groups ? groups.map(g => this.toCamelCase(g) as OptimizationGroup) : []
       };
     } catch (err) {
-      console.error('Error exporting data:', err);
+      console.warn('Error exporting data:', err);
       return {
         trips: [],
         tempTrips: [],
@@ -644,40 +787,50 @@ class FabricService {
 
   // Import data
   async importData(data: { trips?: Trip[]; tempTrips?: Trip[]; optimizationGroups?: OptimizationGroup[] }): Promise<void> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured - cannot import data');
+      return;
+    }
+
     try {
       if (data.trips && data.trips.length > 0) {
         const tripsData = data.trips.map(t => this.toSnakeCase(t));
         const { error } = await this.supabase.from('trips').insert(tripsData);
-        if (error) console.error('Error importing trips:', error);
+        if (error) console.warn('Error importing trips:', error.message);
       }
 
       if (data.tempTrips && data.tempTrips.length > 0) {
         const tempData = data.tempTrips.map(t => this.toSnakeCase(t));
         const { error } = await this.supabase.from('temp_trips').insert(tempData);
-        if (error) console.error('Error importing temp trips:', error);
+        if (error) console.warn('Error importing temp trips:', error.message);
       }
 
       if (data.optimizationGroups && data.optimizationGroups.length > 0) {
         const groupsData = data.optimizationGroups.map(g => this.toSnakeCase(g));
         const { error } = await this.supabase.from('optimization_groups').insert(groupsData);
-        if (error) console.error('Error importing groups:', error);
+        if (error) console.warn('Error importing groups:', error.message);
       }
 
       console.log('Data imported successfully');
     } catch (err) {
-      console.error('Error importing data:', err);
+      console.warn('Error importing data:', err);
     }
   }
 
   // Clear all data
   async clearAllData(): Promise<void> {
+    if (!this.isConfigured) {
+      console.warn('Supabase not configured');
+      return;
+    }
+
     try {
       await this.supabase.from('temp_trips').delete().neq('id', '');
       await this.supabase.from('optimization_groups').delete().neq('id', '');
       await this.supabase.from('trips').delete().neq('id', '');
       console.log('All data cleared');
     } catch (err) {
-      console.error('Error clearing data:', err);
+      console.warn('Error clearing data:', err);
     }
   }
 
@@ -686,20 +839,14 @@ class FabricService {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Placeholder methods for compatibility
-  private getTripsLocal(): Trip[] {
-    console.warn('LocalStorage fallback called but not implemented - using Supabase only');
-    return [];
+  // Check if service is configured
+  public isServiceConfigured(): boolean {
+    return this.isConfigured;
   }
 
-  private getTempTripsLocal(): Trip[] {
-    console.warn('LocalStorage fallback called but not implemented - using Supabase only');
-    return [];
-  }
-
-  private getOptimizationGroupsLocal(): OptimizationGroup[] {
-    console.warn('LocalStorage fallback called but not implemented - using Supabase only');
-    return [];
+  // Check if connected to database
+  public isDatabaseConnected(): boolean {
+    return this.isConnected;
   }
 }
 

@@ -125,10 +125,10 @@ export default function Page() {
 
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { name: "HCM Office", addr: "76 Le Lai Street, Ben Thanh Ward, District 1, HCMC" },
-                { name: "Phan Thiet Factory", addr: "Phan Thiet Industrial Zone Phase 1, Binh Thuan Province" },
-                { name: "Long An Factory", addr: "Loi Binh Nhon Industrial Cluster, Tan An City, Long An Province" },
-                { name: "Tay Ninh Factory", addr: "Kinh Te Hamlet, Binh Minh Commune, Tay Ninh City" },
+                { name: "Ho Chi Minh Office", addr: "No. 76, Le Lai Street, Ben Thanh Ward, Ho Chi Minh City" },
+                { name: "Phan Thiet Factory", addr: "Lots 1/9, 11, 13 and Lot 1/6, Phan Thiet Industrial Park – Phase 1, Binh Thuan Ward, Lam Dong Province" },
+                { name: "Long An Factory", addr: "Lot H.2, along Road No. 6, Loi Binh Nhon Industrial Cluster, Khanh Hau Ward, Tay Ninh Province" },
+                { name: "Tay Ninh Factory", addr: "Kinh Te Hamlet, Binh Minh Ward, Tay Ninh Province" },
               ].map((loc) => (
                 <div
                   key={loc.name}
