@@ -2,7 +2,7 @@
 // Tránh conflict bằng cách import rồi export lại cụ thể
 
 import * as configModule from './config';
-import * as fabricServiceModule from './supabase-service';
+import * as fabricServiceModule from './mysql-service';
 import * as authServiceModule from './auth-service';
 import * as aiOptimizerModule from './ai-optimizer';
 import * as emailServiceModule from './email-service';
@@ -15,11 +15,6 @@ export * from './ai-optimizer';
 export * from './email-service';
 export * from './utils';
 
-// Export supabase-service riêng biệt để tránh conflict với calculateDistance
-export {
-  fabricService,
-  // Các export khác từ supabase-service ngoại trừ calculateDistance
-} from './supabase-service';
 
 // Export named exports
 export { config } from './config';
@@ -29,4 +24,11 @@ export { emailService } from './email-service';
 
 // Nếu cần sử dụng calculateDistance, chỉ định rõ từ module nào
 export { calculateDistance as configCalculateDistance } from './config';
-export { calculateDistance as fabricCalculateDistance } from './supabase-service';
+export { calculateDistance as fabricCalculateDistance } from './mysql-service';
+
+export { fabricService, calculateDistance } from './mysql-service';
+export type { Trip, OptimizationGroup } from './mysql-service';
+export type { User } from './auth-service';
+export { dataSeeder } from './data-seeder';
+export { joinRequestService } from './join-request-service';
+export type { JoinRequest } from './join-request-service';

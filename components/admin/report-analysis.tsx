@@ -25,7 +25,7 @@ import {
   ChevronRight,
   Clock
 } from "lucide-react"
-import { fabricService } from "@/lib/supabase-service"
+import { fabricService } from "@/lib/mysql-service"
 import { config, formatCurrency, getLocationName } from "@/lib/config"
 import { useToast } from "@/components/ui/use-toast"
 import {

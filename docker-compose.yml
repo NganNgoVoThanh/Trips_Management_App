@@ -1,43 +1,72 @@
 version: '3.8'
 
 services:
-  trips-app:
+  mysql:
+    image: mysql:8.0
+    container_name: trips_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${DB_NAME:-trips_management}
+      MYSQL_USER: ${DB_USER:-trips_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-trips_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - trips_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: trips_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${DB_USER:-trips_user}
+      PMA_PASSWORD: ${DB_PASSWORD:-trips_password}
+    ports:
+      - "8080:80"
+    networks:
+      - trips_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_FABRIC_API_URL=${NEXT_PUBLIC_FABRIC_API_URL}
-        - NEXT_PUBLIC_FABRIC_WORKSPACE=${NEXT_PUBLIC_FABRIC_WORKSPACE}
-        - NEXT_PUBLIC_FABRIC_LAKEHOUSE=${NEXT_PUBLIC_FABRIC_LAKEHOUSE}
-        - NEXT_PUBLIC_OPENAI_API_KEY=${NEXT_PUBLIC_OPENAI_API_KEY}
-        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-        - NEXT_PUBLIC_COMPANY_DOMAIN=${NEXT_PUBLIC_COMPANY_DOMAIN}
+    container_name: trips_app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-trips_user}
+      DB_PASSWORD: ${DB_PASSWORD:-trips_password}
+      DB_NAME: ${DB_NAME:-trips_management}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - FABRIC_ACCESS_TOKEN=${FABRIC_ACCESS_TOKEN}
-      - EMAIL_API_KEY=${EMAIL_API_KEY}
-      - SSO_CLIENT_ID=${SSO_CLIENT_ID}
-      - SSO_CLIENT_SECRET=${SSO_CLIENT_SECRET}
-      - SSO_TENANT_ID=${SSO_TENANT_ID}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Optional: Nginx reverse proxy
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - trips_network
     depends_on:
-      - trips-app
-    restart: unless-stopped
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./public:/app/public
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  trips_network:
+    driver: bridge

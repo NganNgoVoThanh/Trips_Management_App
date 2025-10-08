@@ -1,6 +1,6 @@
 // app/api/trips/optimize/reject/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 import { authService } from '@/lib/auth-service';
 
 // Reject optimization and delete TEMP data only

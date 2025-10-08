@@ -27,7 +27,7 @@ import {
   Eye,
   Mail
 } from "lucide-react"
-import { fabricService, Trip } from "@/lib/supabase-service"
+import { fabricService, Trip } from "@/lib/mysql-service"
 import { formatCurrency, getLocationName, config } from "@/lib/config"
 import {
   Select,

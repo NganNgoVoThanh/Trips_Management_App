@@ -1,6 +1,6 @@
 // app/api/trips/data-stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 // Get data statistics (RAW, TEMP, FINAL counts)
 export async function GET(request: NextRequest) {

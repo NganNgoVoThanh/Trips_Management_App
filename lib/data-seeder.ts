@@ -1,5 +1,5 @@
 // lib/data-seeder.ts
-import { fabricService, Trip } from './supabase-service';
+import { fabricService, Trip } from './mysql-service';
 import { config } from './config';
 
 export class DataSeeder {
@@ -12,7 +12,7 @@ export class DataSeeder {
       console.log('✅ Tables initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize tables:', error);
-      console.log('Using local storage fallback');
+      throw error;
     }
   }
 
@@ -113,14 +113,15 @@ export class DataSeeder {
     console.log(`Created ${createdTrips.length} demo trips`);
     return createdTrips;
   }
+  
   // ✅ Backward-compat shims cho route.ts cũ
   async seedTrips(): Promise<void> {
-  // Dự án của bạn đang dùng createDemoData để tạo trip demo
+    // Dự án của bạn đang dùng createDemoData để tạo trip demo
     await this.createDemoData();
   }
 
   async seedOptimizationProposals(): Promise<void> {
-  // Nếu fabricService có hàm tạo nhóm/proposal thì gọi, nếu không thì no-op
+    // Nếu fabricService có hàm tạo nhóm/proposal thì gọi, nếu không thì no-op
     const fsAny = fabricService as any;
 
     if (typeof fsAny.createOptimizationGroupsFromTrips === 'function') {
@@ -154,12 +155,7 @@ export class DataSeeder {
     console.log('⚠️ Clearing all data...');
     
     try {
-      const trips = await fabricService.getTrips();
-      
-      for (const trip of trips) {
-        await fabricService.deleteTrip(trip.id);
-      }
-      
+      await fabricService.clearAllData();
       console.log('✅ All data cleared');
     } catch (error) {
       console.error('❌ Failed to clear data:', error);

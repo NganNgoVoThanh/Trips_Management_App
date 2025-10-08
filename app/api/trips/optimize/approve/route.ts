@@ -1,6 +1,6 @@
 // app/api/trips/optimize/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 import { emailService } from '@/lib/email-service';
 import { authService } from '@/lib/auth-service';
 

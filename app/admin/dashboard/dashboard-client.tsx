@@ -9,7 +9,7 @@ import { TripOptimization } from "@/components/admin/trip-optimization"
 import { TripManagement } from "@/components/admin/trip-management"
 import { JoinRequestsManagement } from "@/components/admin/join-requests-management"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/supabase-service"
+import { fabricService, Trip } from "@/lib/mysql-service"
 import { joinRequestService } from "@/lib/join-request-service"
 import { aiOptimizer } from "@/lib/ai-optimizer"
 import { emailService } from "@/lib/email-service"
@@ -167,7 +167,7 @@ export function AdminDashboardClient() {
         type: 'approval',
         user: t.userName,
         email: t.userEmail,
-        route: `${getLocationName(t.departureLocation)} → ${getLocationName(t.destination)}`,
+        route: `${getLocationName(t.departureLocation)} â†’ ${getLocationName(t.destination)}`,
         date: t.departureDate,
         time: t.departureTime,
         estimatedCost: t.estimatedCost,
@@ -185,7 +185,7 @@ export function AdminDashboardClient() {
         trips: allTrips.filter(trip => trip.optimizedGroupId === t.optimizedGroupId).length,
         savings: (t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0),
         date: new Date(t.updatedAt).toLocaleDateString(),
-        route: `${getLocationName(t.departureLocation)} → ${getLocationName(t.destination)}`
+        route: `${getLocationName(t.departureLocation)} â†’ ${getLocationName(t.destination)}`
       })))
       
     } catch (error) {
@@ -317,7 +317,7 @@ export function AdminDashboardClient() {
           id: jr.id,
           requesterName: jr.requesterName,
           requesterEmail: jr.requesterEmail,
-          tripRoute: `${getLocationName(jr.tripDetails.departureLocation)} → ${getLocationName(jr.tripDetails.destination)}`,
+          tripRoute: `${getLocationName(jr.tripDetails.departureLocation)} â†’ ${getLocationName(jr.tripDetails.destination)}`,
           requestDate: new Date(jr.createdAt).toLocaleDateString(),
           status: jr.status,
           reason: jr.reason || 'N/A'
@@ -789,7 +789,7 @@ export function AdminDashboardClient() {
                       className="text-red-600 mt-2"
                       onClick={handleRunOptimization}
                     >
-                      Run optimization now →
+                      Run optimization now â†’
                     </Button>
                   </div>
                 )}

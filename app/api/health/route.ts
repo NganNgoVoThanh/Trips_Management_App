@@ -1,6 +1,6 @@
 // app/api/health/route.ts
 import { NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 export async function GET() {
   try {

@@ -1,6 +1,6 @@
 // app/api/trips/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 export async function PATCH(
   request: NextRequest,
