@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { emailService } from '@/lib/email-service';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dataSeeder } from '@/lib/data-seeder';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 export async function GET(request: NextRequest) {
   try {

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { AlertCircle, Calendar, Clock, MapPin, Car, Users, Loader2 } from "lucide-react"
-import { fabricService, Trip } from "@/lib/supabase-service"
+import { fabricService, Trip } from "@/lib/mysql-service"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
 import { emailService } from "@/lib/email-service"

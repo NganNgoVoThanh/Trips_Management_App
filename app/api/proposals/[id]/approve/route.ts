@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as fabricService from '@/lib/supabase-service';
+import * as fabricService from '@/lib/mysql-service';
 import { emailService } from '@/lib/email-service';
 import { authService } from '@/lib/auth-service';
 

@@ -1,6 +1,6 @@
 // app/api/trips/[id]/data-type/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/supabase-service';
+import { fabricService } from '@/lib/mysql-service';
 
 // Get trip with data type info
 

@@ -14,6 +14,39 @@ const nextConfig = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     NEXT_PUBLIC_COMPANY_DOMAIN: process.env.NEXT_PUBLIC_COMPANY_DOMAIN || '@intersnack.com.vn',
   },
+  webpack: (config, { isServer }) => {
+    // Exclude Node.js modules from client bundle
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        tls: false,
+        fs: false,
+        dns: false,
+        crypto: false,
+        stream: false,
+        path: false,
+        os: false,
+        http: false,
+        https: false,
+        zlib: false,
+        querystring: false,
+        util: false,
+        url: false,
+        buffer: false,
+        events: false,
+        timers: false,
+      };
+
+      // Exclude mysql2 and other server-only packages from client bundle
+      config.externals = [...(config.externals || []), 'mysql2', 'mysql2/promise'];
+    }
+
+    return config;
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['mysql2'],
+  },
   async headers() {
     return [
       {
@@ -44,7 +77,7 @@ const nextConfig = {
       {
         source: '/admin',
         destination: '/admin/dashboard',
-        permanent: false, // Changed to false to prevent caching issues
+        permanent: false,
       },
     ]
   },

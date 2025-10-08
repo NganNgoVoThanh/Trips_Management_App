@@ -16,7 +16,7 @@ import {
   Loader2,
   TrendingDown
 } from "lucide-react"
-import { fabricService, Trip, calculateDistance } from "@/lib/supabase-service"
+import { fabricService, Trip, calculateDistance } from "@/lib/mysql-service"
 import { aiOptimizer, OptimizationProposal } from "@/lib/ai-optimizer"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
