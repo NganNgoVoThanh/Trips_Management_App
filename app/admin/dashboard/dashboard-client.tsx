@@ -545,20 +545,23 @@ export function AdminDashboardClient() {
         {/* Key Metrics - 2 rows with Join Requests */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Stats cards */}
-          <Card className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
-              <Car className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTrips}</div>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
-                <span className="text-green-600">+12%</span>
-                <span className="ml-1">from last month</span>
-              </div>
-            </CardContent>
-          </Card>
+<Card 
+  className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/total-trips')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
+    <Car className="h-4 w-4 text-red-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">{stats.totalTrips}</div>
+    <div className="flex items-center text-xs text-muted-foreground">
+      <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
+      <span className="text-green-600">+12%</span>
+      <span className="ml-1">from last month</span>
+    </div>
+  </CardContent>
+</Card>
 
           <Card className="border-l-4 border-l-yellow-600 hover:shadow-md transition-shadow cursor-pointer" onClick={handleViewAllPending}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -586,68 +589,83 @@ export function AdminDashboardClient() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-green-600 hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Savings</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(stats.totalSavings)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Year to date savings
-              </p>
-            </CardContent>
-          </Card>
+<Card 
+  className="border-l-4 border-l-green-600 hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/total-savings')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Total Savings</CardTitle>
+    <DollarSign className="h-4 w-4 text-green-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold text-green-600">
+      {formatCurrency(stats.totalSavings)}
+    </div>
+    <p className="text-xs text-muted-foreground">
+      Year to date savings
+    </p>
+  </CardContent>
+</Card>
 
-          <Card className="border-l-4 border-l-blue-600 hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Optimization Rate</CardTitle>
-              <Target className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.optimizationRate.toFixed(0)}%</div>
-              <Progress value={stats.optimizationRate} className="mt-2 h-2" />
-            </CardContent>
-          </Card>
+<Card 
+  className="border-l-4 border-l-blue-600 hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/optimization-rate')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Optimization Rate</CardTitle>
+    <Target className="h-4 w-4 text-blue-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">{stats.optimizationRate.toFixed(0)}%</div>
+    <Progress value={stats.optimizationRate} className="mt-2 h-2" />
+  </CardContent>
+</Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
-              <Users className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeEmployees}</div>
-              <p className="text-xs text-muted-foreground">
-                Using the system
-              </p>
-            </CardContent>
-          </Card>
+<Card 
+  className="hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/active-employees')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
+    <Users className="h-4 w-4 text-purple-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">{stats.activeEmployees}</div>
+    <p className="text-xs text-muted-foreground">
+      Using the system
+    </p>
+  </CardContent>
+</Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <Calendar className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.monthlyTrips}</div>
-              <p className="text-xs text-muted-foreground">
-                Trips scheduled
-              </p>
-            </CardContent>
-          </Card>
+<Card 
+  className="hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/this-month')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">This Month</CardTitle>
+    <Calendar className="h-4 w-4 text-orange-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">{stats.monthlyTrips}</div>
+    <p className="text-xs text-muted-foreground">
+      Trips scheduled
+    </p>
+  </CardContent>
+</Card>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Vehicle Utilization</CardTitle>
-              <Car className="h-4 w-4 text-teal-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.vehicleUtilization.toFixed(0)}%</div>
-              <Progress value={stats.vehicleUtilization} className="mt-2 h-2" />
-            </CardContent>
-          </Card>
+<Card 
+  className="hover:shadow-md transition-shadow cursor-pointer"
+  onClick={() => router.push('/admin/statistics/vehicle-utilization')}
+>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">Vehicle Utilization</CardTitle>
+    <Car className="h-4 w-4 text-teal-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold">{stats.vehicleUtilization.toFixed(0)}%</div>
+    <Progress value={stats.vehicleUtilization} className="mt-2 h-2" />
+  </CardContent>
+</Card>
         </div>
 
         {/* Alerts */}
