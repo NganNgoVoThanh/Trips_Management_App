@@ -1,7 +1,8 @@
+// components/dashboard/header.tsx
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,9 +18,11 @@ import { Car, Calendar, LogOut, User, BarChart3 } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { useEffect, useState } from "react"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 
 export function DashboardHeader() {
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
 
@@ -42,6 +45,11 @@ export function DashboardHeader() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
+  // Check if route is active
+  const isActive = (path: string) => {
+    return pathname === path || pathname?.startsWith(path)
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
       <div className="container flex h-16 items-center justify-between">
@@ -58,9 +66,18 @@ export function DashboardHeader() {
           </Link>
           
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-2">
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-gray-700 hover:text-red-600">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "transition-all",
+                  isActive('/dashboard') && !pathname?.startsWith('/management')
+                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                )}
+              >
                 <Calendar className="mr-2 h-4 w-4" />
                 Trips
               </Button>
@@ -69,7 +86,16 @@ export function DashboardHeader() {
             {/* Management link - only for admin */}
             {user?.role === 'admin' && (
               <Link href="/management">
-                <Button variant="ghost" size="sm" className="text-gray-700 hover:text-red-600">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={cn(
+                    "transition-all",
+                    isActive('/management')
+                      ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                      : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                  )}
+                >
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Management
                 </Button>
