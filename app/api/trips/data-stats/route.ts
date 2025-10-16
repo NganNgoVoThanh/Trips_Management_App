@@ -1,54 +1,41 @@
-// app/api/trips/data-stats/route.ts
+// app/api/trips/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
+import { authService } from '@/lib/auth-service';
 
-// Get data statistics (RAW, TEMP, FINAL counts)
 export async function GET(request: NextRequest) {
   try {
-    // Get all trips including temp
-    const allTrips = await fabricService.getTrips({ includeTemp: true });
+    const searchParams = request.nextUrl.searchParams;
+    const userId = searchParams.get('userId');
+    const status = searchParams.get('status');
     
-    // Count by data type
-    const stats = {
-      raw: allTrips.filter(t => t.dataType === 'raw' || (!t.dataType && t.status === 'pending')).length,
-      temp: allTrips.filter(t => t.dataType === 'temp').length,
-      final: allTrips.filter(t => t.dataType === 'final' || t.status === 'optimized').length,
-      total: allTrips.length,
-      breakdown: {
-        pending: allTrips.filter(t => t.status === 'pending').length,
-        confirmed: allTrips.filter(t => t.status === 'confirmed').length,
-        optimized: allTrips.filter(t => t.status === 'optimized').length,
-        cancelled: allTrips.filter(t => t.status === 'cancelled').length,
-        draft: allTrips.filter(t => t.status === 'draft').length
-      }
+    const filters = {
+      ...(userId && { userId }),
+      ...(status && { status })
     };
     
-    // Get optimization groups stats
-    const proposedGroups = await fabricService.getOptimizationGroups('proposed');
-    const approvedGroups = await fabricService.getOptimizationGroups('approved');
-    const rejectedGroups = await fabricService.getOptimizationGroups('rejected');
-    
-    return NextResponse.json({
-      dataTypes: stats,
-      optimizationGroups: {
-        proposed: proposedGroups.length,
-        approved: approvedGroups.length,
-        rejected: rejectedGroups.length,
-        total: proposedGroups.length + approvedGroups.length + rejectedGroups.length
-      },
-      storageOptimization: {
-        withoutOptimization: stats.raw + stats.final, // If we kept both
-        withOptimization: stats.final, // We only keep final
-        savedRecords: stats.raw, // RAW records that were replaced
-        tempRecords: stats.temp, // Temporary records (will be deleted)
-        savingsPercentage: stats.raw > 0 ? ((stats.raw / (stats.raw + stats.final)) * 100).toFixed(1) : 0
-      }
-    });
-    
+    const trips = await fabricService.getTrips(filters);
+    return NextResponse.json(trips);
   } catch (error: any) {
-    console.error('Error getting data statistics:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get data statistics' },
+      { error: error.message || 'Failed to fetch trips' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const tripData = await request.json();
+    
+    // Validate user is authenticated
+    // In production, check session/token
+    
+    const trip = await fabricService.createTrip(tripData);
+    return NextResponse.json(trip);
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || 'Failed to create trip' },
       { status: 500 }
     );
   }

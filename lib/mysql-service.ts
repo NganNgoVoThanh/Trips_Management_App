@@ -29,8 +29,8 @@ const getPool = async () => {
     keepAliveInitialDelay: 0
   });
   
-  console.log('✅ MySQL Connection Pool initialized');
-  console.log(`📊 Database: ${process.env.DB_NAME || 'trips_management'}`);
+  console.log('âœ… MySQL Connection Pool initialized');
+  console.log(`ðŸ“Š Database: ${process.env.DB_NAME || 'trips_management'}`);
   
   return pool;
 };
@@ -91,13 +91,95 @@ class MySQLService {
       const connection = await poolInstance.getConnection();
       await connection.ping();
       connection.release();
-      console.log('✅ MySQL connection verified');
+      console.log('âœ… MySQL connection verified');
       this.isConnected = true;
     } catch (err: any) {
-      console.warn('⚠️ MySQL connection check failed:', err.message);
+      console.warn('âš ï¸ MySQL connection check failed:', err.message);
       this.isConnected = false;
     } finally {
       this.hasCheckedConnection = true;
+    }
+  }
+  // âœ… THÃŠM helper function nÃ y
+  private toMySQLDateTime(isoString: string): string {
+    if (!isoString) return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    try {
+      const date = new Date(isoString);
+      // Convert to MySQL format: YYYY-MM-DD HH:MM:SS
+      return date.toISOString().slice(0, 19).replace('T', ' ');
+    } catch (error) {
+      console.error('Invalid datetime:', isoString);
+      return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    }
+  }
+
+  // Helper: Convert camelCase to snake_case for DB
+  private toSnakeCase(data: any): any {
+    if (!data) return data;
+    if (Array.isArray(data)) return data.map(item => this.toSnakeCase(item));
+    
+    const converted: any = {};
+    Object.keys(data).forEach(key => {
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      
+      // âœ… THÃŠM: Convert datetime fields
+      if ((snakeKey === 'created_at' || snakeKey === 'updated_at' || 
+           snakeKey === 'approved_at' || snakeKey === 'processed_at') && 
+          typeof data[key] === 'string') {
+        converted[snakeKey] = this.toMySQLDateTime(data[key]);
+      } else {
+        converted[snakeKey] = data[key];
+      }
+    });
+    return converted;
+  }
+
+  // âœ… Sá»¬A createTrip - Ä‘áº£m báº£o datetime Ä‘Ãºng format
+  async createTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
+    const now = new Date();
+    const mysqlNow = now.toISOString().slice(0, 19).replace('T', ' ');
+    
+    const newTrip: Trip = {
+      ...trip,
+      id: this.generateId(),
+      createdAt: now.toISOString(), // Keep ISO for return value
+      updatedAt: now.toISOString(),
+      dataType: trip.dataType || 'raw',
+      status: trip.status || 'pending',
+      notified: trip.notified ?? false
+    };
+
+    if (!this.ensureServerSide('createTrip')) return newTrip;
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      
+      // Convert to snake_case and ensure MySQL datetime format
+      const snakeData = this.toSnakeCase(newTrip);
+      
+      // âœ… QUAN TRá»ŒNG: Override datetime fields vá»›i MySQL format
+      snakeData.created_at = mysqlNow;
+      snakeData.updated_at = mysqlNow;
+      
+      console.log('ðŸ“ Creating trip with data:', {
+        id: snakeData.id,
+        created_at: snakeData.created_at,
+        updated_at: snakeData.updated_at
+      });
+      
+      await connection.query(
+        `INSERT INTO trips SET ?`,
+        [snakeData]
+      );
+      
+      connection.release();
+      console.log('âœ… Trip created in MySQL:', newTrip.id);
+      return newTrip;
+    } catch (err: any) {
+      console.error('âŒ MySQL error creating trip:', err.message);
+      throw new Error(`Failed to create trip: ${err.message}`);
     }
   }
 
@@ -114,23 +196,10 @@ class MySQLService {
     return converted;
   }
 
-  // Helper: Convert camelCase to snake_case for DB
-  private toSnakeCase(data: any): any {
-    if (!data) return data;
-    if (Array.isArray(data)) return data.map(item => this.toSnakeCase(item));
-    
-    const converted: any = {};
-    Object.keys(data).forEach(key => {
-      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-      converted[snakeKey] = data[key];
-    });
-    return converted;
-  }
-
   // Server-side check wrapper
   private ensureServerSide(methodName: string) {
     if (!isServer) {
-      console.warn(`❌ ${methodName} called on client side - skipping`);
+      console.warn(`âŒ ${methodName} called on client side - skipping`);
       return false;
     }
     return true;
@@ -248,45 +317,14 @@ class MySQLService {
       `);
 
       connection.release();
-      console.log('✅ MySQL tables initialized successfully');
+      console.log('âœ… MySQL tables initialized successfully');
     } catch (error: any) {
-      console.error('❌ Failed to initialize tables:', error.message);
+      console.error('âŒ Failed to initialize tables:', error.message);
       throw error;
     }
   }
 
-  // Create a new trip
-  async createTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
-    const newTrip: Trip = {
-      ...trip,
-      id: this.generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      dataType: trip.dataType || 'raw',
-      status: trip.status || 'pending',
-      notified: trip.notified ?? false
-    };
 
-    if (!this.ensureServerSide('createTrip')) return newTrip;
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      const snakeData = this.toSnakeCase(newTrip);
-      
-      await connection.query(
-        `INSERT INTO trips SET ?`,
-        [snakeData]
-      );
-      
-      connection.release();
-      console.log('✅ Trip created in MySQL:', newTrip.id);
-      return newTrip;
-    } catch (err: any) {
-      console.error('❌ MySQL error creating trip:', err.message);
-      return newTrip;
-    }
-  }
 
   // Get all trips
   async getTrips(filters?: { userId?: string; status?: string; includeTemp?: boolean }): Promise<Trip[]> {
@@ -334,7 +372,7 @@ class MySQLService {
       connection.release();
       return allTrips;
     } catch (err: any) {
-      console.warn('⚠️ Error in getTrips:', err.message);
+      console.warn('âš ï¸ Error in getTrips:', err.message);
       return [];
     }
   }
@@ -386,10 +424,10 @@ class MySQLService {
       }
 
       connection.release();
-      console.log(`✅ Created ${tempTrips.length} TEMP trips in MySQL`);
+      console.log(`âœ… Created ${tempTrips.length} TEMP trips in MySQL`);
       return tempTrips;
     } catch (err: any) {
-      console.warn('⚠️ Error creating temp trips:', err.message);
+      console.warn('âš ï¸ Error creating temp trips:', err.message);
       return [];
     }
   }
@@ -450,9 +488,9 @@ class MySQLService {
       );
 
       connection.release();
-      console.log(`✅ Optimization ${groupId} approved`);
+      console.log(`âœ… Optimization ${groupId} approved`);
     } catch (err: any) {
-      console.warn('⚠️ Error approving optimization:', err.message);
+      console.warn('âš ï¸ Error approving optimization:', err.message);
     }
   }
 
@@ -492,9 +530,9 @@ class MySQLService {
       }
 
       connection.release();
-      console.log(`✅ Optimization ${groupId} rejected`);
+      console.log(`âœ… Optimization ${groupId} rejected`);
     } catch (err: any) {
-      console.warn('⚠️ Error rejecting optimization:', err.message);
+      console.warn('âš ï¸ Error rejecting optimization:', err.message);
     }
   }
 
@@ -513,7 +551,7 @@ class MySQLService {
       
       return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
     } catch (err) {
-      console.warn('⚠️ Error fetching temp trips:', err);
+      console.warn('âš ï¸ Error fetching temp trips:', err);
       return [];
     }
   }
@@ -549,7 +587,7 @@ class MySQLService {
 
       return null;
     } catch (err) {
-      console.warn('⚠️ Error fetching trip by ID:', err);
+      console.warn('âš ï¸ Error fetching trip by ID:', err);
       return null;
     }
   }
@@ -590,10 +628,10 @@ class MySQLService {
       );
       
       connection.release();
-      console.log('✅ Trip updated:', id);
+      console.log('âœ… Trip updated:', id);
       return updatedTrip;
     } catch (err: any) {
-      console.warn('⚠️ Error updating trip:', err.message);
+      console.warn('âš ï¸ Error updating trip:', err.message);
       return updatedTrip;
     }
   }
@@ -607,9 +645,9 @@ class MySQLService {
       const connection = await poolInstance.getConnection();
       await connection.query('DELETE FROM trips WHERE id = ?', [id]);
       connection.release();
-      console.log('✅ Trip deleted:', id);
+      console.log('âœ… Trip deleted:', id);
     } catch (err: any) {
-      console.warn('⚠️ Error deleting trip:', err.message);
+      console.warn('âš ï¸ Error deleting trip:', err.message);
     }
   }
 
@@ -645,10 +683,10 @@ class MySQLService {
       );
       
       connection.release();
-      console.log('✅ Optimization group created:', newGroup.id);
+      console.log('âœ… Optimization group created:', newGroup.id);
       return newGroup;
     } catch (err: any) {
-      console.warn('⚠️ Error creating optimization group:', err.message);
+      console.warn('âš ï¸ Error creating optimization group:', err.message);
       return newGroup;
     }
   }
@@ -685,7 +723,7 @@ class MySQLService {
       
       return [];
     } catch (err) {
-      console.warn('⚠️ Error fetching optimization groups:', err);
+      console.warn('âš ï¸ Error fetching optimization groups:', err);
       return [];
     }
   }
@@ -713,7 +751,7 @@ class MySQLService {
 
       return null;
     } catch (err) {
-      console.warn('⚠️ Error fetching optimization group:', err);
+      console.warn('âš ï¸ Error fetching optimization group:', err);
       return null;
     }
   }
@@ -766,10 +804,10 @@ class MySQLService {
       }
       
       connection.release();
-      console.log('✅ Optimization group updated:', id);
+      console.log('âœ… Optimization group updated:', id);
       return updatedGroup;
     } catch (err: any) {
-      console.warn('⚠️ Error updating optimization group:', err.message);
+      console.warn('âš ï¸ Error updating optimization group:', err.message);
       return updatedGroup;
     }
   }
@@ -786,9 +824,9 @@ class MySQLService {
         [proposalId]
       );
       connection.release();
-      console.log('✅ Optimization group deleted:', proposalId);
+      console.log('âœ… Optimization group deleted:', proposalId);
     } catch (err) {
-      console.warn('⚠️ Error deleting optimization group:', err);
+      console.warn('âš ï¸ Error deleting optimization group:', err);
     }
   }
 
@@ -804,9 +842,9 @@ class MySQLService {
         [proposalId]
       );
       connection.release();
-      console.log('✅ Temp data deleted:', proposalId);
+      console.log('âœ… Temp data deleted:', proposalId);
     } catch (err) {
-      console.warn('⚠️ Error deleting temp data:', err);
+      console.warn('âš ï¸ Error deleting temp data:', err);
     }
   }
 
@@ -858,7 +896,7 @@ class MySQLService {
         totalCount: rawCount + tempCount + finalCount
       };
     } catch (err) {
-      console.warn('⚠️ Error getting data stats:', err);
+      console.warn('âš ï¸ Error getting data stats:', err);
       return {
         rawCount: 0,
         tempCount: 0,
@@ -884,9 +922,9 @@ class MySQLService {
       );
 
       connection.release();
-      console.log('✅ Old temp data cleaned up');
+      console.log('âœ… Old temp data cleaned up');
     } catch (err) {
-      console.warn('⚠️ Error in cleanup:', err);
+      console.warn('âš ï¸ Error in cleanup:', err);
     }
   }
 
@@ -922,7 +960,7 @@ class MySQLService {
         }) : []
       };
     } catch (err) {
-      console.warn('⚠️ Error exporting data:', err);
+      console.warn('âš ï¸ Error exporting data:', err);
       return {
         trips: [],
         tempTrips: [],
@@ -976,9 +1014,9 @@ class MySQLService {
       }
 
       connection.release();
-      console.log('✅ Data imported successfully');
+      console.log('âœ… Data imported successfully');
     } catch (err) {
-      console.warn('⚠️ Error importing data:', err);
+      console.warn('âš ï¸ Error importing data:', err);
     }
   }
 
@@ -994,9 +1032,9 @@ class MySQLService {
       await connection.query('DELETE FROM trips');
       await connection.query('DELETE FROM join_requests');
       connection.release();
-      console.log('✅ All data cleared');
+      console.log('âœ… All data cleared');
     } catch (err) {
-      console.warn('⚠️ Error clearing data:', err);
+      console.warn('âš ï¸ Error clearing data:', err);
     }
   }
 

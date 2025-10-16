@@ -159,18 +159,7 @@ export function AdminHeader() {
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Management Dashboard
               </Link>
-            </DropdownMenuItem>
-            
-            {/* Settings */}
-            <DropdownMenuItem asChild>
-              <Link href="/admin/settings" className="cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                System Settings
-              </Link>
-            </DropdownMenuItem>
-            
-            <DropdownMenuSeparator />
-            
+            </DropdownMenuItem>        
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out

@@ -18,7 +18,7 @@ import {
   TrendingUp,
   BarChart3
 } from "lucide-react"
-import { fabricService, Trip } from "@/lib/mysql-service"
+import { fabricService, Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"

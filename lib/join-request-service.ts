@@ -61,7 +61,7 @@ class JoinRequestService {
   // Server-side check wrapper
   private ensureServerSide(methodName: string): boolean {
     if (!isServer) {
-      console.warn(`❌ ${methodName} called on client side - using localStorage fallback`);
+      console.warn(`âŒ ${methodName} called on client side - using localStorage fallback`);
       return false;
     }
     return true;
@@ -198,9 +198,9 @@ class JoinRequestService {
       );
       
       connection.release();
-      console.log('✅ Join request created in MySQL:', request.id);
+      console.log('âœ… Join request created in MySQL:', request.id);
     } catch (err: any) {
-      console.error('❌ Error saving join request to MySQL:', err.message);
+      console.error('âŒ Error saving join request to MySQL:', err.message);
       // Fallback to localStorage
       await this.saveJoinRequestLocal(request);
     }
@@ -247,7 +247,7 @@ class JoinRequestService {
       
       return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as JoinRequest) : [];
     } catch (err: any) {
-      console.warn('⚠️ Error fetching join requests from MySQL:', err.message);
+      console.warn('âš ï¸ Error fetching join requests from MySQL:', err.message);
       // Fallback to localStorage
       return this.getJoinRequestsLocalFiltered(filters);
     }
@@ -277,9 +277,9 @@ class JoinRequestService {
       );
       
       connection.release();
-      console.log('✅ Join request updated in MySQL:', request.id);
+      console.log('âœ… Join request updated in MySQL:', request.id);
     } catch (err: any) {
-      console.error('❌ Error updating join request in MySQL:', err.message);
+      console.error('âŒ Error updating join request in MySQL:', err.message);
       // Fallback to localStorage
       await this.updateJoinRequestLocal(request);
     }
@@ -294,9 +294,9 @@ class JoinRequestService {
       const connection = await poolInstance.getConnection();
       await connection.query('DELETE FROM join_requests WHERE id = ?', [requestId]);
       connection.release();
-      console.log('✅ Join request deleted from MySQL:', requestId);
+      console.log('âœ… Join request deleted from MySQL:', requestId);
     } catch (err: any) {
-      console.error('❌ Error deleting join request from MySQL:', err.message);
+      console.error('âŒ Error deleting join request from MySQL:', err.message);
     }
   }
 
@@ -548,11 +548,11 @@ class JoinRequestService {
         const connection = await poolInstance.getConnection();
         await connection.query('DELETE FROM join_requests');
         connection.release();
-        console.log('✅ All join requests cleared from MySQL');
+        console.log('âœ… All join requests cleared from MySQL');
       } else {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(this.storageKey);
-          console.log('✅ All join requests cleared from localStorage');
+          console.log('âœ… All join requests cleared from localStorage');
         }
       }
     } catch (error) {

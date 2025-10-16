@@ -20,7 +20,7 @@ import {
   MessageSquare,
   AlertCircle
 } from "lucide-react"
-import { joinRequestService, JoinRequest } from "@/lib/join-request-service"
+import { joinRequestService, JoinRequest } from "@/lib/join-request-client"
 import { config, getLocationName } from "@/lib/config"
 import {
   Dialog,
@@ -333,7 +333,7 @@ export function JoinRequestsManagement() {
                           <div className="text-xs text-gray-400">
                             Requested: {formatDateTime(request.createdAt)}
                             {request.processedAt && (
-                              <span> • Processed: {formatDateTime(request.processedAt)}</span>
+                              <span> â€¢ Processed: {formatDateTime(request.processedAt)}</span>
                             )}
                           </div>
                         </div>

@@ -9,7 +9,7 @@ import { AvailableTrips } from "@/components/dashboard/available-trips"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/mysql-service"
+import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency } from "@/lib/config"
 import { 
   Car, 

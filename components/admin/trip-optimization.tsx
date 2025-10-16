@@ -16,10 +16,10 @@ import {
   Loader2,
   TrendingDown
 } from "lucide-react"
-import { fabricService, Trip, calculateDistance } from "@/lib/mysql-service"
+import { fabricService, Trip } from "@/lib/fabric-client"
+import { calculateDistance, getLocationName, formatCurrency, config } from "@/lib/config"
 import { aiOptimizer, OptimizationProposal } from "@/lib/ai-optimizer"
 import { authService } from "@/lib/auth-service"
-import { config, getLocationName, formatCurrency } from "@/lib/config"
 import { emailService } from "@/lib/email-service"
 
 export function TripOptimization() {
