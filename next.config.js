@@ -11,7 +11,7 @@ const nextConfig = {
     ],
   },
   env: {
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:50001',
     NEXT_PUBLIC_COMPANY_DOMAIN: process.env.NEXT_PUBLIC_COMPANY_DOMAIN || '@intersnack.com.vn',
   },
   webpack: (config, { isServer }) => {
@@ -44,9 +44,8 @@ const nextConfig = {
 
     return config;
   },
-  experimental: {
-    serverComponentsExternalPackages: ['mysql2'],
-  },
+  // ✅ FIXED: Changed from experimental.serverComponentsExternalPackages
+  serverExternalPackages: ['mysql2'],
   async headers() {
     return [
       {

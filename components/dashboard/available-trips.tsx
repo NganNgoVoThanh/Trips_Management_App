@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, MapPin, Users, Search, Filter, Loader2, Send } from "lucide-react"
-import { fabricService, Trip } from "@/lib/mysql-service"
-import { joinRequestService } from "@/lib/join-request-service"
+import { fabricService, Trip } from "@/lib/fabric-client"
+import { joinRequestService } from "@/lib/join-request-client"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency, calculateDistance } from "@/lib/config"
 import { useToast } from "@/components/ui/use-toast"
@@ -391,7 +391,7 @@ export function AvailableTrips() {
                         
                         {trip.status === 'optimized' && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            ✓ This is an optimized group trip with cost savings
+                            âœ“ This is an optimized group trip with cost savings
                           </div>
                         )}
                       </div>

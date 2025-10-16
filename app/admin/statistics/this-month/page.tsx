@@ -7,7 +7,7 @@ import { AdminHeader } from "@/components/admin/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Calendar, TrendingUp, MapPin, Download, Loader2, Clock, DollarSign } from "lucide-react"
-import { fabricService, Trip } from "@/lib/mysql-service"
+import { Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
@@ -55,13 +55,17 @@ export default function ThisMonthPage() {
         return
       }
 
-      const allTrips = await fabricService.getTrips()
+      const response = await fetch('/api/trips')
+      if (!response.ok) {
+        throw new Error('Failed to load trips')
+      }
+      const allTrips = await response.json()
       const now = new Date()
       const currentMonth = now.getMonth()
       const currentYear = now.getFullYear()
       
       // This month's trips
-      const thisMonthTrips = allTrips.filter(t => {
+      const thisMonthTrips = allTrips.filter((t: Trip) => {
         const tripDate = new Date(t.departureDate)
         return tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear
       })
@@ -69,7 +73,7 @@ export default function ThisMonthPage() {
       // Last month's trips
       const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
       const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
-      const lastMonthTrips = allTrips.filter(t => {
+      const lastMonthTrips = allTrips.filter((t: Trip) => {
         const tripDate = new Date(t.departureDate)
         return tripDate.getMonth() === lastMonth && tripDate.getFullYear() === lastMonthYear
       })
@@ -80,14 +84,14 @@ export default function ThisMonthPage() {
         : 0
 
       // Status breakdown
-      const optimized = thisMonthTrips.filter(t => t.status === 'optimized')
-      const pending = thisMonthTrips.filter(t => t.status === 'pending')
-      const confirmed = thisMonthTrips.filter(t => t.status === 'confirmed')
-      const cancelled = thisMonthTrips.filter(t => t.status === 'cancelled')
+      const optimized = thisMonthTrips.filter((t: Trip) => t.status === 'optimized')
+      const pending = thisMonthTrips.filter((t: Trip) => t.status === 'pending')
+      const confirmed = thisMonthTrips.filter((t: Trip) => t.status === 'confirmed')
+      const cancelled = thisMonthTrips.filter((t: Trip) => t.status === 'cancelled')
 
       // Calculate costs
-      const totalCost = thisMonthTrips.reduce((sum, t) => sum + (t.actualCost || t.estimatedCost || 0), 0)
-      const totalSavings = optimized.reduce((sum, trip) => {
+      const totalCost = thisMonthTrips.reduce((sum: number, t: Trip) => sum + (t.actualCost || t.estimatedCost || 0), 0)
+      const totalSavings = optimized.reduce((sum: number, trip: Trip) => {
         if (trip.estimatedCost) {
           const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
           return sum + (trip.estimatedCost - actualCost)
@@ -103,7 +107,7 @@ export default function ThisMonthPage() {
         dailyMap[i] = { day: i, trips: 0, optimized: 0 }
       }
 
-      thisMonthTrips.forEach(trip => {
+      thisMonthTrips.forEach((trip: Trip) => {
         const day = new Date(trip.departureDate).getDate()
         if (dailyMap[day]) {
           dailyMap[day].trips += 1
@@ -118,14 +122,14 @@ export default function ThisMonthPage() {
 
       // Route analysis
       const routeCount: { [key: string]: number } = {}
-      thisMonthTrips.forEach(trip => {
+      thisMonthTrips.forEach((trip: Trip) => {
         const route = `${getLocationName(trip.departureLocation)} → ${getLocationName(trip.destination)}`
         routeCount[route] = (routeCount[route] || 0) + 1
       })
       const topRoute = Object.entries(routeCount).sort((a, b) => b[1] - a[1])[0] || ['N/A', 0]
 
       // Unique employees
-      const uniqueEmployees = new Set(thisMonthTrips.map(t => t.userId)).size
+      const uniqueEmployees = new Set(thisMonthTrips.map((t: Trip) => t.userId)).size
 
       // Average trips per day
       const avgTripsPerDay = dailyArray.length > 0 
@@ -133,10 +137,10 @@ export default function ThisMonthPage() {
         : 0
 
       // Upcoming trips (rest of the month)
-      const upcoming = thisMonthTrips.filter(t => {
+      const upcoming = thisMonthTrips.filter((t: Trip) => {
         const tripDate = new Date(t.departureDate)
         return tripDate >= now && t.status !== 'cancelled'
-      }).sort((a, b) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime())
+      }).sort((a: Trip, b: Trip) => new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime())
 
       setStats({
         totalTrips: thisMonthTrips.length,
@@ -194,7 +198,7 @@ export default function ThisMonthPage() {
       [],
       ['Trip Details'],
       ['ID', 'Employee', 'From', 'To', 'Date', 'Status', 'Cost'],
-      ...monthlyTrips.map(t => [
+      ...monthlyTrips.map((t: Trip) => [
         t.id.slice(0, 8),
         t.userName,
         getLocationName(t.departureLocation),

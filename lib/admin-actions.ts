@@ -1,7 +1,7 @@
 // lib/admin-actions.ts
 'use server';
 
-import { fabricService } from '@/lib/mysql-service';
+import { fabricService } from '@/lib/fabric-client';
 import { joinRequestService } from '@/lib/join-request-service';
 import { aiOptimizer } from '@/lib/ai-optimizer';
 import { emailService } from '@/lib/email-service';

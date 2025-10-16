@@ -6,9 +6,16 @@ import { authService } from '@/lib/auth-service';
 
 export async function POST(request: NextRequest) {
   try {
-    const { proposalId, trips, departureTime, vehicleType, estimatedSavings } = await request.json();
+    const body = await request.json();
+    const { 
+      groupId, 
+      proposalId, 
+      trips, 
+      departureTime, 
+      vehicleType, 
+      estimatedSavings 
+    } = body;
     
-    // Get current user (admin)
     const user = authService.getCurrentUser();
     
     if (!user || user.role !== 'admin') {
@@ -18,7 +25,20 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Create optimization group
+    // Trường hợp 1: Chỉ có groupId
+    if (groupId && !trips) {
+      await fabricService.approveOptimization(groupId);
+      return NextResponse.json({ success: true, groupId });
+    }
+    
+    // Trường hợp 2: Có full data
+    if (!trips || !Array.isArray(trips) || trips.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid trips data' },
+        { status: 400 }
+      );
+    }
+    
     const group = await fabricService.createOptimizationGroup({
       trips: trips.map((t: any) => t.id),
       proposedDepartureTime: departureTime,
@@ -30,7 +50,6 @@ export async function POST(request: NextRequest) {
       approvedAt: new Date().toISOString()
     });
     
-    // Update trips
     for (const trip of trips) {
       await fabricService.updateTrip(trip.id, {
         status: 'optimized',
@@ -42,7 +61,6 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Send notifications
     await emailService.sendOptimizationNotification(
       trips,
       departureTime,
@@ -52,6 +70,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ success: true, groupId: group.id });
   } catch (error: any) {
+    console.error('Approve optimization error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to approve optimization' },
       { status: 500 }

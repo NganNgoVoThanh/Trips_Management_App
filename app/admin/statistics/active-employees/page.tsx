@@ -7,7 +7,7 @@ import { AdminHeader } from "@/components/admin/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Users, TrendingUp, Award, Download, Loader2, Mail, Building2 } from "lucide-react"
-import { fabricService, Trip } from "@/lib/mysql-service"
+import { Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
@@ -56,12 +56,16 @@ export default function ActiveEmployeesPage() {
         return
       }
 
-      const allTrips = await fabricService.getTrips()
+      const response = await fetch('/api/trips')
+      if (!response.ok) {
+        throw new Error('Failed to load trips')
+     }
+     const allTrips = await response.json()
       
       // Group trips by user
       const userMap: { [key: string]: EmployeeStats } = {}
       
-      allTrips.forEach(trip => {
+      allTrips.forEach((trip: Trip) => {
         if (!userMap[trip.userId]) {
           userMap[trip.userId] = {
             userId: trip.userId,
@@ -108,9 +112,9 @@ export default function ActiveEmployeesPage() {
         emp.optimizationRate = emp.totalTrips > 0 ? (emp.optimizedTrips / emp.totalTrips) * 100 : 0
         
         // Find most frequent route
-        const userTrips = allTrips.filter(t => t.userId === emp.userId)
+        const userTrips = allTrips.filter((t: Trip) => t.userId === emp.userId)
         const routeCount: { [key: string]: number } = {}
-        userTrips.forEach(trip => {
+        userTrips.forEach((trip: Trip) => {
           const route = `${getLocationName(trip.departureLocation)} → ${getLocationName(trip.destination)}`
           routeCount[route] = (routeCount[route] || 0) + 1
         })

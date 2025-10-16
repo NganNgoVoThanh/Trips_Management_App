@@ -21,7 +21,7 @@ import {
   RefreshCw,
   Loader2
 } from "lucide-react"
-import { fabricService } from "@/lib/mysql-service"
+import { fabricService } from "@/lib/fabric-client"
 import { config } from "@/lib/config"
 import {
   Tabs,

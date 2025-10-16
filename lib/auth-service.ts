@@ -87,12 +87,12 @@ class AuthService {
     // ONLY check against the 3 admin emails
     for (const adminEmail of ADMIN_EMAILS) {
       if (normalizedEmail === adminEmail.toLowerCase()) {
-        console.log(`✅ ${email} is ADMIN`);
+        console.log(`âœ… ${email} is ADMIN`);
         return 'admin';
       }
     }
     
-    console.log(`✅ ${email} is USER`);
+    console.log(`âœ… ${email} is USER`);
     return 'user';
   }
 

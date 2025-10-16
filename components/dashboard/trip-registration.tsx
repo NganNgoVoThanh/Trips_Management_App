@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast"
 import { Calendar, Clock, MapPin, Car, Loader2 } from "lucide-react"
 import { authService } from "@/lib/auth-service"
-import { fabricService, Trip } from "@/lib/mysql-service"
+import { fabricService, Trip } from "@/lib/fabric-client"
 import { config, getLocationName, calculateDistance, formatCurrency } from "@/lib/config"
 
 export function TripRegistration() {
