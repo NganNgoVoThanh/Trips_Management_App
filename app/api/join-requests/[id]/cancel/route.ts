@@ -11,9 +11,13 @@ export async function POST(
     // Await params in Next.js 15
     const { id } = await context.params;
 
+    console.log('Cancel join request:', { id });
+
     // Require user authentication
     const user = await requireAuth(request);
-    
+
+    console.log('User cancelling request:', { userId: user.id, userEmail: user.email });
+
     // Cancel join request with user data
     await joinRequestService.cancelJoinRequest(
       id,
@@ -26,15 +30,18 @@ export async function POST(
         employeeId: user.employeeId
       }
     );
-    
-    return NextResponse.json({ 
+
+    console.log('Join request cancelled successfully:', id);
+
+    return NextResponse.json({
       success: true,
-      message: 'Join request cancelled successfully' 
+      message: 'Join request cancelled successfully'
     }, { status: 200 });
-    
+
   } catch (error: any) {
     console.error('Error cancelling join request:', error);
-    
+    console.error('Error stack:', error.stack);
+
     // Check for authorization errors
     if (error.message.includes('not authenticated')) {
       return NextResponse.json(
@@ -42,14 +49,14 @@ export async function POST(
         { status: 401 }
       );
     }
-    
+
     if (error.message.includes('only cancel your own')) {
       return NextResponse.json(
         { error: 'You can only cancel your own requests' },
         { status: 403 }
       );
     }
-    
+
     return NextResponse.json(
       { error: error.message || 'Failed to cancel join request' },
       { status: 500 }
