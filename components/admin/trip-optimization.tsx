@@ -340,96 +340,96 @@ export function TripOptimization() {
               }
               
               return (
-              <div key={proposal.id} className="rounded-lg border p-4 shadow-sm">
-                <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                  <div>
-                    <h3 className="text-lg font-medium">
-                      Combine {proposal.trips.length} trips
-                    </h3>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-                      <Calendar className="h-4 w-4" />
-                      <span>Date: {proposal.trips[0]?.departureDate ? formatDate(proposal.trips[0].departureDate) : 'N/A'}</span>
-                      <Clock className="ml-2 h-4 w-4" />
-                      <span>Time: {proposal.proposedDepartureTime || 'N/A'}</span>
-                      <Users className="ml-2 h-4 w-4" />
-                      <span>{proposal.vehicleType && config.vehicles[proposal.vehicleType as keyof typeof config.vehicles] 
-                        ? config.vehicles[proposal.vehicleType as keyof typeof config.vehicles].name 
-                        : 'Vehicle'}</span>
+                <div key={`proposal-${proposal.id}`} className="rounded-lg border p-4 shadow-sm">
+                  <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
+                    <div>
+                      <h3 className="text-lg font-medium">
+                        Combine {proposal.trips.length} trips
+                      </h3>
+                      <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                        <Calendar className="h-4 w-4" />
+                        <span>Date: {proposal.trips[0]?.departureDate ? formatDate(proposal.trips[0].departureDate) : 'N/A'}</span>
+                        <Clock className="ml-2 h-4 w-4" />
+                        <span>Time: {proposal.proposedDepartureTime || 'N/A'}</span>
+                        <Users className="ml-2 h-4 w-4" />
+                        <span>{proposal.vehicleType && config.vehicles[proposal.vehicleType as keyof typeof config.vehicles] 
+                          ? config.vehicles[proposal.vehicleType as keyof typeof config.vehicles].name 
+                          : 'Vehicle'}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <TrendingDown className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-600">
+                          Save {formatCurrency(proposal.estimatedSavings || 0)} ({Math.round(proposal.savingsPercentage || 0)}%)
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <TrendingDown className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-600">
-                        Save {formatCurrency(proposal.estimatedSavings || 0)} ({Math.round(proposal.savingsPercentage || 0)}%)
-                      </span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => approveProposal(proposal.id)}
+                        disabled={isApproving}
+                      >
+                        {isApproving ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="mr-1 h-4 w-4" />
+                        )}
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => rejectProposal(proposal.id)}
+                      >
+                        <X className="mr-1 h-4 w-4" />
+                        Reject
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => approveProposal(proposal.id)}
-                      disabled={isApproving}
-                    >
-                      {isApproving ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Check className="mr-1 h-4 w-4" />
-                      )}
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => rejectProposal(proposal.id)}
-                    >
-                      <X className="mr-1 h-4 w-4" />
-                      Reject
-                    </Button>
-                  </div>
-                </div>
 
-                <div className="rounded-md border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-2 text-left font-medium">Employee</th>
-                        <th className="px-4 py-2 text-left font-medium">Route</th>
-                        <th className="px-4 py-2 text-left font-medium">Original Time</th>
-                        <th className="px-4 py-2 text-left font-medium">Proposed Time</th>
-                        <th className="px-4 py-2 text-left font-medium">Change</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {proposal.trips.map((trip) => (
-                        <tr key={trip.id} className="border-b">
-                          <td className="px-4 py-2">{trip.userName || 'Unknown'}</td>
-                          <td className="px-4 py-2">
-                            {getLocationName(trip.departureLocation || '')} → {getLocationName(trip.destination || '')}
-                          </td>
-                          <td className="px-4 py-2">{trip.originalDepartureTime || trip.departureTime || 'N/A'}</td>
-                          <td className="px-4 py-2">{proposal.proposedDepartureTime || 'N/A'}</td>
-                          <td className="px-4 py-2">
-                            <Badge variant={
-                              trip.departureTime === proposal.proposedDepartureTime 
-                                ? "secondary" 
-                                : "outline"
-                            }>
-                              {trip.originalDepartureTime && proposal.proposedDepartureTime 
-                                ? getTimeDifference(trip.originalDepartureTime, proposal.proposedDepartureTime)
-                                : 'N/A'}
-                            </Badge>
-                          </td>
+                  <div className="rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="px-4 py-2 text-left font-medium">Employee</th>
+                          <th className="px-4 py-2 text-left font-medium">Route</th>
+                          <th className="px-4 py-2 text-left font-medium">Original Time</th>
+                          <th className="px-4 py-2 text-left font-medium">Proposed Time</th>
+                          <th className="px-4 py-2 text-left font-medium">Change</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {proposal.trips.map((trip, tripIndex) => (
+                          <tr key={`${proposal.id}-trip-${trip.id}-${tripIndex}`} className="border-b">
+                            <td className="px-4 py-2">{trip.userName || 'Unknown'}</td>
+                            <td className="px-4 py-2">
+                              {getLocationName(trip.departureLocation || '')} → {getLocationName(trip.destination || '')}
+                            </td>
+                            <td className="px-4 py-2">{trip.originalDepartureTime || trip.departureTime || 'N/A'}</td>
+                            <td className="px-4 py-2">{proposal.proposedDepartureTime || 'N/A'}</td>
+                            <td className="px-4 py-2">
+                              <Badge variant={
+                                trip.departureTime === proposal.proposedDepartureTime 
+                                  ? "secondary" 
+                                  : "outline"
+                              }>
+                                {trip.originalDepartureTime && proposal.proposedDepartureTime 
+                                  ? getTimeDifference(trip.originalDepartureTime, proposal.proposedDepartureTime)
+                                  : 'N/A'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-                <div className="mt-3 p-3 bg-muted/50 rounded-md">
-                  <p className="text-sm">
-                    <strong>Optimization Summary:</strong> {proposal.explanation}
-                  </p>
+                  <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                    <p className="text-sm">
+                      <strong>Optimization Summary:</strong> {proposal.explanation}
+                    </p>
+                  </div>
                 </div>
-              </div>
               )
             })}
           </div>

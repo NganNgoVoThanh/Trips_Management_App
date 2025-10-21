@@ -1,17 +1,22 @@
-// app/api/join-requests/[id]/approve/reject/route.ts
+// app/api/join-requests/[id]/reject/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { joinRequestService } from '@/lib/join-request-service';
 import { requireAdmin } from '@/lib/server-auth';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id } = await context.params;
+
     // Require admin authentication
     const adminUser = await requireAdmin(request);
     
-    const { adminNotes } = await request.json();
+    // Parse request body
+    const body = await request.json().catch(() => ({}));
+    const { adminNotes } = body;
     
     if (!adminNotes) {
       return NextResponse.json(
@@ -20,9 +25,9 @@ export async function POST(
       );
     }
     
-    // Pass admin user to rejectJoinRequest
+    // Reject join request with admin user data
     await joinRequestService.rejectJoinRequest(
-      params.id,
+      id,
       adminNotes,
       {
         id: adminUser.id,
@@ -34,16 +39,20 @@ export async function POST(
       }
     );
     
-    return NextResponse.json({
+    return NextResponse.json({ 
       success: true,
-      message: 'Join request rejected successfully'
-    });
-  } catch (error: any) {
-    console.error('Reject join request error:', error);
+      message: 'Join request rejected successfully' 
+    }, { status: 200 });
     
-    if (error.message.includes('Unauthorized') || error.message.includes('not authenticated')) {
+  } catch (error: any) {
+    console.error('Error rejecting join request:', error);
+    
+    // Check for authorization errors
+    if (error.message.includes('Unauthorized') || 
+        error.message.includes('not authenticated') ||
+        error.message.includes('Admin access required')) {
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Unauthorized - Admin access required' },
         { status: 403 }
       );
     }

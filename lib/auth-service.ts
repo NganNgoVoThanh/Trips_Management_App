@@ -53,30 +53,31 @@ class AuthService {
   }
 
   private loadUserFromSession(): void {
-    if (typeof window !== 'undefined') {
-      const userStr = sessionStorage.getItem('currentUser');
-      if (userStr) {
-        try {
-          this.currentUser = JSON.parse(userStr);
-          // Re-validate role based on email
-          if (this.currentUser) {
-            this.currentUser.role = this.determineRole(this.currentUser.email);
-            // Migration: ensure id/employeeId are stable by email
-            const stableId = this.stableUserIdFromEmail(this.currentUser.email);
-            const stableEmp = this.stableEmployeeIdFromEmail(this.currentUser.email);
-            if (this.currentUser.id !== stableId || this.currentUser.employeeId !== stableEmp) {
-              this.currentUser = {
-                ...this.currentUser,
-                id: stableId,
-                employeeId: stableEmp
-              };
-              sessionStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-            }
+    // ✅ FIX: Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    const userStr = sessionStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        this.currentUser = JSON.parse(userStr);
+        // Re-validate role based on email
+        if (this.currentUser) {
+          this.currentUser.role = this.determineRole(this.currentUser.email);
+          // Migration: ensure id/employeeId are stable by email
+          const stableId = this.stableUserIdFromEmail(this.currentUser.email);
+          const stableEmp = this.stableEmployeeIdFromEmail(this.currentUser.email);
+          if (this.currentUser.id !== stableId || this.currentUser.employeeId !== stableEmp) {
+            this.currentUser = {
+              ...this.currentUser,
+              id: stableId,
+              employeeId: stableEmp
+            };
+            sessionStorage.setItem('currentUser', JSON.stringify(this.currentUser));
           }
-        } catch (error) {
-          console.error('Failed to parse user from session:', error);
-          sessionStorage.removeItem('currentUser');
         }
+      } catch (error) {
+        console.error('Failed to parse user from session:', error);
+        sessionStorage.removeItem('currentUser');
       }
     }
   }
@@ -87,12 +88,12 @@ class AuthService {
     // ONLY check against the 3 admin emails
     for (const adminEmail of ADMIN_EMAILS) {
       if (normalizedEmail === adminEmail.toLowerCase()) {
-        console.log(`âœ… ${email} is ADMIN`);
+        console.log(`✅ ${email} is ADMIN`);
         return 'admin';
       }
     }
     
-    console.log(`âœ… ${email} is USER`);
+    console.log(`✅ ${email} is USER`);
     return 'user';
   }
 
@@ -115,15 +116,17 @@ class AuthService {
         id: this.stableUserIdFromEmail(normalizedEmail),
         email: normalizedEmail,
         name: name,
-        role: role, // This will be 'user' for ngan.ngo@intersnack.com.vn
+        role: role,
         department: this.getDepartmentFromEmail(email),
         employeeId: this.stableEmployeeIdFromEmail(normalizedEmail),
         createdAt: new Date().toISOString()
       };
       
-      // Store user in session
+      // ✅ FIX: Only store in sessionStorage on client side
       this.currentUser = user;
-      sessionStorage.setItem('currentUser', JSON.stringify(user));
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('currentUser', JSON.stringify(user));
+      }
       
       console.log('=== LOGIN DEBUG ===');
       console.log('Email:', user.email);
@@ -163,13 +166,6 @@ class AuthService {
     } else {
       return 'General';
     }
-  }
-
-  // Kept for backward compatibility: if some callers still use generateEmployeeId()
-  private generateEmployeeId(email?: string): string {
-    if (!email && this.currentUser?.email) return this.stableEmployeeIdFromEmail(this.currentUser.email);
-    if (!email) throw new Error('Email is required to generate stable employeeId');
-    return this.stableEmployeeIdFromEmail(email);
   }
 
   async logout(): Promise<void> {

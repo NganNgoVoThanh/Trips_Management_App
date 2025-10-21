@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, Clock, MapPin, Users, Search, Filter, Loader2, Send } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency, calculateDistance } from "@/lib/config"
+import { Calendar, Clock, MapPin, Users, Search, Filter, Loader2, Send, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Select,
