@@ -1,13 +1,20 @@
 // app/api/optimize/reject/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
-import { requireAdmin } from '@/lib/server-auth';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    // Require admin authentication using server-side auth
-    const adminUser = await requireAdmin(request);
+    // Check admin auth
+    const user = await getServerUser(request);
     
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
     const { groupId } = body;
@@ -18,29 +25,27 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ✅ FIX: Validate group exists before rejection
+    const group = await fabricService.getOptimizationGroupById(groupId);
     
-    // Reject optimization
+    if (!group) {
+      return NextResponse.json(
+        { error: 'Optimization group not found' },
+        { status: 404 }
+      );
+    }
+
+    // Reject the optimization (backend handles cleanup)
     await fabricService.rejectOptimization(groupId);
     
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Optimization rejected successfully',
-      groupId 
+    return NextResponse.json({
+      success: true,
+      message: `Optimization ${groupId} rejected successfully`
     });
     
   } catch (error: any) {
-    console.error('Reject optimization error:', error);
-    
-    // Check for authorization errors
-    if (error.message.includes('Unauthorized') || 
-        error.message.includes('not authenticated') ||
-        error.message.includes('Admin access required')) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Admin access required' },
-        { status: 403 }
-      );
-    }
-    
+    console.error('Error rejecting optimization:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to reject optimization' },
       { status: 500 }

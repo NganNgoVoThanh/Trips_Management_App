@@ -11,13 +11,19 @@ export async function POST(
     // Await params in Next.js 15
     const { id } = await context.params;
 
+    console.log('Approve join request:', { id });
+
     // Require admin authentication
     const adminUser = await requireAdmin(request);
-    
+
+    console.log('Admin user:', { adminId: adminUser.id, adminEmail: adminUser.email });
+
     // Parse request body
     const body = await request.json().catch(() => ({}));
     const { adminNotes } = body;
-    
+
+    console.log('Approving join request with notes:', adminNotes ? adminNotes.substring(0, 50) + '...' : 'no notes');
+
     // Approve join request with admin user data
     await joinRequestService.approveJoinRequest(
       id,
@@ -31,17 +37,20 @@ export async function POST(
         employeeId: adminUser.employeeId
       }
     );
-    
-    return NextResponse.json({ 
+
+    console.log('Join request approved successfully:', id);
+
+    return NextResponse.json({
       success: true,
-      message: 'Join request approved successfully' 
+      message: 'Join request approved successfully'
     }, { status: 200 });
-    
+
   } catch (error: any) {
     console.error('Error approving join request:', error);
-    
+    console.error('Error stack:', error.stack);
+
     // Check for authorization errors
-    if (error.message.includes('Unauthorized') || 
+    if (error.message.includes('Unauthorized') ||
         error.message.includes('not authenticated') ||
         error.message.includes('Admin access required')) {
       return NextResponse.json(
@@ -49,7 +58,7 @@ export async function POST(
         { status: 403 }
       );
     }
-    
+
     return NextResponse.json(
       { error: error.message || 'Failed to approve join request' },
       { status: 500 }

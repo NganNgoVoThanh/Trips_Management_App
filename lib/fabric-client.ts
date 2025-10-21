@@ -8,6 +8,31 @@ class FabricClientService {
   private baseUrl = '/api';
   private isClient = typeof window !== 'undefined';
 
+  /**
+   * Safely parse JSON response with Content-Type validation
+   */
+  private async parseJsonResponse(response: Response): Promise<any> {
+    const contentType = response.headers.get('content-type');
+
+    // Check if response is JSON
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Expected JSON but received:', contentType, text.substring(0, 200));
+      throw new Error(
+        `Server returned ${response.status} with non-JSON content. ` +
+        `Expected application/json but got ${contentType || 'no content-type'}. ` +
+        `This usually means the API endpoint doesn't exist (404).`
+      );
+    }
+
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse JSON:', error);
+      throw new Error('Invalid JSON response from server');
+    }
+  }
+
   async getTrips(filters?: { 
     userId?: string; 
     status?: string; 
@@ -30,12 +55,13 @@ class FabricClientService {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const trips = await response.json();
+      const trips = await this.parseJsonResponse(response);
       return Array.isArray(trips) ? trips : [];
     } catch (error) {
       console.error('Error fetching trips:', error);
@@ -53,13 +79,14 @@ class FabricClientService {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (!response.ok) {
         if (response.status === 404) return null;
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      return await response.json();
+      return await this.parseJsonResponse(response);
     } catch (error) {
       console.error('Error fetching trip by ID:', error);
       return null;
@@ -82,11 +109,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await this.parseJsonResponse(response).catch(() => ({}));
         throw new Error(error.error || 'Failed to create trip');
       }
 
-      return await response.json();
+      return await this.parseJsonResponse(response);
     } catch (error: any) {
       console.error('Error creating trip:', error);
       throw error;
@@ -109,11 +136,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await this.parseJsonResponse(response).catch(() => ({}));
         throw new Error(error.error || 'Failed to update trip');
       }
 
-      return await response.json();
+      return await this.parseJsonResponse(response);
     } catch (error: any) {
       console.error('Error updating trip:', error);
       throw error;
@@ -130,7 +157,7 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await this.parseJsonResponse(response).catch(() => ({}));
         throw new Error(error.error || 'Failed to delete trip');
       }
     } catch (error: any) {
@@ -157,11 +184,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await this.parseJsonResponse(response).catch(() => ({}));
         throw new Error(error.error || 'Failed to create optimization group');
       }
 
-      return await response.json();
+      return await this.parseJsonResponse(response);
     } catch (error: any) {
       console.error('Error creating optimization group:', error);
       throw error;
@@ -181,10 +208,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const groups = await response.json();
+      const groups = await this.parseJsonResponse(response);
       return Array.isArray(groups) ? groups : [];
     } catch (error) {
       console.error('Error fetching optimization groups:', error);
@@ -241,13 +269,14 @@ class FabricClientService {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const trips = await response.json();
-      return Array.isArray(trips) 
-        ? trips.filter((t: Trip) => 
-            t.optimizedGroupId === groupId && 
+      const trips = await this.parseJsonResponse(response);
+      return Array.isArray(trips)
+        ? trips.filter((t: Trip) =>
+            t.optimizedGroupId === groupId &&
             t.dataType === 'temp'
           )
         : [];
@@ -284,11 +313,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await this.parseJsonResponse(response).catch(() => ({}));
         throw new Error(error.error || 'Failed to create temp trips');
       }
 
-      const trips = await response.json();
+      const trips = await this.parseJsonResponse(response);
       return Array.isArray(trips) ? trips : [];
     } catch (error: any) {
       console.error('Error creating temp trips:', error);
@@ -296,51 +325,71 @@ class FabricClientService {
     }
   }
 
-  async approveOptimization(groupId: string): Promise<void> {
-    if (!this.isClient) return;
+async approveOptimization(groupId: string): Promise<void> {
+  if (!this.isClient) return;
 
-    try {
-      const response = await fetch(`${this.baseUrl}/optimize/approve`, {
-        method: 'POST',
-        credentials: 'include', // ✅ FIX
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ groupId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to approve optimization');
-      }
-    } catch (error: any) {
-      console.error('Error approving optimization:', error);
-      throw error;
+  try {
+    // ✅ FIX: Ensure groupId is sent properly
+    if (!groupId) {
+      throw new Error('Group ID is required for approval');
     }
-  }
 
-  async rejectOptimization(groupId: string): Promise<void> {
-    if (!this.isClient) return;
+    const response = await fetch(`${this.baseUrl}/optimize/approve`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ groupId }), // Ensure groupId is in body
+    });
 
-    try {
-      const response = await fetch(`${this.baseUrl}/optimize/reject`, {
-        method: 'POST',
-        credentials: 'include', // ✅ FIX
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ groupId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to reject optimization');
-      }
-    } catch (error: any) {
-      console.error('Error rejecting optimization:', error);
-      throw error;
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response).catch(() => ({ 
+        error: 'Failed to approve optimization' 
+      }));
+      throw new Error(error.error || `HTTP ${response.status}`);
     }
+
+    const result = await this.parseJsonResponse(response);
+    console.log('Optimization approved:', result);
+  } catch (error: any) {
+    console.error('Error approving optimization:', error);
+    throw error;
   }
+}
+
+async rejectOptimization(groupId: string): Promise<void> {
+  if (!this.isClient) return;
+
+  try {
+    // ✅ FIX: Ensure groupId is sent properly
+    if (!groupId) {
+      throw new Error('Group ID is required for rejection');
+    }
+
+    const response = await fetch(`${this.baseUrl}/optimize/reject`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ groupId }), // Ensure groupId is in body
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response).catch(() => ({ 
+        error: 'Failed to reject optimization' 
+      }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const result = await this.parseJsonResponse(response);
+    console.log('Optimization rejected:', result);
+  } catch (error: any) {
+    console.error('Error rejecting optimization:', error);
+    throw error;
+  }
+}
 
   async deleteOptimizationGroup(proposalId: string): Promise<void> {
     if (!this.isClient) return;
@@ -388,10 +437,11 @@ class FabricClientService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      return await response.json();
+      return await this.parseJsonResponse(response);
     } catch (error) {
       console.error('Error fetching data stats:', error);
       return {

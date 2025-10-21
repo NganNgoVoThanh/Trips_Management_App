@@ -10,11 +10,12 @@ const publicApiPaths = [
   '/api/init'
 ];
 
-// Admin-only API paths
+// Admin-only API paths (REMOVED /api/join-requests from here!)
 const adminApiPaths = [
   '/api/optimize/approve',
   '/api/optimize/reject',
-  '/api/join-requests',
+  // '/api/join-requests', // ❌ REMOVED - users can access this
+  '/api/join-requests/stats', // Only stats require auth check
 ];
 
 // Admin-only page paths
@@ -23,7 +24,7 @@ const adminPagePaths = ['/admin'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // ✅ Allow public API paths (exact match or starts with)
+  // ✅ Allow public API paths
   if (publicApiPaths.some(path => pathname === path || pathname.startsWith(path + '/'))) {
     return NextResponse.next();
   }
@@ -64,9 +65,13 @@ export function middleware(request: NextRequest) {
         throw new Error('Invalid session data');
       }
       
+      // ✅ Special handling for join-requests approve/reject (admin only)
+      const isJoinRequestAdminPath = pathname.match(/^\/api\/join-requests\/[^/]+\/(approve|reject)/);
+      
       // ✅ Check admin access for admin paths
       const isAdminPath = adminApiPaths.some(path => pathname.startsWith(path)) || 
-                         adminPagePaths.some(path => pathname.startsWith(path));
+                         adminPagePaths.some(path => pathname.startsWith(path)) ||
+                         isJoinRequestAdminPath;
       
       if (isAdminPath && userData.role !== 'admin') {
         // Not admin - return 403 for API, redirect for pages
@@ -119,13 +124,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, robots.txt (metadata files)
-     * - public assets (images, etc)
-     */
     '/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
   ],
 };

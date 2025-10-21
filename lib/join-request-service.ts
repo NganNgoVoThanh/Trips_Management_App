@@ -2,6 +2,7 @@
 import { fabricService } from './mysql-service';
 import { authService } from './auth-service';
 import { emailService } from './email-service';
+import { toMySQLDateTime, getCurrentVietnamTime } from './utils'; // ✅ Import từ utils
 
 // Check if we're on server side
 const isServer = typeof window === 'undefined';
@@ -31,19 +32,7 @@ const getPool = async () => {
   return pool;
 };
 
-// ✅ NEW: Helper to convert ISO to MySQL datetime
-const toMySQLDateTime = (isoString: string): string => {
-  if (!isoString) return new Date().toISOString().slice(0, 19).replace('T', ' ');
-  
-  try {
-    const date = new Date(isoString);
-    // Convert to MySQL format: YYYY-MM-DD HH:MM:SS
-    return date.toISOString().slice(0, 19).replace('T', ' ');
-  } catch (error) {
-    console.error('Invalid datetime:', isoString);
-    return new Date().toISOString().slice(0, 19).replace('T', ' ');
-  }
-};
+// ❌ REMOVED: Old toMySQLDateTime function - now imported from utils
 
 // User interface for server-side operations
 export interface RequestUser {
@@ -113,7 +102,7 @@ class JoinRequestService {
     Object.keys(data).forEach(key => {
       const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
       
-      // ✅ FIX: Convert datetime fields to MySQL format
+      // ✅ FIX: Convert datetime fields to MySQL format using utils
       if ((snakeKey === 'created_at' || snakeKey === 'updated_at' || 
            snakeKey === 'processed_at') && typeof data[key] === 'string') {
         converted[snakeKey] = toMySQLDateTime(data[key]);
@@ -175,8 +164,8 @@ class JoinRequestService {
         requesterDepartment: user.department,
         reason,
         status: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: getCurrentVietnamTime(), // ✅ Use Vietnam time
+        updatedAt: getCurrentVietnamTime()  // ✅ Use Vietnam time
       };
 
       if (this.ensureServerSide('createJoinRequest')) {
@@ -238,8 +227,8 @@ class JoinRequestService {
         status: 'approved',
         adminNotes,
         processedBy: user.id,
-        processedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        processedAt: getCurrentVietnamTime(), // ✅ Use Vietnam time
+        updatedAt: getCurrentVietnamTime()    // ✅ Use Vietnam time
       };
 
       if (this.ensureServerSide('approveJoinRequest')) {
@@ -299,8 +288,8 @@ class JoinRequestService {
         status: 'rejected',
         adminNotes,
         processedBy: user.id,
-        processedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        processedAt: getCurrentVietnamTime(), // ✅ Use Vietnam time
+        updatedAt: getCurrentVietnamTime()    // ✅ Use Vietnam time
       };
 
       if (this.ensureServerSide('rejectJoinRequest')) {
@@ -360,7 +349,7 @@ class JoinRequestService {
       const updatedRequest: JoinRequest = {
         ...request,
         status: 'cancelled',
-        updatedAt: new Date().toISOString()
+        updatedAt: getCurrentVietnamTime() // ✅ Use Vietnam time
       };
 
       if (this.ensureServerSide('cancelJoinRequest')) {
@@ -375,6 +364,8 @@ class JoinRequestService {
       throw error;
     }
   }
+
+  // ... rest of the methods remain the same ...
 
   async getJoinRequests(filters?: {
     tripId?: string;

@@ -13,7 +13,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Prevent multiple simultaneous checks
     if (isChecking.current) return
     
-    const checkAuth = () => {
+    const checkAuth = async () => {
       isChecking.current = true
       
       try {
@@ -47,10 +47,24 @@ export function useAuth() {
   
   const login = async (email: string) => {
     try {
-      const user = await authService.loginWithSSO(email)
+      // Call API login endpoint
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      const user = await response.json();
       
-      // Set cookie for middleware
-      document.cookie = `session=${JSON.stringify(user)}; path=/; max-age=86400; SameSite=Lax`
+      // ✅ Update local auth service
+      await authService.loginWithSSO(email);
       
       // Use replace instead of push to prevent back button issues
       if (user.role === 'admin') {
@@ -67,9 +81,33 @@ export function useAuth() {
   }
   
   const logout = async () => {
-    await authService.logout()
-    document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-    router.replace('/')
+    try {
+      // ✅ Call API logout endpoint FIRST
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      // ✅ Then clear local session
+      await authService.logout();
+      
+      // ✅ Force clear all possible storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear();
+        localStorage.removeItem('currentUser');
+        // Clear all cookies
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+      }
+      
+      // ✅ Hard redirect to clear any cached state
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect anyway
+      window.location.href = '/';
+    }
   }
   
   const user = authService.getCurrentUser()
