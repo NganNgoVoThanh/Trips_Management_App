@@ -29,7 +29,7 @@ const getPool = async () => {
     keepAliveInitialDelay: 0
   });
   
-  console.log('âœ… MySQL Connection Pool initialized');
+  console.log('✓ MySQL Connection Pool initialized');
   console.log(`ðŸ“Š Database: ${process.env.DB_NAME || 'trips_management'}`);
   
   return pool;
@@ -91,7 +91,7 @@ class MySQLService {
       const connection = await poolInstance.getConnection();
       await connection.ping();
       connection.release();
-      console.log('âœ… MySQL connection verified');
+      console.log('✓ MySQL connection verified');
       this.isConnected = true;
     } catch (err: any) {
       console.warn('âš ï¸ MySQL connection check failed:', err.message);
@@ -100,7 +100,7 @@ class MySQLService {
       this.hasCheckedConnection = true;
     }
   }
-  // âœ… THÃŠM helper function nÃ y
+  // ✓ THÃŠM helper function nÃ y
   private toMySQLDateTime(isoString: string): string {
     if (!isoString) return new Date().toISOString().slice(0, 19).replace('T', ' ');
     
@@ -123,7 +123,7 @@ class MySQLService {
     Object.keys(data).forEach(key => {
       const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
       
-      // âœ… THÃŠM: Convert datetime fields
+      // ✓ THÃŠM: Convert datetime fields
       if ((snakeKey === 'created_at' || snakeKey === 'updated_at' || 
            snakeKey === 'approved_at' || snakeKey === 'processed_at') && 
           typeof data[key] === 'string') {
@@ -135,7 +135,7 @@ class MySQLService {
     return converted;
   }
 
-  // âœ… Sá»¬A createTrip - Ä‘áº£m báº£o datetime Ä‘Ãºng format
+  // ✓ Sá»¬A createTrip - Ä‘áº£m báº£o datetime Ä‘Ãºng format
   async createTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
     const now = new Date();
     const mysqlNow = now.toISOString().slice(0, 19).replace('T', ' ');
@@ -159,7 +159,7 @@ class MySQLService {
       // Convert to snake_case and ensure MySQL datetime format
       const snakeData = this.toSnakeCase(newTrip);
       
-      // âœ… QUAN TRá»ŒNG: Override datetime fields vá»›i MySQL format
+      // ✓ QUAN TRá»ŒNG: Override datetime fields vá»›i MySQL format
       snakeData.created_at = mysqlNow;
       snakeData.updated_at = mysqlNow;
       
@@ -175,7 +175,7 @@ class MySQLService {
       );
       
       connection.release();
-      console.log('âœ… Trip created in MySQL:', newTrip.id);
+      console.log('✓ Trip created in MySQL:', newTrip.id);
       return newTrip;
     } catch (err: any) {
       console.error('âŒ MySQL error creating trip:', err.message);
@@ -317,7 +317,7 @@ class MySQLService {
       `);
 
       connection.release();
-      console.log('âœ… MySQL tables initialized successfully');
+      console.log('✓ MySQL tables initialized successfully');
     } catch (error: any) {
       console.error('âŒ Failed to initialize tables:', error.message);
       throw error;
@@ -424,7 +424,7 @@ class MySQLService {
       }
 
       connection.release();
-      console.log(`âœ… Created ${tempTrips.length} TEMP trips in MySQL`);
+      console.log(`✓ Created ${tempTrips.length} TEMP trips in MySQL`);
       return tempTrips;
     } catch (err: any) {
       console.warn('âš ï¸ Error creating temp trips:', err.message);
@@ -488,7 +488,7 @@ class MySQLService {
       );
 
       connection.release();
-      console.log(`âœ… Optimization ${groupId} approved`);
+      console.log(`✓ Optimization ${groupId} approved`);
     } catch (err: any) {
       console.warn('âš ï¸ Error approving optimization:', err.message);
     }
@@ -530,7 +530,7 @@ class MySQLService {
       }
 
       connection.release();
-      console.log(`âœ… Optimization ${groupId} rejected`);
+      console.log(`✓ Optimization ${groupId} rejected`);
     } catch (err: any) {
       console.warn('âš ï¸ Error rejecting optimization:', err.message);
     }
@@ -628,7 +628,7 @@ class MySQLService {
       );
       
       connection.release();
-      console.log('âœ… Trip updated:', id);
+      console.log('✓ Trip updated:', id);
       return updatedTrip;
     } catch (err: any) {
       console.warn('âš ï¸ Error updating trip:', err.message);
@@ -645,7 +645,7 @@ class MySQLService {
       const connection = await poolInstance.getConnection();
       await connection.query('DELETE FROM trips WHERE id = ?', [id]);
       connection.release();
-      console.log('âœ… Trip deleted:', id);
+      console.log('✓ Trip deleted:', id);
     } catch (err: any) {
       console.warn('âš ï¸ Error deleting trip:', err.message);
     }
@@ -683,7 +683,7 @@ class MySQLService {
       );
       
       connection.release();
-      console.log('âœ… Optimization group created:', newGroup.id);
+      console.log('✓ Optimization group created:', newGroup.id);
       return newGroup;
     } catch (err: any) {
       console.warn('âš ï¸ Error creating optimization group:', err.message);
@@ -804,7 +804,7 @@ class MySQLService {
       }
       
       connection.release();
-      console.log('âœ… Optimization group updated:', id);
+      console.log('✓ Optimization group updated:', id);
       return updatedGroup;
     } catch (err: any) {
       console.warn('âš ï¸ Error updating optimization group:', err.message);
@@ -824,7 +824,7 @@ class MySQLService {
         [proposalId]
       );
       connection.release();
-      console.log('âœ… Optimization group deleted:', proposalId);
+      console.log('✓ Optimization group deleted:', proposalId);
     } catch (err) {
       console.warn('âš ï¸ Error deleting optimization group:', err);
     }
@@ -842,7 +842,7 @@ class MySQLService {
         [proposalId]
       );
       connection.release();
-      console.log('âœ… Temp data deleted:', proposalId);
+      console.log('✓ Temp data deleted:', proposalId);
     } catch (err) {
       console.warn('âš ï¸ Error deleting temp data:', err);
     }
@@ -922,7 +922,7 @@ class MySQLService {
       );
 
       connection.release();
-      console.log('âœ… Old temp data cleaned up');
+      console.log('✓ Old temp data cleaned up');
     } catch (err) {
       console.warn('âš ï¸ Error in cleanup:', err);
     }
@@ -1014,7 +1014,7 @@ class MySQLService {
       }
 
       connection.release();
-      console.log('âœ… Data imported successfully');
+      console.log('✓ Data imported successfully');
     } catch (err) {
       console.warn('âš ï¸ Error importing data:', err);
     }
@@ -1032,7 +1032,7 @@ class MySQLService {
       await connection.query('DELETE FROM trips');
       await connection.query('DELETE FROM join_requests');
       connection.release();
-      console.log('âœ… All data cleared');
+      console.log('✓ All data cleared');
     } catch (err) {
       console.warn('âš ï¸ Error clearing data:', err);
     }

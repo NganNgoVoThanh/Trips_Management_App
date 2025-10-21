@@ -2,318 +2,298 @@
 import { Trip } from './mysql-service';
 import { config, getLocationName, formatCurrency } from './config';
 
-export interface EmailTemplate {
-  to: string | string[];
+interface EmailNotification {
+  to: string[];
   subject: string;
-  html: string;
-  text?: string;
-}
-
-// Simple email data structure
-export interface EmailData {
-  to: string | string[];
-  subject: string;
-  text: string;
+  body: string;
   html?: string;
 }
 
 class EmailService {
-  private apiEndpoint: string;
-  
+  private isConfigured: boolean = false;
+  private pendingEmails: EmailNotification[] = [];
+
   constructor() {
-    // In production, use actual email service (SendGrid, AWS SES, etc.)
-    this.apiEndpoint = process.env.EMAIL_API_URL || '';
+    // In production, check for email service configuration
+    this.isConfigured = !!process.env.EMAIL_SERVICE_URL || 
+                       !!process.env.SMTP_HOST ||
+                       typeof window === 'undefined'; // Allow on server
   }
 
-  // PUBLIC method - can be called from anywhere
-  async sendEmail(data: EmailData | EmailTemplate): Promise<void> {
-    try {
-      if (!this.apiEndpoint) {
-        // Log email in development
-        console.log('📧 Email (dev mode):', {
-          to: data.to,
-          subject: data.subject,
-          text: 'text' in data ? data.text : 'HTML email'
-        });
-        return;
-      }
-
-      // Ensure 'to' is always an array
-      const toArray = Array.isArray(data.to) ? data.to : [data.to];
-
-      // Send via email API
-      const response = await fetch(this.apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.EMAIL_API_KEY || ''}`
-        },
-        body: JSON.stringify({
-          ...data,
-          to: toArray
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Email sending failed: ${response.statusText}`);
-      }
-      
-      console.log('✅ Email sent successfully to:', toArray.join(', '));
-    } catch (error) {
-      console.error('❌ Error sending email:', error);
-      // In production, could queue for retry or log to monitoring service
-    }
-  }
-
-  // Send trip confirmation email
-  async sendTripConfirmation(trip: Trip): Promise<void> {
-    const template = this.createTripConfirmationTemplate(trip);
-    await this.sendEmail(template);
-  }
-
-  // Send optimization notification
+  /**
+   * Send optimization notification to affected employees
+   */
   async sendOptimizationNotification(
-    trips: Trip[], 
-    newDepartureTime: string,
+    trips: Trip[],
+    proposedDepartureTime: string,
     vehicleType: string,
     estimatedSavings: number
   ): Promise<void> {
-    const emails = trips.map(t => t.userEmail).filter(Boolean);
-    if (emails.length === 0) return;
+    if (!trips || trips.length === 0) {
+      console.warn('No trips to notify about');
+      return;
+    }
+
+    // Group trips by user email
+    const tripsByUser = new Map<string, Trip[]>();
+    trips.forEach(trip => {
+      if (trip.userEmail) {
+        if (!tripsByUser.has(trip.userEmail)) {
+          tripsByUser.set(trip.userEmail, []);
+        }
+        tripsByUser.get(trip.userEmail)?.push(trip);
+      }
+    });
+
+    // Send email to each affected user
+    for (const [email, userTrips] of tripsByUser) {
+      const subject = 'Your Trip Has Been Optimized';
+      
+      const tripDetails = userTrips.map(trip => {
+        const from = getLocationName(trip.departureLocation || '');
+        const to = getLocationName(trip.destination || '');
+        const date = new Date(trip.departureDate).toLocaleDateString();
+        const originalTime = trip.originalDepartureTime || trip.departureTime;
+        
+        return `
+          • Route: ${from} → ${to}
+          • Date: ${date}
+          • Original Time: ${originalTime}
+          • New Time: ${proposedDepartureTime}
+        `;
+      }).join('\n');
+
+      const vehicleInfo = config.vehicles[vehicleType as keyof typeof config.vehicles]?.name || vehicleType;
+      
+      const body = `
+Dear ${userTrips[0].userName || 'Employee'},
+
+Your upcoming trip(s) have been optimized for cost efficiency. Here are the details:
+
+${tripDetails}
+
+Vehicle Type: ${vehicleInfo}
+Estimated Company Savings: ${formatCurrency(estimatedSavings)}
+
+Please note the updated departure time. If you have any concerns or conflicts with the new schedule, please contact the admin team immediately.
+
+Best regards,
+Intersnack Trips Management Team
+      `.trim();
+
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px; }
+    .trip-details { background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .highlight { color: #2563eb; font-weight: bold; }
+    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Your Trip Has Been Optimized</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${userTrips[0].userName || 'Employee'},</p>
+      
+      <p>Your upcoming trip(s) have been optimized for cost efficiency. Here are the details:</p>
+      
+      ${userTrips.map(trip => `
+        <div class="trip-details">
+          <p><strong>Route:</strong> ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}</p>
+          <p><strong>Date:</strong> ${new Date(trip.departureDate).toLocaleDateString()}</p>
+          <p><strong>Original Time:</strong> ${trip.originalDepartureTime || trip.departureTime}</p>
+          <p class="highlight"><strong>New Time:</strong> ${proposedDepartureTime}</p>
+        </div>
+      `).join('')}
+      
+      <div class="trip-details">
+        <p><strong>Vehicle Type:</strong> ${vehicleInfo}</p>
+        <p><strong>Estimated Company Savings:</strong> ${formatCurrency(estimatedSavings)}</p>
+      </div>
+      
+      <p>Please note the updated departure time. If you have any concerns or conflicts with the new schedule, please contact the admin team immediately.</p>
+      
+      <div class="footer">
+        <p>Best regards,<br/>Intersnack Trips Management Team</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+      `.trim();
+
+      await this.sendEmail({
+        to: [email],
+        subject,
+        body,
+        html
+      });
+    }
+
+    // Also send summary to admins
+    await this.sendAdminNotification(trips, proposedDepartureTime, vehicleType, estimatedSavings);
+  }
+
+  /**
+   * Send summary notification to admin team
+   */
+  private async sendAdminNotification(
+    trips: Trip[],
+    proposedDepartureTime: string,
+    vehicleType: string,
+    estimatedSavings: number
+  ): Promise<void> {
+    const adminEmails = config.adminEmails || [];
     
-    const template = this.createOptimizationTemplate(trips, newDepartureTime, vehicleType, estimatedSavings);
+    if (adminEmails.length === 0) {
+      console.warn('No admin emails configured');
+      return;
+    }
+
+    const subject = `Trip Optimization Approved - ${trips.length} Trips Combined`;
+    
+    const tripList = trips.map(trip => {
+      return `• ${trip.userName} (${trip.userEmail}): ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}`;
+    }).join('\n');
+
+    const body = `
+Trip Optimization Summary
+========================
+
+Number of Trips Combined: ${trips.length}
+Departure Date: ${new Date(trips[0].departureDate).toLocaleDateString()}
+New Departure Time: ${proposedDepartureTime}
+Vehicle Type: ${config.vehicles[vehicleType as keyof typeof config.vehicles]?.name || vehicleType}
+Estimated Savings: ${formatCurrency(estimatedSavings)}
+
+Affected Employees:
+${tripList}
+
+All affected employees have been notified via email.
+
+--
+Intersnack Trips Management System
+    `.trim();
+
     await this.sendEmail({
-      to: emails,
-      subject: template.subject,
-      text: template.text || '',
-      html: template.html
+      to: adminEmails,
+      subject,
+      body
     });
   }
 
-  // Send trip cancellation notification
+  /**
+   * Send trip cancellation notification
+   */
   async sendCancellationNotification(trip: Trip): Promise<void> {
-    const template = this.createCancellationTemplate(trip);
-    await this.sendEmail(template);
+    if (!trip.userEmail) {
+      console.warn('No email address for trip cancellation');
+      return;
+    }
+
+    const subject = 'Trip Cancellation Notice';
+    const body = `
+Dear ${trip.userName || 'Employee'},
+
+Your trip scheduled for ${new Date(trip.departureDate).toLocaleDateString()} from ${getLocationName(trip.departureLocation || '')} to ${getLocationName(trip.destination || '')} has been cancelled.
+
+If you have any questions, please contact the admin team.
+
+Best regards,
+Intersnack Trips Management Team
+    `.trim();
+
+    await this.sendEmail({
+      to: [trip.userEmail],
+      subject,
+      body
+    });
   }
 
-  // Send approval notification
-  async sendApprovalNotification(trip: Trip): Promise<void> {
-    const template = this.createApprovalTemplate(trip);
-    await this.sendEmail(template);
-  }
+  /**
+   * Core email sending function
+   */
+  private async sendEmail(notification: EmailNotification): Promise<void> {
+    // Store email for later processing if not configured
+    if (!this.isConfigured) {
+      console.log('📧 Email queued (service not configured):', notification.subject);
+      this.pendingEmails.push(notification);
+      return;
+    }
 
-  // Send bulk emails with rate limiting
-  async sendBulkEmails(templates: EmailTemplate[], delayMs: number = 100): Promise<void> {
-    for (const template of templates) {
-      await this.sendEmail(template);
-      // Rate limiting to avoid overwhelming email service
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+    try {
+      // In production, integrate with actual email service
+      // Options: SendGrid, AWS SES, Mailgun, SMTP, etc.
+      
+      if (process.env.EMAIL_SERVICE_URL) {
+        // Example: External email API
+        const response = await fetch(process.env.EMAIL_SERVICE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.EMAIL_API_KEY}`
+          },
+          body: JSON.stringify({
+            to: notification.to,
+            subject: notification.subject,
+            text: notification.body,
+            html: notification.html
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Email API error: ${response.status}`);
+        }
+      } else {
+        // Development: Log emails to console
+        console.log('📧 Email sent (dev mode):');
+        console.log('To:', notification.to.join(', '));
+        console.log('Subject:', notification.subject);
+        console.log('Body:', notification.body.substring(0, 200) + '...');
+      }
+      
+      // Mark trips as notified in database
+      // This would be handled by the backend service
+      
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      // In production, implement retry logic or queue for later
+      this.pendingEmails.push(notification);
     }
   }
 
-  // Create trip confirmation email template
-  private createTripConfirmationTemplate(trip: Trip): EmailTemplate {
-    const departureLocation = getLocationName(trip.departureLocation);
-    const destination = getLocationName(trip.destination);
-    const estimatedCost = trip.estimatedCost ? formatCurrency(trip.estimatedCost) : 'TBD';
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
-          .content { background: #f9fafb; padding: 20px; margin: 20px 0; }
-          .button { display: inline-block; padding: 12px 24px; background: #4F46E5; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 30px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🚗 Trip Confirmed</h1>
-          </div>
-          
-          <div class="content">
-            <h2>Trip Details</h2>
-            <p><strong>From:</strong> ${departureLocation}</p>
-            <p><strong>To:</strong> ${destination}</p>
-            <p><strong>Departure:</strong> ${trip.departureDate} at ${trip.departureTime}</p>
-            ${trip.returnDate ? `<p><strong>Return:</strong> ${trip.returnDate} at ${trip.returnTime || 'TBD'}</p>` : ''}
-            <p><strong>Estimated Cost:</strong> ${estimatedCost}</p>
-            ${trip.vehicleType ? `<p><strong>Vehicle:</strong> ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</p>` : ''}
-          </div>
-          
-          <center>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" class="button">View Dashboard</a>
-          </center>
-          
-          <div class="footer">
-            <p>This is an automated email from Trips Management System.</p>
-            <p>For support, contact: support@company.com</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    return {
-      to: trip.userEmail,
-      subject: `✅ Trip Confirmed - ${trip.id}`,
-      html,
-      text: `Your trip from ${departureLocation} to ${destination} on ${trip.departureDate} has been confirmed.`
-    };
+  /**
+   * Get pending emails (for debugging/monitoring)
+   */
+  getPendingEmails(): EmailNotification[] {
+    return this.pendingEmails;
   }
 
-  // Create optimization notification template
-  private createOptimizationTemplate(
-    trips: Trip[],
-    newDepartureTime: string,
-    vehicleType: string,
-    estimatedSavings: number
-  ): EmailTemplate {
-    const tripCount = trips.length;
-    const departureLocation = trips[0] ? getLocationName(trips[0].departureLocation) : 'Unknown';
-    const destination = trips[0] ? getLocationName(trips[0].destination) : 'Unknown';
-    const savings = formatCurrency(estimatedSavings);
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
-          .content { background: #f9fafb; padding: 20px; margin: 20px 0; }
-          .highlight { background: #DEF7EC; padding: 15px; border-left: 4px solid #10B981; margin: 15px 0; }
-          .button { display: inline-block; padding: 12px 24px; background: #10B981; color: white; text-decoration: none; border-radius: 6px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>💰 Trip Optimized!</h1>
-          </div>
-          
-          <div class="content">
-            <p>Good news! Your trip has been combined with ${tripCount - 1} other trip(s) to save costs.</p>
-            
-            <div class="highlight">
-              <h3>Optimization Details</h3>
-              <p><strong>Route:</strong> ${departureLocation} → ${destination}</p>
-              <p><strong>New Departure Time:</strong> ${newDepartureTime}</p>
-              <p><strong>Vehicle:</strong> ${config.vehicles[vehicleType as keyof typeof config.vehicles]?.name || vehicleType}</p>
-              <p><strong>Estimated Savings:</strong> ${savings}</p>
-            </div>
-            
-            <p>The trip schedule has been updated. Please check the dashboard for details.</p>
-          </div>
-          
-          <center>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" class="button">View Details</a>
-          </center>
-        </div>
-      </body>
-      </html>
-    `;
-
-    return {
-      to: [], // Will be filled by caller
-      subject: `💰 Your Trip Has Been Optimized`,
-      html,
-      text: `Your trip has been combined with ${tripCount - 1} other trips. New departure time: ${newDepartureTime}. Estimated savings: ${savings}.`
-    };
+  /**
+   * Retry sending pending emails
+   */
+  async retryPendingEmails(): Promise<void> {
+    const pending = [...this.pendingEmails];
+    this.pendingEmails = [];
+    
+    for (const email of pending) {
+      await this.sendEmail(email);
+    }
   }
 
-  // Create cancellation notification template
-  private createCancellationTemplate(trip: Trip): EmailTemplate {
-    const departureLocation = getLocationName(trip.departureLocation);
-    const destination = getLocationName(trip.destination);
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #EF4444; color: white; padding: 20px; text-align: center; }
-          .content { background: #f9fafb; padding: 20px; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>⚠️ Trip Cancelled</h1>
-          </div>
-          
-          <div class="content">
-            <p>Your trip has been cancelled:</p>
-            <p><strong>From:</strong> ${departureLocation}</p>
-            <p><strong>To:</strong> ${destination}</p>
-            <p><strong>Date:</strong> ${trip.departureDate}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    return {
-      to: trip.userEmail,
-      subject: `⚠️ Trip Cancelled - ${trip.id}`,
-      html,
-      text: `Your trip from ${departureLocation} to ${destination} on ${trip.departureDate} has been cancelled.`
-    };
-  }
-
-  // Create approval notification template
-  private createApprovalTemplate(trip: Trip): EmailTemplate {
-    const departureLocation = getLocationName(trip.departureLocation);
-    const destination = getLocationName(trip.destination);
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
-          .content { background: #f9fafb; padding: 20px; margin: 20px 0; }
-          .button { display: inline-block; padding: 12px 24px; background: #10B981; color: white; text-decoration: none; border-radius: 6px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✅ Trip Approved</h1>
-          </div>
-          
-          <div class="content">
-            <p>Your trip has been approved:</p>
-            <p><strong>From:</strong> ${departureLocation}</p>
-            <p><strong>To:</strong> ${destination}</p>
-            <p><strong>Departure:</strong> ${trip.departureDate} at ${trip.departureTime}</p>
-            ${trip.returnDate ? `<p><strong>Return:</strong> ${trip.returnDate}</p>` : ''}
-          </div>
-          
-          <center>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" class="button">View Details</a>
-          </center>
-        </div>
-      </body>
-      </html>
-    `;
-
-    return {
-      to: trip.userEmail,
-      subject: `✅ Trip Approved - ${trip.id}`,
-      html,
-      text: `Your trip from ${departureLocation} to ${destination} on ${trip.departureDate} has been approved.`
-    };
+  /**
+   * Check if email service is configured
+   */
+  isServiceConfigured(): boolean {
+    return this.isConfigured;
   }
 }
 

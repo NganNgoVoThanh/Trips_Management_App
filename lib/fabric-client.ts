@@ -74,7 +74,7 @@ class FabricClientService {
 
     try {
       const response = await fetch(`${this.baseUrl}/trips/${id}`, {
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         }
@@ -101,7 +101,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips`, {
         method: 'POST',
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -128,7 +128,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/${id}`, {
         method: 'PATCH',
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -153,7 +153,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/${id}`, {
         method: 'DELETE',
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -176,7 +176,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/optimize`, {
         method: 'POST',
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -201,7 +201,7 @@ class FabricClientService {
     try {
       const params = status ? `?status=${status}` : '';
       const response = await fetch(`${this.baseUrl}/optimize${params}`, {
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         }
@@ -224,8 +224,20 @@ class FabricClientService {
     if (!this.isClient) return null;
 
     try {
-      const groups = await this.getOptimizationGroups();
-      return groups.find((g: OptimizationGroup) => g.id === id) || null;
+      const response = await fetch(`${this.baseUrl}/optimize/${id}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        const errorData = await this.parseJsonResponse(response).catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      return await this.parseJsonResponse(response);
     } catch (error) {
       console.error('Error fetching optimization group:', error);
       return null;
@@ -259,9 +271,9 @@ class FabricClientService {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/trips?includeTemp=true`,
+        `${this.baseUrl}/trips?includeTemp=true&optimizedGroupId=${groupId}`,
         {
-          credentials: 'include', // ✅ FIX
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
           }
@@ -302,7 +314,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/temp`, {
         method: 'POST',
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -325,71 +337,75 @@ class FabricClientService {
     }
   }
 
-async approveOptimization(groupId: string): Promise<void> {
-  if (!this.isClient) return;
+  async approveOptimization(groupId: string): Promise<void> {
+    if (!this.isClient) return;
 
-  try {
-    // ✅ FIX: Ensure groupId is sent properly
-    if (!groupId) {
-      throw new Error('Group ID is required for approval');
+    try {
+      // ✅ FIX: Validate groupId before sending
+      if (!groupId) {
+        throw new Error('Group ID is required for approval');
+      }
+
+      console.log('Approving optimization with groupId:', groupId);
+
+      const response = await fetch(`${this.baseUrl}/optimize/approve`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ groupId }), // ✅ FIX: Ensure groupId is in body
+      });
+
+      if (!response.ok) {
+        const error = await this.parseJsonResponse(response).catch(() => ({ 
+          error: 'Failed to approve optimization' 
+        }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const result = await this.parseJsonResponse(response);
+      console.log('Optimization approved successfully:', result);
+    } catch (error: any) {
+      console.error('Error approving optimization:', error);
+      throw error;
     }
-
-    const response = await fetch(`${this.baseUrl}/optimize/approve`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ groupId }), // Ensure groupId is in body
-    });
-
-    if (!response.ok) {
-      const error = await this.parseJsonResponse(response).catch(() => ({ 
-        error: 'Failed to approve optimization' 
-      }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    const result = await this.parseJsonResponse(response);
-    console.log('Optimization approved:', result);
-  } catch (error: any) {
-    console.error('Error approving optimization:', error);
-    throw error;
   }
-}
 
-async rejectOptimization(groupId: string): Promise<void> {
-  if (!this.isClient) return;
+  async rejectOptimization(groupId: string): Promise<void> {
+    if (!this.isClient) return;
 
-  try {
-    // ✅ FIX: Ensure groupId is sent properly
-    if (!groupId) {
-      throw new Error('Group ID is required for rejection');
+    try {
+      // ✅ FIX: Validate groupId before sending
+      if (!groupId) {
+        throw new Error('Group ID is required for rejection');
+      }
+
+      console.log('Rejecting optimization with groupId:', groupId);
+
+      const response = await fetch(`${this.baseUrl}/optimize/reject`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ groupId }), // ✅ FIX: Ensure groupId is in body
+      });
+
+      if (!response.ok) {
+        const error = await this.parseJsonResponse(response).catch(() => ({ 
+          error: 'Failed to reject optimization' 
+        }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const result = await this.parseJsonResponse(response);
+      console.log('Optimization rejected successfully:', result);
+    } catch (error: any) {
+      console.error('Error rejecting optimization:', error);
+      throw error;
     }
-
-    const response = await fetch(`${this.baseUrl}/optimize/reject`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ groupId }), // Ensure groupId is in body
-    });
-
-    if (!response.ok) {
-      const error = await this.parseJsonResponse(response).catch(() => ({ 
-        error: 'Failed to reject optimization' 
-      }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    const result = await this.parseJsonResponse(response);
-    console.log('Optimization rejected:', result);
-  } catch (error: any) {
-    console.error('Error rejecting optimization:', error);
-    throw error;
   }
-}
 
   async deleteOptimizationGroup(proposalId: string): Promise<void> {
     if (!this.isClient) return;
@@ -430,7 +446,7 @@ async rejectOptimization(groupId: string): Promise<void> {
 
     try {
       const response = await fetch(`${this.baseUrl}/trips/data-stats`, {
-        credentials: 'include', // ✅ FIX
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         }

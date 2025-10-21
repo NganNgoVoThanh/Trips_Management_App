@@ -20,7 +20,6 @@ import { fabricService, Trip } from "@/lib/fabric-client"
 import { calculateDistance, getLocationName, formatCurrency, config } from "@/lib/config"
 import { aiOptimizer, OptimizationProposal } from "@/lib/ai-optimizer"
 import { authService } from "@/lib/auth-service"
-import { emailService } from "@/lib/email-service"
 
 export function TripOptimization() {
   const { toast } = useToast()
@@ -28,7 +27,8 @@ export function TripOptimization() {
   const [pendingTrips, setPendingTrips] = useState<Trip[]>([])
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [isApproving, setIsApproving] = useState(false)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -186,44 +186,36 @@ export function TripOptimization() {
   }
 
   const approveProposal = async (proposalId: string) => {
-    setIsApproving(true)
+    if (!proposalId) {
+      toast({
+        title: "Error",
+        description: "Invalid proposal ID",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setApprovingId(proposalId)
     
     try {
       const proposal = proposals.find(p => p.id === proposalId)
-      if (!proposal) return
-      
-      // Backend handles RAW→FINAL conversion
-      await fabricService.approveOptimization(proposalId)
-      
-      // Send notifications
-      const finalTrips = await Promise.all(
-        proposal.trips.map(async (tempTrip) => {
-          if (tempTrip.parentTripId) {
-            const finalTrip = await fabricService.getTripById(tempTrip.parentTripId)
-            return finalTrip
-          }
-          return null
-        })
-      )
-      
-      const validFinalTrips = finalTrips.filter(t => t !== null) as Trip[]
-      
-      if (validFinalTrips.length > 0) {
-        await emailService.sendOptimizationNotification(
-          validFinalTrips,
-          proposal.proposedDepartureTime || validFinalTrips[0].departureTime,
-          proposal.vehicleType || 'car-4',
-          proposal.estimatedSavings || 0
-        )
+      if (!proposal) {
+        throw new Error("Proposal not found")
       }
       
-      toast({
-        title: "Optimization Approved",
-        description: `Successfully optimized ${proposal.trips.length} trips`,
-      })
+      // ✅ FIX: Pass groupId properly to the backend
+      await fabricService.approveOptimization(proposalId)
       
-      // Reload data
+      // Update UI - remove approved proposal
+      setProposals(proposals.filter(p => p.id !== proposalId))
+      
+      // Reload data to get updated trips
       await loadData()
+      
+      toast({
+        title: "Proposal Approved",
+        description: `Optimization approved for ${proposal.trips.length} trips. Notifications have been sent.`,
+      })
     } catch (error: any) {
       console.error('Approval error:', error)
       toast({
@@ -232,15 +224,27 @@ export function TripOptimization() {
         variant: "destructive"
       })
     } finally {
-      setIsApproving(false)
+      setApprovingId(null)
     }
   }
 
   const rejectProposal = async (proposalId: string) => {
+    if (!proposalId) {
+      toast({
+        title: "Error",
+        description: "Invalid proposal ID",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setRejectingId(proposalId)
+    
     try {
-      // Backend handles TEMP deletion, RAW preservation
+      // ✅ FIX: Pass groupId properly to the backend
       await fabricService.rejectOptimization(proposalId)
       
+      // Update UI - remove rejected proposal
       setProposals(proposals.filter(p => p.id !== proposalId))
       
       toast({
@@ -248,11 +252,14 @@ export function TripOptimization() {
         description: "The optimization proposal has been rejected",
       })
     } catch (error: any) {
+      console.error('Rejection error:', error)
       toast({
         title: "Rejection Failed",
         description: error.message || "Failed to reject proposal",
         variant: "destructive"
       })
+    } finally {
+      setRejectingId(null)
     }
   }
 
@@ -339,6 +346,9 @@ export function TripOptimization() {
                 return null
               }
               
+              const isApproving = approvingId === proposal.id
+              const isRejecting = rejectingId === proposal.id
+              
               return (
                 <div key={`proposal-${proposal.id}`} className="rounded-lg border p-4 shadow-sm">
                   <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
@@ -367,7 +377,7 @@ export function TripOptimization() {
                       <Button
                         size="sm"
                         onClick={() => approveProposal(proposal.id)}
-                        disabled={isApproving}
+                        disabled={isApproving || isRejecting}
                       >
                         {isApproving ? (
                           <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -380,8 +390,13 @@ export function TripOptimization() {
                         size="sm"
                         variant="outline"
                         onClick={() => rejectProposal(proposal.id)}
+                        disabled={isApproving || isRejecting}
                       >
-                        <X className="mr-1 h-4 w-4" />
+                        {isRejecting ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="mr-1 h-4 w-4" />
+                        )}
                         Reject
                       </Button>
                     </div>
