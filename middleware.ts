@@ -2,33 +2,54 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Paths that require authentication
-const protectedPaths = ['/dashboard', '/admin'];
+// Public API paths that don't need auth
+const publicApiPaths = [
+  '/api/auth/login',
+  '/api/auth/logout', 
+  '/api/health',
+  '/api/init'
+];
 
-// Paths that require admin role
-const adminPaths = ['/admin'];
+// Admin-only API paths
+const adminApiPaths = [
+  '/api/optimize/approve',
+  '/api/optimize/reject',
+  '/api/join-requests',
+];
 
-// Public paths that don't need auth
-const publicPaths = ['/', '/login', '/api/auth'];
+// Admin-only page paths
+const adminPagePaths = ['/admin'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Allow public paths
-  if (publicPaths.some(path => pathname === path || pathname.startsWith(path))) {
+  // ✅ Allow public API paths (exact match or starts with)
+  if (publicApiPaths.some(path => pathname === path || pathname.startsWith(path + '/'))) {
     return NextResponse.next();
   }
   
-  // Check if path needs protection
-  const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
-  const isAdminPath = adminPaths.some(path => pathname.startsWith(path));
+  // ✅ Allow public pages
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
   
-  if (isProtectedPath) {
-    // Check for session in cookies
+  // ✅ Check if this is a protected path (API or page)
+  const isApiPath = pathname.startsWith('/api');
+  const isPagePath = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
+  
+  if (isApiPath || isPagePath) {
+    // Check for session cookie
     const session = request.cookies.get('session');
     
     if (!session) {
-      // Redirect to home for login
+      // No session - return 401 for API, redirect for pages
+      if (isApiPath) {
+        return NextResponse.json(
+          { error: 'User not authenticated' },
+          { status: 401 }
+        );
+      }
+      
       const url = request.nextUrl.clone();
       url.pathname = '/';
       url.searchParams.set('redirect', pathname);
@@ -36,33 +57,63 @@ export function middleware(request: NextRequest) {
     }
     
     try {
-      // Parse session to check user role
+      // Parse session to get user data
       const userData = JSON.parse(session.value);
       
-      // Check for admin access
+      if (!userData || !userData.id || !userData.email || !userData.role) {
+        throw new Error('Invalid session data');
+      }
+      
+      // ✅ Check admin access for admin paths
+      const isAdminPath = adminApiPaths.some(path => pathname.startsWith(path)) || 
+                         adminPagePaths.some(path => pathname.startsWith(path));
+      
       if (isAdminPath && userData.role !== 'admin') {
-        // Redirect non-admin users to regular dashboard
+        // Not admin - return 403 for API, redirect for pages
+        if (isApiPath) {
+          return NextResponse.json(
+            { error: 'Unauthorized - Admin access required' },
+            { status: 403 }
+          );
+        }
+        
         const url = request.nextUrl.clone();
         url.pathname = '/dashboard';
         return NextResponse.redirect(url);
       }
       
-      // Allow access - add user data to headers
+      // ✅ Allow access - set user headers for API routes
       const response = NextResponse.next();
-      response.headers.set('x-user-id', userData.id);
-      response.headers.set('x-user-email', userData.email);
-      response.headers.set('x-user-role', userData.role);
+      
+      if (isApiPath) {
+        response.headers.set('x-user-id', userData.id);
+        response.headers.set('x-user-email', userData.email);
+        response.headers.set('x-user-role', userData.role);
+        if (userData.name) response.headers.set('x-user-name', userData.name);
+        if (userData.department) response.headers.set('x-user-department', userData.department);
+        if (userData.employeeId) response.headers.set('x-user-employee-id', userData.employeeId);
+      }
+      
       return response;
       
     } catch (error) {
-      console.error('Invalid session:', error);
-      // Invalid session, redirect to login
+      console.error('Session parse error:', error);
+      
+      // Invalid session - return 401 for API, redirect for pages
+      if (isApiPath) {
+        return NextResponse.json(
+          { error: 'Invalid session' },
+          { status: 401 }
+        );
+      }
+      
       const url = request.nextUrl.clone();
       url.pathname = '/';
       return NextResponse.redirect(url);
     }
   }
   
+  // Allow all other paths (static files, etc.)
   return NextResponse.next();
 }
 

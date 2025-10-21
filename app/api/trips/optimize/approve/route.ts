@@ -1,23 +1,19 @@
-// app/api/trips/optimize/approve/route.ts
+// app/api/optimize/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
 import { emailService } from '@/lib/email-service';
-import { authService } from '@/lib/auth-service';
+import { requireAdmin } from '@/lib/server-auth';
 
-// Approve optimization and replace RAW with FINAL
 export async function POST(request: NextRequest) {
   try {
-    const { groupId } = await request.json();
+    // Require admin authentication using server-side auth
+    const adminUser = await requireAdmin(request);
     
-    // Check admin permission
-    const user = authService.getCurrentUser();
-    if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Admin access required' },
-        { status: 403 }
-      );
-    }
+    // Parse request body
+    const body = await request.json();
+    const { groupId } = body;
     
+    // ✅ FIX: Only need groupId, get trips from optimization group
     if (!groupId) {
       return NextResponse.json(
         { error: 'Group ID is required' },
@@ -25,8 +21,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Get optimization group
+    // Get optimization group to get trip IDs
     const group = await fabricService.getOptimizationGroupById(groupId);
+    
     if (!group) {
       return NextResponse.json(
         { error: 'Optimization group not found' },
@@ -34,16 +31,17 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Approve optimization - this replaces RAW with FINAL
+    // Approve optimization (converts TEMP → FINAL, updates RAW trips)
     await fabricService.approveOptimization(groupId);
     
-    // Get updated trips for notification
+    // Get final trips for notification
     const finalTrips = await Promise.all(
-      group.trips.map(id => fabricService.getTripById(id))
+      group.trips.map(tripId => fabricService.getTripById(tripId))
     );
     
-    // Send notifications
     const validTrips = finalTrips.filter(t => t !== null);
+    
+    // Send notification emails
     if (validTrips.length > 0) {
       await emailService.sendOptimizationNotification(
         validTrips as any,
@@ -53,17 +51,25 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    return NextResponse.json({
-      success: true,
-      message: `Optimization approved. ${group.trips.length} RAW trips replaced with FINAL data`,
+    return NextResponse.json({ 
+      success: true, 
       groupId,
-      tripsUpdated: group.trips.length,
-      dataReplaced: true,
-      tempDataDeleted: true
+      message: `Optimization approved for ${validTrips.length} trips`
     });
     
   } catch (error: any) {
-    console.error('Error approving optimization:', error);
+    console.error('Approve optimization error:', error);
+    
+    // Check for authorization errors
+    if (error.message.includes('Unauthorized') || 
+        error.message.includes('not authenticated') ||
+        error.message.includes('Admin access required')) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to approve optimization' },
       { status: 500 }

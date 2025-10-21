@@ -2,10 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
 import { emailService } from '@/lib/email-service';
-import { authService } from '@/lib/auth-service';
+import { requireAdmin } from '@/lib/server-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Require admin authentication using server-side auth
+    const adminUser = await requireAdmin(request);
+    
+    // Parse request body
     const body = await request.json();
     const { 
       groupId, 
@@ -16,22 +20,13 @@ export async function POST(request: NextRequest) {
       estimatedSavings 
     } = body;
     
-    const user = authService.getCurrentUser();
-    
-    if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-    
-    // Trường hợp 1: Chỉ có groupId
+    // Case 1: Only groupId provided (approve existing optimization)
     if (groupId && !trips) {
       await fabricService.approveOptimization(groupId);
       return NextResponse.json({ success: true, groupId });
     }
     
-    // Trường hợp 2: Có full data
+    // Case 2: Full data provided (create new optimization)
     if (!trips || !Array.isArray(trips) || trips.length === 0) {
       return NextResponse.json(
         { error: 'Invalid trips data' },
@@ -39,17 +34,19 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Create optimization group
     const group = await fabricService.createOptimizationGroup({
       trips: trips.map((t: any) => t.id),
       proposedDepartureTime: departureTime,
       vehicleType,
       estimatedSavings,
       status: 'approved',
-      createdBy: user.id,
-      approvedBy: user.id,
+      createdBy: adminUser.id,
+      approvedBy: adminUser.id,
       approvedAt: new Date().toISOString()
     });
     
+    // Update trips
     for (const trip of trips) {
       await fabricService.updateTrip(trip.id, {
         status: 'optimized',
@@ -61,6 +58,7 @@ export async function POST(request: NextRequest) {
       });
     }
     
+    // Send notification emails
     await emailService.sendOptimizationNotification(
       trips,
       departureTime,
@@ -69,8 +67,20 @@ export async function POST(request: NextRequest) {
     );
     
     return NextResponse.json({ success: true, groupId: group.id });
+    
   } catch (error: any) {
     console.error('Approve optimization error:', error);
+    
+    // Check for authorization errors
+    if (error.message.includes('Unauthorized') || 
+        error.message.includes('not authenticated') ||
+        error.message.includes('Admin access required')) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
+        { status: 403 }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to approve optimization' },
       { status: 500 }

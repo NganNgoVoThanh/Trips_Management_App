@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-import { authService } from "@/lib/auth-service"
 import { config } from "@/lib/config"
 import Image from "next/image"
 
@@ -49,29 +48,46 @@ export function LoginButton({
         return
       }
 
-      // Authenticate with SSO
-      const user = await authService.loginWithSSO(email)
+      // ✅ FIX: Call API login endpoint to set cookie
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include', // ✅ Important: include credentials
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Login failed')
+      }
+
+      const user = await response.json()
+      
+      // ✅ Also save to sessionStorage for client-side access
+      sessionStorage.setItem('currentUser', JSON.stringify(user))
       
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.name}!`,
       })
 
-      // Redirect based on role
+      setOpen(false)
+      
+      // ✅ FIX: Redirect immediately after cookie is set
       if (user.role === 'admin') {
-        setTimeout(() => router.push("/admin/dashboard"), 1500)
+        router.push("/admin/dashboard")
       } else {
-        setTimeout(() => router.push("/dashboard"), 1500)
+        router.push("/dashboard")
       }
 
-      setOpen(false)
     } catch (error: any) {
       toast({
         title: "Login Failed",
         description: error.message || "An error occurred during login",
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
     }
   }

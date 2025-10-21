@@ -14,7 +14,7 @@ class FabricClientService {
     includeTemp?: boolean 
   }): Promise<Trip[]> {
     if (!this.isClient) {
-      console.warn('âš ï¸ getTrips called on server side - skipping');
+      console.warn('⚠️ getTrips called on server side - skipping');
       return [];
     }
 
@@ -24,7 +24,12 @@ class FabricClientService {
       if (filters?.status) params.append('status', filters.status);
       if (filters?.includeTemp) params.append('includeTemp', 'true');
 
-      const response = await fetch(`${this.baseUrl}/trips?${params.toString()}`);
+      const response = await fetch(`${this.baseUrl}/trips?${params.toString()}`, {
+        credentials: 'include', // ✅ FIX: Include cookies
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -42,7 +47,12 @@ class FabricClientService {
     if (!this.isClient) return null;
 
     try {
-      const response = await fetch(`${this.baseUrl}/trips/${id}`);
+      const response = await fetch(`${this.baseUrl}/trips/${id}`, {
+        credentials: 'include', // ✅ FIX
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (!response.ok) {
         if (response.status === 404) return null;
@@ -64,6 +74,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips`, {
         method: 'POST',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -90,6 +101,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/${id}`, {
         method: 'PATCH',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -114,6 +126,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/${id}`, {
         method: 'DELETE',
+        credentials: 'include', // ✅ FIX
       });
 
       if (!response.ok) {
@@ -136,6 +149,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/optimize`, {
         method: 'POST',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -159,7 +173,12 @@ class FabricClientService {
 
     try {
       const params = status ? `?status=${status}` : '';
-      const response = await fetch(`${this.baseUrl}/optimize${params}`);
+      const response = await fetch(`${this.baseUrl}/optimize${params}`, {
+        credentials: 'include', // ✅ FIX
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -212,7 +231,13 @@ class FabricClientService {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/trips?includeTemp=true`
+        `${this.baseUrl}/trips?includeTemp=true`,
+        {
+          credentials: 'include', // ✅ FIX
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       );
 
       if (!response.ok) {
@@ -248,6 +273,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/trips/temp`, {
         method: 'POST',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -276,6 +302,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/optimize/approve`, {
         method: 'POST',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -298,6 +325,7 @@ class FabricClientService {
     try {
       const response = await fetch(`${this.baseUrl}/optimize/reject`, {
         method: 'POST',
+        credentials: 'include', // ✅ FIX
         headers: {
           'Content-Type': 'application/json',
         },
@@ -352,7 +380,12 @@ class FabricClientService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/trips/data-stats`);
+      const response = await fetch(`${this.baseUrl}/trips/data-stats`, {
+        credentials: 'include', // ✅ FIX
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

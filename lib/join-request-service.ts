@@ -31,6 +31,30 @@ const getPool = async () => {
   return pool;
 };
 
+// ✅ NEW: Helper to convert ISO to MySQL datetime
+const toMySQLDateTime = (isoString: string): string => {
+  if (!isoString) return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  
+  try {
+    const date = new Date(isoString);
+    // Convert to MySQL format: YYYY-MM-DD HH:MM:SS
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+  } catch (error) {
+    console.error('Invalid datetime:', isoString);
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
+};
+
+// User interface for server-side operations
+export interface RequestUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'user';
+  department?: string;
+  employeeId?: string;
+}
+
 export interface JoinRequest {
   id: string;
   tripId: string;
@@ -56,18 +80,16 @@ export interface JoinRequest {
 
 class JoinRequestService {
   private storageKey = 'join_requests';
-  private useMySQLStorage = isServer; // Only use MySQL on server side
+  private useMySQLStorage = isServer;
 
-  // Server-side check wrapper
   private ensureServerSide(methodName: string): boolean {
     if (!isServer) {
-      console.warn(`âŒ ${methodName} called on client side - using localStorage fallback`);
+      console.warn(`⚠️ ${methodName} called on client side - using localStorage fallback`);
       return false;
     }
     return true;
   }
 
-  // Helper: Convert snake_case to camelCase
   private toCamelCase(data: any): any {
     if (!data) return data;
     
@@ -75,7 +97,6 @@ class JoinRequestService {
     Object.keys(data).forEach(key => {
       const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
       
-      // Special handling for JSON fields
       if (key === 'trip_details' && typeof data[key] === 'string') {
         converted[camelKey] = JSON.parse(data[key]);
       } else {
@@ -85,7 +106,6 @@ class JoinRequestService {
     return converted;
   }
 
-  // Helper: Convert camelCase to snake_case
   private toSnakeCase(data: any): any {
     if (!data) return data;
     
@@ -93,8 +113,11 @@ class JoinRequestService {
     Object.keys(data).forEach(key => {
       const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
       
-      // Special handling for JSON fields
-      if (key === 'tripDetails' && typeof data[key] === 'object') {
+      // ✅ FIX: Convert datetime fields to MySQL format
+      if ((snakeKey === 'created_at' || snakeKey === 'updated_at' || 
+           snakeKey === 'processed_at') && typeof data[key] === 'string') {
+        converted[snakeKey] = toMySQLDateTime(data[key]);
+      } else if (key === 'tripDetails' && typeof data[key] === 'object') {
         converted[snakeKey] = JSON.stringify(data[key]);
       } else {
         converted[snakeKey] = data[key];
@@ -103,20 +126,35 @@ class JoinRequestService {
     return converted;
   }
 
-  // Create new join request
   async createJoinRequest(
     tripId: string,
     tripDetails: JoinRequest['tripDetails'],
-    reason?: string
+    reason?: string,
+    requestUser?: RequestUser
   ): Promise<JoinRequest> {
     try {
-      const user = authService.getCurrentUser();
+      let user: RequestUser | null = null;
+      
+      if (requestUser) {
+        user = requestUser;
+      } else if (typeof window !== 'undefined') {
+        const clientUser = authService.getCurrentUser();
+        if (clientUser) {
+          user = {
+            id: clientUser.id,
+            email: clientUser.email,
+            name: clientUser.name,
+            role: clientUser.role,
+            department: clientUser.department,
+            employeeId: clientUser.employeeId
+          };
+        }
+      }
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Check if user already has a pending request for this trip
       const existingRequests = await this.getJoinRequests({ 
         tripId, 
         requesterId: user.id,
@@ -141,17 +179,13 @@ class JoinRequestService {
         updatedAt: new Date().toISOString()
       };
 
-      // Save to MySQL or localStorage
       if (this.ensureServerSide('createJoinRequest')) {
         await this.saveJoinRequestMySQL(joinRequest);
       } else {
         await this.saveJoinRequestLocal(joinRequest);
       }
 
-      // Send notification to admin
       await this.notifyAdminNewRequest(joinRequest);
-
-      // Send confirmation to requester
       await this.sendRequestConfirmation(joinRequest);
 
       return joinRequest;
@@ -161,149 +195,29 @@ class JoinRequestService {
     }
   }
 
-  // Get join requests with filters
-  async getJoinRequests(filters?: {
-    tripId?: string;
-    requesterId?: string;
-    status?: string;
-  }): Promise<JoinRequest[]> {
+  async approveJoinRequest(
+    requestId: string, 
+    adminNotes?: string,
+    adminUser?: RequestUser
+  ): Promise<void> {
     try {
-      if (this.ensureServerSide('getJoinRequests')) {
-        return await this.getJoinRequestsMySQL(filters);
-      } else {
-        return this.getJoinRequestsLocalFiltered(filters);
+      let user: RequestUser | null = null;
+      
+      if (adminUser) {
+        user = adminUser;
+      } else if (typeof window !== 'undefined') {
+        const clientUser = authService.getCurrentUser();
+        if (clientUser) {
+          user = {
+            id: clientUser.id,
+            email: clientUser.email,
+            name: clientUser.name,
+            role: clientUser.role,
+            department: clientUser.department,
+            employeeId: clientUser.employeeId
+          };
+        }
       }
-    } catch (error) {
-      console.error('Error getting join requests:', error);
-      // Fallback to localStorage on error
-      return this.getJoinRequestsLocalFiltered(filters);
-    }
-  }
-
-  // MySQL: Save join request
-  private async saveJoinRequestMySQL(request: JoinRequest): Promise<void> {
-    if (!this.ensureServerSide('saveJoinRequestMySQL')) {
-      await this.saveJoinRequestLocal(request);
-      return;
-    }
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      const snakeData = this.toSnakeCase(request);
-      
-      await connection.query(
-        'INSERT INTO join_requests SET ?',
-        [snakeData]
-      );
-      
-      connection.release();
-      console.log('âœ… Join request created in MySQL:', request.id);
-    } catch (err: any) {
-      console.error('âŒ Error saving join request to MySQL:', err.message);
-      // Fallback to localStorage
-      await this.saveJoinRequestLocal(request);
-    }
-  }
-
-  // MySQL: Get join requests with filters
-  private async getJoinRequestsMySQL(filters?: {
-    tripId?: string;
-    requesterId?: string;
-    status?: string;
-  }): Promise<JoinRequest[]> {
-    if (!this.ensureServerSide('getJoinRequestsMySQL')) {
-      return this.getJoinRequestsLocalFiltered(filters);
-    }
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      let query = 'SELECT * FROM join_requests';
-      const conditions: string[] = [];
-      const params: any[] = [];
-      
-      if (filters?.tripId) {
-        conditions.push('trip_id = ?');
-        params.push(filters.tripId);
-      }
-      if (filters?.requesterId) {
-        conditions.push('requester_id = ?');
-        params.push(filters.requesterId);
-      }
-      if (filters?.status) {
-        conditions.push('status = ?');
-        params.push(filters.status);
-      }
-      
-      if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ');
-      }
-      
-      query += ' ORDER BY created_at DESC';
-      
-      const [rows] = await connection.query(query, params);
-      connection.release();
-      
-      return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as JoinRequest) : [];
-    } catch (err: any) {
-      console.warn('âš ï¸ Error fetching join requests from MySQL:', err.message);
-      // Fallback to localStorage
-      return this.getJoinRequestsLocalFiltered(filters);
-    }
-  }
-
-  // MySQL: Update join request
-  private async updateJoinRequestMySQL(request: JoinRequest): Promise<void> {
-    if (!this.ensureServerSide('updateJoinRequestMySQL')) {
-      await this.updateJoinRequestLocal(request);
-      return;
-    }
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      const snakeData = this.toSnakeCase({
-        ...request,
-        updated_at: new Date().toISOString()
-      });
-      
-      // Remove id from update data
-      delete snakeData.id;
-      
-      await connection.query(
-        'UPDATE join_requests SET ? WHERE id = ?',
-        [snakeData, request.id]
-      );
-      
-      connection.release();
-      console.log('âœ… Join request updated in MySQL:', request.id);
-    } catch (err: any) {
-      console.error('âŒ Error updating join request in MySQL:', err.message);
-      // Fallback to localStorage
-      await this.updateJoinRequestLocal(request);
-    }
-  }
-
-  // MySQL: Delete join request
-  private async deleteJoinRequestMySQL(requestId: string): Promise<void> {
-    if (!this.ensureServerSide('deleteJoinRequestMySQL')) return;
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      await connection.query('DELETE FROM join_requests WHERE id = ?', [requestId]);
-      connection.release();
-      console.log('âœ… Join request deleted from MySQL:', requestId);
-    } catch (err: any) {
-      console.error('âŒ Error deleting join request from MySQL:', err.message);
-    }
-  }
-
-  // Approve join request
-  async approveJoinRequest(requestId: string, adminNotes?: string): Promise<void> {
-    try {
-      const user = authService.getCurrentUser();
       
       if (!user || user.role !== 'admin') {
         throw new Error('Only admins can approve join requests');
@@ -319,7 +233,6 @@ class JoinRequestService {
         throw new Error('Only pending requests can be approved');
       }
 
-      // Update request status
       const updatedRequest: JoinRequest = {
         ...request,
         status: 'approved',
@@ -335,10 +248,7 @@ class JoinRequestService {
         await this.updateJoinRequestLocal(updatedRequest);
       }
 
-      // Add user to the trip
       await this.addUserToTrip(request);
-
-      // Send approval notification
       await this.sendApprovalNotification(updatedRequest);
     } catch (error) {
       console.error('Error approving join request:', error);
@@ -346,10 +256,29 @@ class JoinRequestService {
     }
   }
 
-  // Reject join request
-  async rejectJoinRequest(requestId: string, adminNotes: string): Promise<void> {
+  async rejectJoinRequest(
+    requestId: string, 
+    adminNotes: string,
+    adminUser?: RequestUser
+  ): Promise<void> {
     try {
-      const user = authService.getCurrentUser();
+      let user: RequestUser | null = null;
+      
+      if (adminUser) {
+        user = adminUser;
+      } else if (typeof window !== 'undefined') {
+        const clientUser = authService.getCurrentUser();
+        if (clientUser) {
+          user = {
+            id: clientUser.id,
+            email: clientUser.email,
+            name: clientUser.name,
+            role: clientUser.role,
+            department: clientUser.department,
+            employeeId: clientUser.employeeId
+          };
+        }
+      }
       
       if (!user || user.role !== 'admin') {
         throw new Error('Only admins can reject join requests');
@@ -365,7 +294,6 @@ class JoinRequestService {
         throw new Error('Only pending requests can be rejected');
       }
 
-      // Update request status
       const updatedRequest: JoinRequest = {
         ...request,
         status: 'rejected',
@@ -381,7 +309,6 @@ class JoinRequestService {
         await this.updateJoinRequestLocal(updatedRequest);
       }
 
-      // Send rejection notification
       await this.sendRejectionNotification(updatedRequest);
     } catch (error) {
       console.error('Error rejecting join request:', error);
@@ -389,10 +316,28 @@ class JoinRequestService {
     }
   }
 
-  // Cancel join request (by requester)
-  async cancelJoinRequest(requestId: string): Promise<void> {
+  async cancelJoinRequest(
+    requestId: string,
+    requesterUser?: RequestUser
+  ): Promise<void> {
     try {
-      const user = authService.getCurrentUser();
+      let user: RequestUser | null = null;
+      
+      if (requesterUser) {
+        user = requesterUser;
+      } else if (typeof window !== 'undefined') {
+        const clientUser = authService.getCurrentUser();
+        if (clientUser) {
+          user = {
+            id: clientUser.id,
+            email: clientUser.email,
+            name: clientUser.name,
+            role: clientUser.role,
+            department: clientUser.department,
+            employeeId: clientUser.employeeId
+          };
+        }
+      }
       
       if (!user) {
         throw new Error('User not authenticated');
@@ -412,7 +357,6 @@ class JoinRequestService {
         throw new Error('Only pending requests can be cancelled');
       }
 
-      // Update request status
       const updatedRequest: JoinRequest = {
         ...request,
         status: 'cancelled',
@@ -424,104 +368,57 @@ class JoinRequestService {
       } else {
         await this.updateJoinRequestLocal(updatedRequest);
       }
+
+      await this.sendCancellationNotification(updatedRequest);
     } catch (error) {
       console.error('Error cancelling join request:', error);
       throw error;
     }
   }
 
-  // Get join request by ID
-  async getJoinRequestById(requestId: string): Promise<JoinRequest | null> {
-    const requests = await this.getJoinRequests();
-    return requests.find(r => r.id === requestId) || null;
-  }
-
-  // Add user to trip after approval
-  private async addUserToTrip(request: JoinRequest): Promise<void> {
-    // Create a new trip entry for the user
-    await fabricService.createTrip({
-      userId: request.requesterId,
-      userName: request.requesterName,
-      userEmail: request.requesterEmail,
-      departureLocation: request.tripDetails.departureLocation,
-      destination: request.tripDetails.destination,
-      departureDate: request.tripDetails.departureDate,
-      departureTime: request.tripDetails.departureTime,
-      returnDate: request.tripDetails.departureDate, // Same day return assumed
-      returnTime: '18:00', // Default return time
-      status: 'confirmed',
-      optimizedGroupId: request.tripDetails.optimizedGroupId,
-      notified: false,
-      estimatedCost: 0, // Will be calculated
-      vehicleType: 'car-4' // Default
-    });
-  }
-
-  // Local storage operations (fallback)
-  private getJoinRequestsLocal(): JoinRequest[] {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(this.storageKey);
-    return data ? JSON.parse(data) : [];
-  }
-
-  private getJoinRequestsLocalFiltered(filters?: {
+  async getJoinRequests(filters?: {
     tripId?: string;
     requesterId?: string;
     status?: string;
-  }): JoinRequest[] {
-    const requests = this.getJoinRequestsLocal();
-    
-    if (!filters) return requests;
-
-    return requests.filter(request => {
-      if (filters.tripId && request.tripId !== filters.tripId) return false;
-      if (filters.requesterId && request.requesterId !== filters.requesterId) return false;
-      if (filters.status && request.status !== filters.status) return false;
-      return true;
-    });
-  }
-
-  private async saveJoinRequestLocal(request: JoinRequest): Promise<void> {
-    if (typeof window === 'undefined') return;
-    const requests = this.getJoinRequestsLocal();
-    requests.push(request);
-    localStorage.setItem(this.storageKey, JSON.stringify(requests));
-  }
-
-  private async updateJoinRequestLocal(request: JoinRequest): Promise<void> {
-    if (typeof window === 'undefined') return;
-    const requests = this.getJoinRequestsLocal();
-    const index = requests.findIndex(r => r.id === request.id);
-    
-    if (index !== -1) {
-      requests[index] = request;
-      localStorage.setItem(this.storageKey, JSON.stringify(requests));
+  }): Promise<JoinRequest[]> {
+    try {
+      if (this.ensureServerSide('getJoinRequests')) {
+        return await this.getJoinRequestsMySQL(filters);
+      } else {
+        return this.getJoinRequestsLocalFiltered(filters);
+      }
+    } catch (error) {
+      console.error('Error getting join requests:', error);
+      return this.getJoinRequestsLocalFiltered(filters);
     }
   }
 
-  // Notification methods
-  private async notifyAdminNewRequest(request: JoinRequest): Promise<void> {
-    console.log('Notifying admin about new join request:', request);
+  async getJoinRequestById(requestId: string): Promise<JoinRequest | null> {
+    try {
+      if (this.ensureServerSide('getJoinRequestById')) {
+        const poolInstance = await getPool();
+        const connection = await poolInstance.getConnection();
+        const [rows] = await connection.query(
+          'SELECT * FROM join_requests WHERE id = ?',
+          [requestId]
+        );
+        connection.release();
+        
+        if (Array.isArray(rows) && rows.length > 0) {
+          return this.toCamelCase(rows[0]);
+        }
+        return null;
+      } else {
+        const requests = this.getJoinRequestsLocal();
+        return requests.find(r => r.id === requestId) || null;
+      }
+    } catch (error) {
+      console.error('Error getting join request by ID:', error);
+      const requests = this.getJoinRequestsLocal();
+      return requests.find(r => r.id === requestId) || null;
+    }
   }
 
-  private async sendRequestConfirmation(request: JoinRequest): Promise<void> {
-    console.log('Sending confirmation to requester:', request);
-  }
-
-  private async sendApprovalNotification(request: JoinRequest): Promise<void> {
-    console.log('Sending approval notification:', request);
-  }
-
-  private async sendRejectionNotification(request: JoinRequest): Promise<void> {
-    console.log('Sending rejection notification:', request);
-  }
-
-  // Generate unique ID
-  private generateId(): string {
-    return `join-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  // Get statistics for admin dashboard
   async getJoinRequestStats(): Promise<{
     total: number;
     pending: number;
@@ -529,34 +426,278 @@ class JoinRequestService {
     rejected: number;
     cancelled: number;
   }> {
-    const requests = await this.getJoinRequests();
-    
-    return {
-      total: requests.length,
-      pending: requests.filter(r => r.status === 'pending').length,
-      approved: requests.filter(r => r.status === 'approved').length,
-      rejected: requests.filter(r => r.status === 'rejected').length,
-      cancelled: requests.filter(r => r.status === 'cancelled').length
-    };
+    try {
+      const requests = await this.getJoinRequests();
+      return {
+        total: requests.length,
+        pending: requests.filter(r => r.status === 'pending').length,
+        approved: requests.filter(r => r.status === 'approved').length,
+        rejected: requests.filter(r => r.status === 'rejected').length,
+        cancelled: requests.filter(r => r.status === 'cancelled').length
+      };
+    } catch (error) {
+      console.error('Error getting join request stats:', error);
+      return { total: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+    }
   }
 
-  // Clear all join requests (admin only)
   async clearAllJoinRequests(): Promise<void> {
-    try {
-      if (this.ensureServerSide('clearAllJoinRequests')) {
+    if (this.ensureServerSide('clearAllJoinRequests')) {
+      try {
         const poolInstance = await getPool();
         const connection = await poolInstance.getConnection();
         await connection.query('DELETE FROM join_requests');
         connection.release();
-        console.log('âœ… All join requests cleared from MySQL');
-      } else {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(this.storageKey);
-          console.log('âœ… All join requests cleared from localStorage');
-        }
+        console.log('✅ All join requests cleared from MySQL');
+      } catch (error) {
+        console.error('Error clearing join requests:', error);
+        throw error;
+      }
+    } else {
+      localStorage.removeItem(this.storageKey);
+    }
+  }
+
+  private async saveJoinRequestMySQL(request: JoinRequest): Promise<void> {
+    if (!this.ensureServerSide('saveJoinRequestMySQL')) {
+      await this.saveJoinRequestLocal(request);
+      return;
+    }
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      const snakeData = this.toSnakeCase(request);
+      
+      await connection.query(
+        'INSERT INTO join_requests SET ?',
+        [snakeData]
+      );
+      
+      connection.release();
+      console.log('✅ Join request saved to MySQL:', request.id);
+    } catch (err: any) {
+      console.error('❌ Error saving join request to MySQL:', err.message);
+      await this.saveJoinRequestLocal(request);
+    }
+  }
+
+  private async getJoinRequestsMySQL(filters?: {
+    tripId?: string;
+    requesterId?: string;
+    status?: string;
+  }): Promise<JoinRequest[]> {
+    if (!this.ensureServerSide('getJoinRequestsMySQL')) {
+      return this.getJoinRequestsLocalFiltered(filters);
+    }
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      
+      let query = 'SELECT * FROM join_requests WHERE 1=1';
+      const params: any[] = [];
+      
+      if (filters?.tripId) {
+        query += ' AND trip_id = ?';
+        params.push(filters.tripId);
+      }
+      if (filters?.requesterId) {
+        query += ' AND requester_id = ?';
+        params.push(filters.requesterId);
+      }
+      if (filters?.status) {
+        query += ' AND status = ?';
+        params.push(filters.status);
+      }
+      
+      query += ' ORDER BY created_at DESC';
+      
+      const [rows] = await connection.query(query, params);
+      connection.release();
+      
+      if (Array.isArray(rows)) {
+        return rows.map(row => this.toCamelCase(row));
+      }
+      return [];
+    } catch (err: any) {
+      console.error('❌ Error getting join requests from MySQL:', err.message);
+      return this.getJoinRequestsLocalFiltered(filters);
+    }
+  }
+
+  private async updateJoinRequestMySQL(request: JoinRequest): Promise<void> {
+    if (!this.ensureServerSide('updateJoinRequestMySQL')) {
+      await this.updateJoinRequestLocal(request);
+      return;
+    }
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      const snakeData = this.toSnakeCase(request);
+      
+      delete snakeData.id;
+      
+      await connection.query(
+        'UPDATE join_requests SET ? WHERE id = ?',
+        [snakeData, request.id]
+      );
+      
+      connection.release();
+      console.log('✅ Join request updated in MySQL:', request.id);
+    } catch (err: any) {
+      console.error('❌ Error updating join request in MySQL:', err.message);
+      await this.updateJoinRequestLocal(request);
+    }
+  }
+
+  private getJoinRequestsLocal(): JoinRequest[] {
+    if (typeof window === 'undefined') return [];
+    
+    try {
+      const data = localStorage.getItem(this.storageKey);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error reading from localStorage:', error);
+      return [];
+    }
+  }
+
+  private getJoinRequestsLocalFiltered(filters?: {
+    tripId?: string;
+    requesterId?: string;
+    status?: string;
+  }): JoinRequest[] {
+    let requests = this.getJoinRequestsLocal();
+    
+    if (filters?.tripId) {
+      requests = requests.filter(r => r.tripId === filters.tripId);
+    }
+    if (filters?.requesterId) {
+      requests = requests.filter(r => r.requesterId === filters.requesterId);
+    }
+    if (filters?.status) {
+      requests = requests.filter(r => r.status === filters.status);
+    }
+    
+    return requests;
+  }
+
+  private async saveJoinRequestLocal(request: JoinRequest): Promise<void> {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const requests = this.getJoinRequestsLocal();
+      requests.push(request);
+      localStorage.setItem(this.storageKey, JSON.stringify(requests));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  }
+
+  private async updateJoinRequestLocal(request: JoinRequest): Promise<void> {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const requests = this.getJoinRequestsLocal();
+      const index = requests.findIndex(r => r.id === request.id);
+      
+      if (index !== -1) {
+        requests[index] = request;
+        localStorage.setItem(this.storageKey, JSON.stringify(requests));
       }
     } catch (error) {
-      console.error('Error clearing join requests:', error);
+      console.error('Error updating localStorage:', error);
+    }
+  }
+
+  private generateId(): string {
+    return `jr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private async notifyAdminNewRequest(request: JoinRequest): Promise<void> {
+    try {
+      await emailService.sendEmail({
+        to: 'admin@company.com',
+        subject: 'New Trip Join Request',
+        text: `New join request from ${request.requesterName} for trip ${request.tripId}`,
+        html: `<p>New join request from <strong>${request.requesterName}</strong></p>
+               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
+               <p>Date: ${request.tripDetails.departureDate} at ${request.tripDetails.departureTime}</p>`
+      });
+    } catch (error) {
+      console.error('Error sending admin notification:', error);
+    }
+  }
+
+  private async sendRequestConfirmation(request: JoinRequest): Promise<void> {
+    try {
+      await emailService.sendEmail({
+        to: request.requesterEmail,
+        subject: 'Trip Join Request Submitted',
+        text: `Your request to join the trip has been submitted and is awaiting admin approval.`,
+        html: `<p>Your request to join the trip has been submitted.</p>
+               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
+               <p>Status: <strong>Pending Approval</strong></p>`
+      });
+    } catch (error) {
+      console.error('Error sending confirmation:', error);
+    }
+  }
+
+  private async sendApprovalNotification(request: JoinRequest): Promise<void> {
+    try {
+      await emailService.sendEmail({
+        to: request.requesterEmail,
+        subject: 'Trip Join Request Approved',
+        text: `Your request to join the trip has been approved!`,
+        html: `<p>Great news! Your request to join the trip has been <strong>approved</strong>.</p>
+               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
+               <p>Date: ${request.tripDetails.departureDate} at ${request.tripDetails.departureTime}</p>`
+      });
+    } catch (error) {
+      console.error('Error sending approval notification:', error);
+    }
+  }
+
+  private async sendRejectionNotification(request: JoinRequest): Promise<void> {
+    try {
+      await emailService.sendEmail({
+        to: request.requesterEmail,
+        subject: 'Trip Join Request Rejected',
+        text: `Your request to join the trip has been rejected.`,
+        html: `<p>Your request to join the trip has been rejected.</p>
+               ${request.adminNotes ? `<p>Admin notes: ${request.adminNotes}</p>` : ''}
+               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>`
+      });
+    } catch (error) {
+      console.error('Error sending rejection notification:', error);
+    }
+  }
+
+  private async sendCancellationNotification(request: JoinRequest): Promise<void> {
+    try {
+      await emailService.sendEmail({
+        to: 'admin@company.com',
+        subject: 'Trip Join Request Cancelled',
+        text: `Join request by ${request.requesterName} has been cancelled.`,
+        html: `<p>Join request by <strong>${request.requesterName}</strong> has been cancelled.</p>
+               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>`
+      });
+    } catch (error) {
+      console.error('Error sending cancellation notification:', error);
+    }
+  }
+
+  private async addUserToTrip(request: JoinRequest): Promise<void> {
+    try {
+      const trip = await fabricService.getTripById(request.tripId);
+      if (trip) {
+        console.log(`✅ User ${request.requesterName} added to trip ${request.tripId}`);
+      }
+    } catch (error) {
+      console.error('Error adding user to trip:', error);
     }
   }
 }

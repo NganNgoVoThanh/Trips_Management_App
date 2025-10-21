@@ -1,7 +1,7 @@
 // app/api/trips/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
-import { authService } from '@/lib/auth-service';
+import { getUserFromRequest } from '@/lib/server-auth';
 
 export async function GET(request: NextRequest) {
   try {

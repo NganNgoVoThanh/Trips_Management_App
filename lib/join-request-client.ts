@@ -13,7 +13,7 @@ class JoinRequestClientService {
     status?: string;
   }): Promise<JoinRequest[]> {
     if (!this.isClient) {
-      console.warn('âš ï¸ getJoinRequests called on server side');
+      console.warn('⚠️ getJoinRequests called on server side');
       return [];
     }
 
@@ -23,7 +23,12 @@ class JoinRequestClientService {
       if (filters?.requesterId) params.append('requesterId', filters.requesterId);
       if (filters?.status) params.append('status', filters.status);
 
-      const response = await fetch(`${this.baseUrl}/join-requests?${params.toString()}`);
+      const response = await fetch(`${this.baseUrl}/join-requests?${params.toString()}`, {
+        credentials: 'include', // ← FIX: Include cookies
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -49,6 +54,7 @@ class JoinRequestClientService {
     try {
       const response = await fetch(`${this.baseUrl}/join-requests`, {
         method: 'POST',
+        credentials: 'include', // ← FIX: Include cookies
         headers: {
           'Content-Type': 'application/json',
         },
@@ -73,6 +79,7 @@ class JoinRequestClientService {
     try {
       const response = await fetch(`${this.baseUrl}/join-requests/${requestId}/approve`, {
         method: 'POST',
+        credentials: 'include', // ← FIX: Include cookies
         headers: {
           'Content-Type': 'application/json',
         },
@@ -95,6 +102,7 @@ class JoinRequestClientService {
     try {
       const response = await fetch(`${this.baseUrl}/join-requests/${requestId}/reject`, {
         method: 'POST',
+        credentials: 'include', // ← FIX: Include cookies
         headers: {
           'Content-Type': 'application/json',
         },
@@ -117,6 +125,7 @@ class JoinRequestClientService {
     try {
       const response = await fetch(`${this.baseUrl}/join-requests/${requestId}/cancel`, {
         method: 'POST',
+        credentials: 'include', // ← FIX: Include cookies
       });
 
       if (!response.ok) {
@@ -147,9 +156,25 @@ class JoinRequestClientService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/join-requests/stats`);
+      const response = await fetch(`${this.baseUrl}/join-requests/stats`, {
+        credentials: 'include', // ← FIX: Include cookies để auth
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (!response.ok) {
+        // Nếu 401, return empty stats thay vì throw error
+        if (response.status === 401) {
+          console.warn('⚠️ User not authenticated for stats');
+          return {
+            total: 0,
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            cancelled: 0,
+          };
+        }
         throw new Error(`HTTP ${response.status}`);
       }
 
