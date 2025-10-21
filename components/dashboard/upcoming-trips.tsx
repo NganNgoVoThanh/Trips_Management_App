@@ -9,6 +9,7 @@ import { AlertCircle, Calendar, Clock, MapPin, Car, Users, Loader2 } from "lucid
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
+import { formatDateVN, formatDateLongVN } from "@/lib/date-utils"
 import { emailService } from "@/lib/email-service"
 import {
   Dialog,
@@ -114,15 +115,7 @@ export function UpcomingTrips() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      weekday: 'short',
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-  }
+  // Remove old formatDate - now using formatDateLongVN from date-utils
 
   const getDaysUntilTrip = (dateString: string) => {
     const tripDate = new Date(dateString)
@@ -182,10 +175,10 @@ export function UpcomingTrips() {
             <div className="space-y-4">
               {trips.map((trip) => (
                 <div key={trip.id} className="rounded-lg border p-4 shadow-sm transition-all hover:shadow">
-                  <div className="flex flex-col justify-between gap-4 md:flex-row">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">
+                  <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                        <h3 className="font-medium break-words max-w-full">
                           {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                         </h3>
                         <Badge 
@@ -197,34 +190,34 @@ export function UpcomingTrips() {
                         </Badge>
                       </div>
                       
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(trip.departureDate)}</span>
-                          <Badge variant="secondary" className="ml-1">
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-1 min-w-fit">
+                          <Calendar className="h-4 w-4 flex-shrink-0" />
+                          <span className="break-words">{formatDateLongVN(trip.departureDate)}</span>
+                          <Badge variant="secondary" className="ml-1 whitespace-nowrap">
                             {getDaysUntilTrip(trip.departureDate)}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{trip.departureTime}</span>
+                        <div className="flex items-center gap-1 flex-wrap min-w-fit">
+                          <Clock className="h-4 w-4 flex-shrink-0" />
+                          <span className="whitespace-nowrap">{trip.departureTime}</span>
                           {trip.originalDepartureTime && trip.originalDepartureTime !== trip.departureTime && (
-                            <span className="text-amber-600">
+                            <span className="text-amber-600 whitespace-nowrap">
                               (was {trip.originalDepartureTime})
                             </span>
                           )}
                         </div>
                       </div>
                       
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>Return: {formatDate(trip.returnDate)} at {trip.returnTime}</span>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-1 min-w-fit">
+                          <Calendar className="h-4 w-4 flex-shrink-0" />
+                          <span className="break-words">Return: {formatDateLongVN(trip.returnDate)} at {trip.returnTime}</span>
                         </div>
                         {trip.vehicleType && (
-                          <div className="flex items-center gap-1">
-                            <Car className="h-4 w-4" />
-                            <span>{config.vehicles[trip.vehicleType as keyof typeof config.vehicles].name}</span>
+                          <div className="flex items-center gap-1 min-w-fit">
+                            <Car className="h-4 w-4 flex-shrink-0" />
+                            <span className="whitespace-nowrap">{config.vehicles[trip.vehicleType as keyof typeof config.vehicles].name}</span>
                           </div>
                         )}
                       </div>
@@ -264,27 +257,27 @@ export function UpcomingTrips() {
                             <div>
                               <h4 className="mb-2 font-medium">Route Information</h4>
                               <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                                   <span className="text-gray-500">From:</span>
-                                  <span>{getLocationName(trip.departureLocation)}</span>
+                                  <span className="break-words text-right">{getLocationName(trip.departureLocation)}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                                   <span className="text-gray-500">To:</span>
-                                  <span>{getLocationName(trip.destination)}</span>
+                                  <span className="break-words text-right">{getLocationName(trip.destination)}</span>
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div>
                               <h4 className="mb-2 font-medium">Schedule</h4>
                               <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                                   <span className="text-gray-500">Departure:</span>
-                                  <span>{formatDate(trip.departureDate)} at {trip.departureTime}</span>
+                                  <span className="break-words text-right">{formatDateVN(trip.departureDate)} at {trip.departureTime}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                                   <span className="text-gray-500">Return:</span>
-                                  <span>{formatDate(trip.returnDate)} at {trip.returnTime}</span>
+                                  <span className="break-words text-right">{formatDateVN(trip.returnDate)} at {trip.returnTime}</span>
                                 </div>
                               </div>
                             </div>
@@ -351,12 +344,12 @@ export function UpcomingTrips() {
             </DialogDescription>
           </DialogHeader>
           {selectedTrip && (
-            <div className="py-4">
-              <p className="text-sm">
+            <div className="py-4 space-y-2">
+              <p className="text-sm break-words">
                 <strong>Trip:</strong> {getLocationName(selectedTrip.departureLocation)} → {getLocationName(selectedTrip.destination)}
               </p>
               <p className="text-sm">
-                <strong>Date:</strong> {formatDate(selectedTrip.departureDate)}
+                <strong>Date:</strong> {formatDateVN(selectedTrip.departureDate)}
               </p>
             </div>
           )}

@@ -11,6 +11,7 @@ import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
 import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency, calculateDistance } from "@/lib/config"
+import { formatDateVN, formatDateLongVN } from "@/lib/date-utils"
 import { Calendar, Clock, MapPin, Users, Search, Filter, Loader2, Send, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -232,15 +233,7 @@ export function AvailableTrips() {
     setFilteredTrips(filtered)
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      weekday: 'short',
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-  }
+  // Remove old formatDate - now using formatDateLongVN from date-utils
 
   const getNextWeekDate = () => {
     const date = new Date()
@@ -337,10 +330,10 @@ export function AvailableTrips() {
                 
                 return (
                   <div key={trip.id} className="rounded-lg border p-4 shadow-sm transition-all hover:shadow">
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">
+                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                          <h3 className="font-medium break-words max-w-full">
                             {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                           </h3>
                           <Badge variant="secondary">
@@ -360,25 +353,25 @@ export function AvailableTrips() {
                           )}
                         </div>
                         
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{formatDate(trip.departureDate)}</span>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
+                          <div className="flex items-center gap-1 min-w-fit">
+                            <Calendar className="h-4 w-4 flex-shrink-0" />
+                            <span className="break-words">{formatDateLongVN(trip.departureDate)}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            <span>{trip.departureTime}</span>
+                          <div className="flex items-center gap-1 min-w-fit">
+                            <Clock className="h-4 w-4 flex-shrink-0" />
+                            <span className="whitespace-nowrap">{trip.departureTime}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            <span>{trip.groupSize}/{trip.totalSeats} passengers</span>
+                          <div className="flex items-center gap-1 min-w-fit">
+                            <Users className="h-4 w-4 flex-shrink-0" />
+                            <span className="whitespace-nowrap">{trip.groupSize}/{trip.totalSeats} passengers</span>
                           </div>
                         </div>
                         
-                        <div className="flex flex-wrap gap-4 text-sm">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <span className="text-gray-600">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                          <div className="flex items-center gap-1 min-w-fit">
+                            <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-600 whitespace-nowrap">
                               Distance: {calculateDistance(trip.departureLocation, trip.destination)} km
                             </span>
                           </div>
@@ -438,15 +431,15 @@ export function AvailableTrips() {
           {selectedTrip && (
             <div className="space-y-4">
               <div className="rounded-lg bg-muted p-3 space-y-2">
-                <div className="flex justify-between text-sm">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-sm">
                   <span className="text-muted-foreground">Route:</span>
-                  <span className="font-medium">
+                  <span className="font-medium break-words text-right">
                     {getLocationName(selectedTrip.departureLocation)} → {getLocationName(selectedTrip.destination)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-sm">
                   <span className="text-muted-foreground">Date:</span>
-                  <span className="font-medium">{formatDate(selectedTrip.departureDate)}</span>
+                  <span className="font-medium text-right">{formatDateVN(selectedTrip.departureDate)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Time:</span>

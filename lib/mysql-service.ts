@@ -1,5 +1,6 @@
 // lib/mysql-service.ts
 import { config } from './config';
+import { toMySQLDateTimeUTC, nowInMySQL, utcToVN } from './date-utils';
 
 // Lazy import mysql2 only on server side
 let pool: any = null;
@@ -102,15 +103,14 @@ class MySQLService {
   }
   // âœ… THÃŠM helper function nÃ y
   private toMySQLDateTime(isoString: string): string {
-    if (!isoString) return new Date().toISOString().slice(0, 19).replace('T', ' ');
-    
+    if (!isoString) return nowInMySQL();
+
     try {
-      const date = new Date(isoString);
-      // Convert to MySQL format: YYYY-MM-DD HH:MM:SS
-      return date.toISOString().slice(0, 19).replace('T', ' ');
+      // Use the utility function that properly handles timezones
+      return toMySQLDateTimeUTC(isoString);
     } catch (error) {
       console.error('Invalid datetime:', isoString);
-      return new Date().toISOString().slice(0, 19).replace('T', ' ');
+      return nowInMySQL();
     }
   }
 
@@ -138,12 +138,12 @@ class MySQLService {
   // âœ… Sá»¬A createTrip - Ä‘áº£m báº£o datetime Ä‘Ãºng format
   async createTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
     const now = new Date();
-    const mysqlNow = now.toISOString().slice(0, 19).replace('T', ' ');
+    const mysqlNow = nowInMySQL(); // Get current time in MySQL UTC format
     
     const newTrip: Trip = {
       ...trip,
       id: this.generateId(),
-      createdAt: now.toISOString(), // Keep ISO for return value
+      createdAt: now.toISOString(), // Return as ISO for consistency
       updatedAt: now.toISOString(),
       dataType: trip.dataType || 'raw',
       status: trip.status || 'pending',
@@ -183,15 +183,36 @@ class MySQLService {
     }
   }
 
-  // Helper: Convert snake_case DB results to camelCase
+  /**
+   * Convert snake_case DB results to camelCase
+   * Also handles timezone conversion for datetime fields from UTC to Vietnam time
+   */
   private toCamelCase(data: any): any {
     if (!data) return data;
     if (Array.isArray(data)) return data.map(item => this.toCamelCase(item));
-    
+
     const converted: any = {};
     Object.keys(data).forEach(key => {
       const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-      converted[camelKey] = data[key];
+
+      // Convert timestamp fields from MySQL (UTC) to ISO string
+      // MySQL stores as UTC, we return as ISO string for consistency
+      if ((key === 'created_at' || key === 'updated_at' ||
+           key === 'approved_at' || key === 'processed_at') && data[key]) {
+        // MySQL datetime is in UTC, convert to ISO string
+        const mysqlDate = data[key];
+        if (mysqlDate instanceof Date) {
+          converted[camelKey] = mysqlDate.toISOString();
+        } else if (typeof mysqlDate === 'string') {
+          // Convert MySQL datetime string to ISO
+          const isoString = mysqlDate.replace(' ', 'T') + 'Z';
+          converted[camelKey] = isoString;
+        } else {
+          converted[camelKey] = data[key];
+        }
+      } else {
+        converted[camelKey] = data[key];
+      }
     });
     return converted;
   }
@@ -621,7 +642,10 @@ class MySQLService {
         ...updates,
         updated_at: new Date().toISOString()
       });
-      
+
+      // Ensure updated_at is in MySQL format (UTC)
+      snakeData.updated_at = nowInMySQL();
+
       await connection.query(
         'UPDATE trips SET ? WHERE id = ?',
         [snakeData, id]
