@@ -201,6 +201,39 @@ export function AvailableTrips() {
     return request ? request.status : null
   }
 
+  const getPendingRequest = (tripId: string) => {
+    return userRequests.find(req => 
+      req.tripId === tripId && 
+      req.status === 'pending'
+    )
+  }
+
+  const handleCancelRequest = async (tripId: string) => {
+    const request = getPendingRequest(tripId)
+    if (!request) return
+
+    try {
+      setIsSubmitting(true)
+      await joinRequestService.cancelJoinRequest(request.id)
+      
+      toast({
+        title: "Request Cancelled",
+        description: "Your join request has been cancelled successfully",
+      })
+      
+      // Reload user requests
+      await loadUserJoinRequests()
+    } catch (error: any) {
+      toast({
+        title: "Cancellation Failed",
+        description: error.message || "Failed to cancel join request",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const filterTrips = () => {
     let filtered = [...trips]
     
@@ -391,7 +424,7 @@ export function AvailableTrips() {
                         
                         {trip.status === 'optimized' && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            âœ“ This is an optimized group trip with cost savings
+                             This is an optimized group trip with cost savings
                           </div>
                         )}
                       </div>
@@ -415,6 +448,28 @@ export function AvailableTrips() {
                             </>
                           )}
                         </Button>
+                        
+                        {hasExistingRequest(trip.id) && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="bg-red-700 hover:bg-red-800 text-white"
+                            onClick={() => handleCancelRequest(trip.id)}
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                Cancelling...
+                              </>
+                            ) : (
+                              <>
+                                <X className="mr-1 h-3 w-3" />
+                                Cancel
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
