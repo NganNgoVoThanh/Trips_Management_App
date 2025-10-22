@@ -174,7 +174,7 @@ class FabricClientService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/optimize`, {
+      const response = await fetch(`${this.baseUrl}/optimize/create`, {
         method: 'POST',
         credentials: 'include',
         headers: {

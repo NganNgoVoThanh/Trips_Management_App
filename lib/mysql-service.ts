@@ -433,108 +433,120 @@ class MySQLService {
   }
 
   // Approve optimization
-  async approveOptimization(groupId: string): Promise<void> {
-    if (!this.ensureServerSide('approveOptimization')) return;
+async approveOptimization(groupId: string): Promise<void> {
+  if (!this.ensureServerSide('approveOptimization')) return;
 
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      
-      const [tempRows] = await connection.query(
-        'SELECT * FROM temp_trips WHERE optimized_group_id = ?',
-        [groupId]
-      );
+  try {
+    const poolInstance = await getPool();
+    const connection = await poolInstance.getConnection();
+    
+    // ✅ QUAN TRỌNG: Convert sang MySQL datetime format
+    const mysqlNow = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    console.log(`✅ MySQL datetime format: ${mysqlNow}`); // Debug log
+    
+    const [tempRows] = await connection.query(
+      'SELECT * FROM temp_trips WHERE optimized_group_id = ?',
+      [groupId]
+    );
 
-      if (Array.isArray(tempRows)) {
-        for (const tempTrip of tempRows) {
-          const camelTrip = this.toCamelCase(tempTrip);
-          
-          if (camelTrip.parentTripId) {
-            await connection.query(
-              `UPDATE trips SET 
-                data_type = ?,
-                status = ?,
-                departure_time = ?,
-                vehicle_type = ?,
-                actual_cost = ?,
-                optimized_group_id = ?,
-                original_departure_time = ?,
-                updated_at = ?
-              WHERE id = ?`,
-              [
-                'final',
-                'optimized',
-                camelTrip.departureTime,
-                camelTrip.vehicleType,
-                camelTrip.actualCost,
-                camelTrip.optimizedGroupId,
-                camelTrip.originalDepartureTime,
-                new Date().toISOString(),
-                camelTrip.parentTripId
-              ]
-            );
-          }
-        }
-      }
-
-      await connection.query(
-        'DELETE FROM temp_trips WHERE optimized_group_id = ?',
-        [groupId]
-      );
-
-      await connection.query(
-        'UPDATE optimization_groups SET status = ?, approved_at = ? WHERE id = ?',
-        ['approved', new Date().toISOString(), groupId]
-      );
-
-      connection.release();
-      console.log(`✓ Optimization ${groupId} approved`);
-    } catch (err: any) {
-      console.warn('âš ï¸ Error approving optimization:', err.message);
-    }
-  }
-
-  // Reject optimization
-  async rejectOptimization(groupId: string): Promise<void> {
-    if (!this.ensureServerSide('rejectOptimization')) return;
-
-    try {
-      const poolInstance = await getPool();
-      const connection = await poolInstance.getConnection();
-      
-      await connection.query(
-        'DELETE FROM temp_trips WHERE optimized_group_id = ?',
-        [groupId]
-      );
-
-      await connection.query(
-        'UPDATE optimization_groups SET status = ? WHERE id = ?',
-        ['rejected', groupId]
-      );
-
-      const [groupRows] = await connection.query(
-        'SELECT trips FROM optimization_groups WHERE id = ?',
-        [groupId]
-      );
-
-      if (Array.isArray(groupRows) && groupRows.length > 0) {
-        const group = groupRows[0] as any;
-        const tripIds = JSON.parse(group.trips);
+    if (Array.isArray(tempRows)) {
+      for (const tempTrip of tempRows) {
+        const camelTrip = this.toCamelCase(tempTrip);
         
-        if (Array.isArray(tripIds) && tripIds.length > 0) {
+        if (camelTrip.parentTripId) {
           await connection.query(
-            'UPDATE trips SET status = ?, updated_at = ? WHERE id IN (?)',
-            ['pending', new Date().toISOString(), tripIds]
+            `UPDATE trips SET 
+              data_type = ?,
+              status = ?,
+              departure_time = ?,
+              vehicle_type = ?,
+              actual_cost = ?,
+              optimized_group_id = ?,
+              original_departure_time = ?,
+              updated_at = ?
+            WHERE id = ?`,
+            [
+              'final',
+              'optimized',
+              camelTrip.departureTime,
+              camelTrip.vehicleType,
+              camelTrip.actualCost,
+              camelTrip.optimizedGroupId,
+              camelTrip.originalDepartureTime,
+              mysqlNow, // ✅ Dùng MySQL format
+              camelTrip.parentTripId
+            ]
           );
         }
       }
-
-      connection.release();
-      console.log(`✓ Optimization ${groupId} rejected`);
-    } catch (err: any) {
-      console.warn('âš ï¸ Error rejecting optimization:', err.message);
     }
+
+    await connection.query(
+      'DELETE FROM temp_trips WHERE optimized_group_id = ?',
+      [groupId]
+    );
+
+    await connection.query(
+      'UPDATE optimization_groups SET status = ?, approved_at = ? WHERE id = ?',
+      ['approved', mysqlNow, groupId] // ✅ Dùng MySQL format
+    );
+
+    connection.release();
+    console.log(`✅ Optimization ${groupId} approved`);
+  } catch (err: any) {
+    console.error('❌ Error approving optimization:', err.message);
+    throw new Error(`Failed to approve optimization: ${err.message}`); // ✅ Throw error
   }
+}
+
+  // Reject optimization
+async rejectOptimization(groupId: string): Promise<void> {
+  if (!this.ensureServerSide('rejectOptimization')) return;
+
+  try {
+    const poolInstance = await getPool();
+    const connection = await poolInstance.getConnection();
+    
+    // ✅ QUAN TRỌNG: Convert sang MySQL datetime format
+    const mysqlNow = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    console.log(`✅ MySQL datetime format: ${mysqlNow}`); // Debug log
+    
+    await connection.query(
+      'DELETE FROM temp_trips WHERE optimized_group_id = ?',
+      [groupId]
+    );
+
+    await connection.query(
+      'UPDATE optimization_groups SET status = ? WHERE id = ?',
+      ['rejected', groupId]
+    );
+
+    const [groupRows] = await connection.query(
+      'SELECT trips FROM optimization_groups WHERE id = ?',
+      [groupId]
+    );
+
+    if (Array.isArray(groupRows) && groupRows.length > 0) {
+      const group = groupRows[0] as any;
+      const tripIds = JSON.parse(group.trips);
+      
+      if (Array.isArray(tripIds) && tripIds.length > 0) {
+        await connection.query(
+          'UPDATE trips SET status = ?, updated_at = ? WHERE id IN (?)',
+          ['pending', mysqlNow, tripIds] // ✅ Dùng MySQL format
+        );
+      }
+    }
+
+    connection.release();
+    console.log(`✅ Optimization ${groupId} rejected`);
+  } catch (err: any) {
+    console.error('❌ Error rejecting optimization:', err.message);
+    throw new Error(`Failed to reject optimization: ${err.message}`); // ✅ Throw error
+  }
+}
 
   // Get temp trips by group ID
   async getTempTripsByGroupId(groupId: string): Promise<Trip[]> {
@@ -619,7 +631,7 @@ class MySQLService {
       const connection = await poolInstance.getConnection();
       const snakeData = this.toSnakeCase({
         ...updates,
-        updated_at: new Date().toISOString()
+        updated_at: this.toMySQLDateTime(new Date().toISOString())
       });
       
       await connection.query(
