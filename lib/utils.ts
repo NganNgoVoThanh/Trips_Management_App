@@ -14,10 +14,20 @@ export function formatDateTime(dateString: string | Date | null | undefined): st
   if (!dateString) return 'N/A';
   
   try {
-    const date = new Date(dateString);
+    let date: Date;
+    
+    // Handle MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+      // MySQL datetime is already in Vietnam timezone, parse it directly
+      date = new Date(dateString.replace(' ', 'T') + '+07:00');
+    } else {
+      // Handle ISO string or other formats
+      date = new Date(dateString);
+    }
     
     // Check valid date
     if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
       return 'Invalid date';
     }
     
@@ -38,7 +48,7 @@ export function formatDateTime(dateString: string | Date | null | undefined): st
     return formatted.replace(', ', ' ');
     
   } catch (error) {
-    console.error('Error formatting datetime:', error);
+    console.error('Error formatting datetime:', error, dateString);
     return 'Invalid date';
   }
 }
@@ -51,9 +61,17 @@ export function formatDate(dateString: string | Date | null | undefined): string
   if (!dateString) return 'N/A';
   
   try {
-    const date = new Date(dateString);
+    let date: Date;
+    
+    // Handle MySQL datetime format
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(dateString)) {
+      date = new Date(dateString.replace(' ', 'T') + '+07:00');
+    } else {
+      date = new Date(dateString);
+    }
     
     if (isNaN(date.getTime())) {
+      console.error('Invalid date:', dateString);
       return 'Invalid date';
     }
     
@@ -65,7 +83,7 @@ export function formatDate(dateString: string | Date | null | undefined): string
     }).format(date);
     
   } catch (error) {
-    console.error('Error formatting date:', error);
+    console.error('Error formatting date:', error, dateString);
     return 'Invalid date';
   }
 }
@@ -78,9 +96,17 @@ export function formatTime(dateString: string | Date | null | undefined): string
   if (!dateString) return 'N/A';
   
   try {
-    const date = new Date(dateString);
+    let date: Date;
+    
+    // Handle MySQL datetime format
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+      date = new Date(dateString.replace(' ', 'T') + '+07:00');
+    } else {
+      date = new Date(dateString);
+    }
     
     if (isNaN(date.getTime())) {
+      console.error('Invalid time:', dateString);
       return 'Invalid time';
     }
     
@@ -92,7 +118,7 @@ export function formatTime(dateString: string | Date | null | undefined): string
     }).format(date);
     
   } catch (error) {
-    console.error('Error formatting time:', error);
+    console.error('Error formatting time:', error, dateString);
     return 'Invalid time';
   }
 }

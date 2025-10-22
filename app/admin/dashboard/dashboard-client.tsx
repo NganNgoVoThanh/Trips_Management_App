@@ -14,6 +14,7 @@ import { joinRequestService } from "@/lib/join-request-client"
 import { aiOptimizer } from "@/lib/ai-optimizer"
 import { emailService } from "@/lib/email-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
+import { formatDate, formatTime, formatDateTime } from "@/lib/utils"
 import { 
   Users, 
   Car, 
@@ -161,20 +162,20 @@ export function AdminDashboardClient() {
         pendingJoinRequests: joinRequestStats.pending
       })
       
-      // Set pending actions with real data
+      // Set pending actions with real data - FIX: Use formatDate and formatTime
       setPendingActions(pending.slice(0, 5).map(t => ({
         id: t.id,
         type: 'approval',
         user: t.userName,
         email: t.userEmail,
         route: `${getLocationName(t.departureLocation)} → ${getLocationName(t.destination)}`,
-        date: t.departureDate,
-        time: t.departureTime,
+        date: formatDate(t.departureDate),
+        time: formatTime(t.departureDate),
         estimatedCost: t.estimatedCost,
         trip: t
       })))
       
-      // Recent optimizations with real data
+      // Recent optimizations with real data - FIX: Use formatDate
       const recentOpt = optimized
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 5)
@@ -184,7 +185,7 @@ export function AdminDashboardClient() {
         groupId: t.optimizedGroupId,
         trips: allTrips.filter(trip => trip.optimizedGroupId === t.optimizedGroupId).length,
         savings: (t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0),
-        date: new Date(t.updatedAt).toLocaleDateString(),
+        date: formatDate(t.updatedAt),
         route: `${getLocationName(t.departureLocation)} → ${getLocationName(t.destination)}`
       })))
       
@@ -290,7 +291,7 @@ export function AdminDashboardClient() {
       const allTrips = await fabricService.getTrips()
       const joinRequests = await joinRequestService.getJoinRequests()
       
-      // Create comprehensive report
+      // Create comprehensive report - FIX: Use formatDate and formatDateTime
       const report = {
         generatedAt: new Date().toISOString(),
         totalTrips: allTrips.length,
@@ -304,8 +305,8 @@ export function AdminDashboardClient() {
           email: t.userEmail,
           from: getLocationName(t.departureLocation),
           to: getLocationName(t.destination),
-          date: t.departureDate,
-          time: t.departureTime,
+          date: formatDate(t.departureDate),
+          time: formatTime(t.departureDate),
           status: t.status,
           vehicleType: t.vehicleType || 'N/A',
           estimatedCost: t.estimatedCost || 0,
@@ -318,7 +319,7 @@ export function AdminDashboardClient() {
           requesterName: jr.requesterName,
           requesterEmail: jr.requesterEmail,
           tripRoute: `${getLocationName(jr.tripDetails.departureLocation)} → ${getLocationName(jr.tripDetails.destination)}`,
-          requestDate: new Date(jr.createdAt).toLocaleDateString(),
+          requestDate: formatDate(jr.createdAt),
           status: jr.status,
           reason: jr.reason || 'N/A'
         }))
@@ -326,7 +327,7 @@ export function AdminDashboardClient() {
       
       // Convert to CSV
       const csv = [
-        ['Admin Dashboard Report - ' + new Date().toLocaleDateString()],
+        ['Admin Dashboard Report - ' + formatDate(new Date())],
         [],
         ['Summary Statistics'],
         ['Total Trips', report.totalTrips],

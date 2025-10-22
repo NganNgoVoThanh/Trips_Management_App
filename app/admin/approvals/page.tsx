@@ -13,6 +13,7 @@ import { authService } from "@/lib/auth-service"
 import { getLocationName, formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { formatDate, formatTime } from "@/lib/utils" // ✅ THÊM import formatDateTime
 
 export default function ApprovalsPage() {
   const router = useRouter()
@@ -173,8 +174,8 @@ export default function ApprovalsPage() {
                       </div>
                       
                       <div className="flex items-center gap-6 text-sm text-gray-600">
-                        <span>Departure: {trip.departureDate} at {trip.departureTime}</span>
-                        <span>Return: {trip.returnDate} at {trip.returnTime}</span>
+                        <span>Departure: {formatDate(trip.departureDate)} at {trip.departureTime}</span>
+                        <span>Return: {formatDate(trip.returnDate)} at {trip.returnTime}</span>
                       </div>
                       
                       {trip.estimatedCost && (

@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency, getLocationName, config } from "@/lib/config"
+import { formatDateTime, formatDate} from "@/lib/utils" // ✅ THÊM import formatDateTime
 import {
   Select,
   SelectContent,
@@ -210,47 +211,11 @@ export default function ManagementDashboard() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await loadDashboardData()
+    toast({
+      title: "Dashboard Refreshed",
+      description: "Data has been updated successfully"
+    })
     setIsRefreshing(false)
-    toast({
-      title: "Data Refreshed",
-      description: "Dashboard data has been updated",
-    })
-  }
-
-  const exportReport = () => {
-    // Generate comprehensive CSV report
-    const headers = ['ID', 'Employee', 'Email', 'From', 'To', 'Date', 'Time', 'Status', 'Vehicle', 'Est. Cost', 'Actual Cost', 'Savings']
-    const rows = trips.map(t => [
-      t.id.slice(0, 8),
-      t.userName,
-      t.userEmail,
-      getLocationName(t.departureLocation),
-      getLocationName(t.destination),
-      t.departureDate,
-      t.departureTime,
-      t.status,
-      t.vehicleType || 'N/A',
-      t.estimatedCost || 0,
-      t.actualCost || t.estimatedCost || 0,
-      (t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0)
-    ])
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n')
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `management-report-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    
-    toast({
-      title: "Report Exported",
-      description: "Management report has been downloaded",
-    })
   }
 
   const handleViewTrip = (trip: Trip) => {
@@ -260,23 +225,20 @@ export default function ManagementDashboard() {
 
   const handleApproveTrip = async (tripId: string) => {
     try {
-      await fabricService.updateTrip(tripId, { 
-        status: 'confirmed',
-        notified: true 
+      await fabricService.updateTrip(tripId, {
+        status: 'confirmed'
       })
-      const trip = trips.find(t => t.id === tripId)
-      if (trip) {
-        await emailService.sendApprovalNotification(trip)
-      }
+      
+      await loadDashboardData()
+      
       toast({
         title: "Trip Approved",
-        description: "Trip has been approved and employee notified",
+        description: "Trip has been confirmed successfully"
       })
-      await loadDashboardData()
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to approve trip",
+        description: error.message || "Failed to approve trip",
         variant: "destructive"
       })
     }
@@ -284,57 +246,57 @@ export default function ManagementDashboard() {
 
   const handleSaveSettings = () => {
     setIsSavingSettings(true)
-    try {
-      localStorage.setItem('management_settings', JSON.stringify(settings))
-      // Update config (in production, this would update backend)
-      config.optimization.maxWaitTime = settings.maxWaitTime
-      config.optimization.minSavingsPercentage = settings.minSavings
-      config.optimization.maxDetour = settings.maxDetour
-      
+    localStorage.setItem('management_settings', JSON.stringify(settings))
+    
+    setTimeout(() => {
+      setIsSavingSettings(false)
       toast({
         title: "Settings Saved",
-        description: "System settings have been updated",
+        description: "System settings have been updated successfully"
+      })
+    }, 500)
+  }
+
+  const handleExportData = async () => {
+    try {
+      const dataStr = JSON.stringify(trips, null, 2)
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `trips-export-${new Date().toISOString().split('T')[0]}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+      
+      toast({
+        title: "Export Successful",
+        description: "Trip data has been exported"
       })
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to save settings",
+        title: "Export Failed",
+        description: "Failed to export data",
         variant: "destructive"
       })
-    } finally {
-      setIsSavingSettings(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        {isAdmin ? <AdminHeader /> : <DashboardHeader />}
-        <div className="flex items-center justify-center flex-1">
-          <Loader2 className="h-8 w-8 animate-spin text-red-600" />
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="min-h-screen bg-gray-50">
       {isAdmin ? <AdminHeader /> : <DashboardHeader />}
-      <div className="container mx-auto p-6 space-y-6 flex-1">
-        <div className="flex justify-between items-center">
+      
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header Actions */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Management Dashboard</h1>
-            <p className="text-gray-500 mt-1">Comprehensive overview of trip management system</p>
+            <p className="text-gray-500 mt-1">Comprehensive trip management and analytics</p>
           </div>
+          
           <div className="flex gap-2">
-            <Button onClick={exportReport} className="bg-red-600 hover:bg-red-700">
-              <Download className="mr-2 h-4 w-4" />
-              Export Report
-            </Button>
             <Button 
-              onClick={handleRefresh} 
               variant="outline" 
-              className="border-red-200 hover:bg-red-50"
+              onClick={handleRefresh}
               disabled={isRefreshing}
             >
               {isRefreshing ? (
@@ -344,79 +306,81 @@ export default function ManagementDashboard() {
               )}
               Refresh
             </Button>
+            <Button 
+              variant="outline"
+              onClick={handleExportData}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Data
+            </Button>
           </div>
         </div>
 
-        {/* Key Metrics */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-red-600 cursor-pointer hover:shadow-md" onClick={() => setStatusFilter('all')}>
+          <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Trips</CardTitle>
-                <Car className="h-4 w-4 text-red-600" />
-              </div>
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Total Trips
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalTrips}</div>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.monthlyTrips} this month
-              </p>
+              <p className="text-xs text-gray-500 mt-1">All registered trips</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-green-600">
+          <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Savings</CardTitle>
-                <TrendingDown className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Pending
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{stats.pendingTrips}</div>
+              <p className="text-xs text-gray-500 mt-1">Awaiting approval</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Optimization Rate
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {stats.optimizationRate.toFixed(1)}%
               </div>
+              <p className="text-xs text-gray-500 mt-1">Trips optimized</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Total Savings
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(stats.totalSavings)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Avg: {formatCurrency(stats.averageSavings)}/trip
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-blue-600">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600">Optimization Rate</CardTitle>
-                <Activity className="h-4 w-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.optimizationRate.toFixed(1)}%</div>
-              <Progress value={stats.optimizationRate} className="mt-2 h-2" />
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-purple-600">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600">Active Employees</CardTitle>
-                <Users className="h-4 w-4 text-purple-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeEmployees}</div>
-              <p className="text-xs text-gray-500 mt-1">
-                Using the system
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Cost reduction</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="bg-red-50 border border-red-200">
+          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="trips">All Trips</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="employees">Employees</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -451,7 +415,7 @@ export default function ManagementDashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium">{trip.departureDate}</p>
+                          <p className="text-sm font-medium">{formatDateTime(trip.createdAt)}</p>
                           <Badge variant="outline" className="text-xs">
                             {trip.status}
                           </Badge>
@@ -521,18 +485,6 @@ export default function ManagementDashboard() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                    <Select value={locationFilter} onValueChange={setLocationFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filter by location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Locations</SelectItem>
-                        <SelectItem value="HCM Office">HCM Office</SelectItem>
-                        <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
-                        <SelectItem value="Long An Factory">Long An Factory</SelectItem>
-                        <SelectItem value="Long An Factory">Tay Ninh Factory</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Status" />
@@ -549,67 +501,46 @@ export default function ManagementDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left p-3">Trip ID</th>
-                        <th className="text-left p-3">Employee</th>
-                        <th className="text-left p-3">Route</th>
-                        <th className="text-left p-3">Date</th>
-                        <th className="text-left p-3">Status</th>
-                        <th className="text-left p-3">Cost</th>
-                        <th className="text-left p-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTrips.map((trip) => (
-                        <tr key={trip.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 font-mono text-xs">{trip.id.slice(0, 8)}</td>
-                          <td className="p-3">{trip.userName}</td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3 text-gray-400" />
-                              <span className="text-xs">
-                                {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3">{trip.departureDate}</td>
-                          <td className="p-3">
-                            <Badge 
-                              variant={trip.status === 'optimized' ? 'default' : 'outline'}
-                              className={
-                                trip.status === 'optimized' ? 'bg-blue-100 text-blue-700' :
-                                trip.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                                trip.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }
-                            >
-                              {trip.status}
-                            </Badge>
-                          </td>
-                          <td className="p-3">
-                            {trip.estimatedCost && formatCurrency(trip.estimatedCost)}
-                          </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleViewTrip(trip)}>
-                                <Eye className="h-3 w-3 mr-1" />
-                                View
-                              </Button>
-                              {trip.status === 'pending' && isAdmin && (
-                                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-600" onClick={() => handleApproveTrip(trip.id)}>
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Approve
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-2">
+                  {filteredTrips.map((trip) => (
+                    <div 
+                      key={trip.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleViewTrip(trip)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`h-3 w-3 rounded-full ${
+                          trip.status === 'optimized' ? 'bg-blue-500' :
+                          trip.status === 'confirmed' ? 'bg-green-500' :
+                          trip.status === 'pending' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`} />
+                        <div>
+                          <p className="font-medium">{trip.userName}</p>
+                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Departure: {formatDate(trip.departureDate)} at {trip.departureTime}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <Badge variant="outline">{trip.status}</Badge>
+                          {trip.estimatedCost && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              {formatCurrency(trip.estimatedCost)}
+                            </p>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -617,76 +548,74 @@ export default function ManagementDashboard() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Trip Distribution by Location</CardTitle>
+                  <CardTitle>Monthly Statistics</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.keys(config.locations).map(location => {
-                      const count = trips.filter(t => 
-                        t.departureLocation === location || t.destination === location
-                      ).length
-                      const percentage = trips.length > 0 ? (count / trips.length) * 100 : 0
-                      
-                      return (
-                        <div key={location}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{getLocationName(location)}</span>
-                            <span className="font-medium">{count} trips</span>
-                          </div>
-                          <Progress value={percentage} className="h-2" />
-                        </div>
-                      )
-                    })}
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">This Month</span>
+                    <span className="text-lg font-bold">{stats.monthlyTrips} trips</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Active Employees</span>
+                    <span className="text-lg font-bold">{stats.activeEmployees}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Average Savings</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {formatCurrency(stats.averageSavings)}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Vehicle Utilization</CardTitle>
+                  <CardTitle>Performance Metrics</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Object.keys(config.vehicles).map(vehicle => {
-                      const count = trips.filter(t => t.vehicleType === vehicle).length
-                      const percentage = trips.length > 0 ? (count / trips.length) * 100 : 0
-                      
-                      return (
-                        <div key={vehicle}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>{config.vehicles[vehicle as keyof typeof config.vehicles].name}</span>
-                            <span className="font-medium">{count} trips</span>
-                          </div>
-                          <Progress value={percentage} className="h-2" />
-                        </div>
-                      )
-                    })}
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-gray-500">Optimization Rate</span>
+                      <span className="text-sm font-medium">{stats.optimizationRate.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={stats.optimizationRate} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-gray-500">Pending Rate</span>
+                      <span className="text-sm font-medium">
+                        {stats.totalTrips > 0 ? ((stats.pendingTrips / stats.totalTrips) * 100).toFixed(1) : 0}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={stats.totalTrips > 0 ? (stats.pendingTrips / stats.totalTrips) * 100 : 0} 
+                      className="h-2" 
+                    />
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
 
-          {/* Employees Tab */}
-          <TabsContent value="employees" className="space-y-4">
+            {/* Employee Activity Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Employee Trip Statistics</CardTitle>
+                <CardTitle>Employee Activity</CardTitle>
+                <CardDescription>Trip activity by employee</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full">
                     <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left p-3">Employee</th>
-                        <th className="text-left p-3">Email</th>
-                        <th className="text-left p-3">Total Trips</th>
-                        <th className="text-left p-3">Optimized</th>
-                        <th className="text-left p-3">Savings</th>
-                        <th className="text-left p-3">Last Trip</th>
+                      <tr className="border-b">
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Name</th>
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Email</th>
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Total Trips</th>
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Optimized</th>
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Savings</th>
+                        <th className="text-left p-3 text-sm font-medium text-gray-500">Last Trip</th>
                       </tr>
                     </thead>
                     <tbody>

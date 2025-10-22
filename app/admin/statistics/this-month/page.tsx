@@ -13,6 +13,7 @@ import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
+import { formatDateTime } from "@/lib/utils" // ✅ THÊM import formatDateTime
 
 interface DayStats {
   day: number
@@ -398,7 +399,7 @@ export default function ThisMonthPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-medium">{trip.departureDate}</p>
+                      <p className="text-xs font-medium">{formatDateTime(trip.createdAt)}</p>
                       <Badge variant="outline" className="text-xs">
                         {trip.status}
                       </Badge>
