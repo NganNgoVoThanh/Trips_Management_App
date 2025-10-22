@@ -21,6 +21,176 @@ class EmailService {
   }
 
   /**
+   * Send trip confirmation notification
+   */
+  async sendTripConfirmation(trip: Trip): Promise<void> {
+    if (!trip.userEmail) {
+      console.warn('No email address for trip confirmation');
+      return;
+    }
+
+    const subject = 'Trip Registration Confirmed';
+    
+    const body = `
+Dear ${trip.userName || 'Employee'},
+
+Your trip registration has been confirmed!
+
+Trip Details:
+• From: ${getLocationName(trip.departureLocation || '')}
+• To: ${getLocationName(trip.destination || '')}
+• Departure: ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}
+• Return: ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}
+${trip.vehicleType ? `• Vehicle: ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}` : ''}
+${trip.estimatedCost ? `• Estimated Cost: ${formatCurrency(trip.estimatedCost)}` : ''}
+
+If you have any questions or need to make changes, please contact the admin team.
+
+Best regards,
+Intersnack Trips Management Team
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px; }
+    .trip-details { background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .highlight { color: #10b981; font-weight: bold; }
+    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Trip Registration Confirmed</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${trip.userName || 'Employee'},</p>
+      
+      <p>Your trip registration has been confirmed!</p>
+      
+      <div class="trip-details">
+        <h3>Trip Details:</h3>
+        <p><strong>From:</strong> ${getLocationName(trip.departureLocation || '')}</p>
+        <p><strong>To:</strong> ${getLocationName(trip.destination || '')}</p>
+        <p><strong>Departure:</strong> ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</p>
+        <p><strong>Return:</strong> ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</p>
+        ${trip.vehicleType ? `<p><strong>Vehicle:</strong> ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</p>` : ''}
+        ${trip.estimatedCost ? `<p><strong>Estimated Cost:</strong> ${formatCurrency(trip.estimatedCost)}</p>` : ''}
+      </div>
+      
+      <p>If you have any questions or need to make changes, please contact the admin team.</p>
+      
+      <div class="footer">
+        <p>Best regards,<br/>Intersnack Trips Management Team</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await this.sendEmail({
+      to: [trip.userEmail],
+      subject,
+      body,
+      html
+    });
+  }
+
+  /**
+   * Send trip approval notification
+   */
+  async sendApprovalNotification(trip: Trip): Promise<void> {
+    if (!trip.userEmail) {
+      console.warn('No email address for trip approval');
+      return;
+    }
+
+    const subject = 'Trip Approved';
+    
+    const body = `
+Dear ${trip.userName || 'Employee'},
+
+Your trip has been approved by the admin team!
+
+Trip Details:
+• From: ${getLocationName(trip.departureLocation || '')}
+• To: ${getLocationName(trip.destination || '')}
+• Departure: ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}
+• Return: ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}
+${trip.vehicleType ? `• Vehicle: ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}` : ''}
+${trip.estimatedCost ? `• Estimated Cost: ${formatCurrency(trip.estimatedCost)}` : ''}
+
+Status: ${trip.status}
+
+You can now proceed with your travel arrangements.
+
+Best regards,
+Intersnack Trips Management Team
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px; }
+    .trip-details { background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .highlight { color: #10b981; font-weight: bold; }
+    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+    .status-badge { display: inline-block; padding: 4px 12px; background-color: #10b981; color: white; border-radius: 4px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>✓ Trip Approved</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${trip.userName || 'Employee'},</p>
+      
+      <p>Your trip has been approved by the admin team!</p>
+      
+      <div class="trip-details">
+        <h3>Trip Details:</h3>
+        <p><strong>From:</strong> ${getLocationName(trip.departureLocation || '')}</p>
+        <p><strong>To:</strong> ${getLocationName(trip.destination || '')}</p>
+        <p><strong>Departure:</strong> ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</p>
+        <p><strong>Return:</strong> ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</p>
+        ${trip.vehicleType ? `<p><strong>Vehicle:</strong> ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</p>` : ''}
+        ${trip.estimatedCost ? `<p><strong>Estimated Cost:</strong> ${formatCurrency(trip.estimatedCost)}</p>` : ''}
+        <p><strong>Status:</strong> <span class="status-badge">${trip.status}</span></p>
+      </div>
+      
+      <p>You can now proceed with your travel arrangements.</p>
+      
+      <div class="footer">
+        <p>Best regards,<br/>Intersnack Trips Management Team</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await this.sendEmail({
+      to: [trip.userEmail],
+      subject,
+      body,
+      html
+    });
+  }
+
+  /**
    * Send optimization notification to affected employees
    */
   async sendOptimizationNotification(
