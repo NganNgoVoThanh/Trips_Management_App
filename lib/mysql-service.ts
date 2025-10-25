@@ -30,7 +30,7 @@ const getPool = async () => {
   });
   
   console.log('✓ MySQL Connection Pool initialized');
-  console.log(`ðŸ“Š Database: ${process.env.DB_NAME || 'trips_management'}`);
+  console.log(`✓ Database: ${process.env.DB_NAME || 'trips_management'}`);
   
   return pool;
 };

@@ -109,7 +109,7 @@ async function setup() {
     aiKey: await question('AI API Key: '),
     
     // App configuration
-    appUrl: await question('\nApplication URL [http://localhost:3000]: ') || 'http://localhost:3000',
+    appUrl: await question('\nApplication URL [http://localhost:50001]: ') || 'http://localhost:50001',
   };
   
   // Test Fabric connection
@@ -206,7 +206,7 @@ init().catch(console.error);
   
   log('\nNext steps:', 'yellow');
   log('1. Run the development server: npm run dev');
-  log('2. Open http://localhost:3000 in your browser');
+  log('2. Open http://localhost:50001 in your browser');
   log('3. Login with an @intersnack.com.vn email');
   
   if (!fabricConnected) {

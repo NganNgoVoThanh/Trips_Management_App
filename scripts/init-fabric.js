@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS optimization_groups (
   log('\nNext steps:');
   log('1. Create tables in Fabric (SQL above)');
   log('2. Restart your dev server: npm run dev');
-  log('3. Test login at: http://localhost:3000');
+  log('3. Test login at: http://localhost:50001');
   log('\nTest accounts:');
   log('  Admin: admin@intersnack.com.vn', 'cyan');
   log('  User: ngan.ngo@intersnack.com.vn', 'cyan');

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // output: 'standalone', // Disabled for PM2 compatibility - use next start instead
   reactStrictMode: false, // Disable strict mode to prevent double renders
   images: {
     remotePatterns: [
@@ -42,10 +42,21 @@ const nextConfig = {
       config.externals = [...(config.externals || []), 'mysql2', 'mysql2/promise'];
     }
 
+    // Handle server-side externals for both server and client
+    if (isServer) {
+      // Mark mysql2 and native modules as external for server bundle
+      config.externals.push({
+        'mysql2': 'commonjs mysql2',
+        'mysql2/promise': 'commonjs mysql2/promise',
+        'better-sqlite3': 'commonjs better-sqlite3',
+        'clamav.js': 'commonjs clamav.js'
+      });
+    }
+
     return config;
   },
-  // ✅ FIXED: Changed from experimental.serverComponentsExternalPackages
-  serverExternalPackages: ['mysql2'],
+  // ✅ FIXED: Removed 'serverExternalPackages' - not supported in Next.js 14.2.3
+  // Server-side packages are now handled in webpack config above
   async headers() {
     return [
       {

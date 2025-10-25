@@ -1,41 +1,25 @@
-// app/api/trips/route.ts
+// app/api/trips/data-stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
-import { getUserFromRequest } from '@/lib/server-auth';
+import { getServerUser } from '@/lib/server-auth'; // ✅ FIXED: Changed from getUserFromRequest
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-    const status = searchParams.get('status');
-    
-    const filters = {
-      ...(userId && { userId }),
-      ...(status && { status })
-    };
-    
-    const trips = await fabricService.getTrips(filters);
-    return NextResponse.json(trips);
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch trips' },
-      { status: 500 }
-    );
-  }
-}
+    // Optional: Check authentication
+    // const user = await getServerUser(request);
+    // if (!user) {
+    //   return NextResponse.json(
+    //     { error: 'Unauthorized' },
+    //     { status: 401 }
+    //   );
+    // }
 
-export async function POST(request: NextRequest) {
-  try {
-    const tripData = await request.json();
-    
-    // Validate user is authenticated
-    // In production, check session/token
-    
-    const trip = await fabricService.createTrip(tripData);
-    return NextResponse.json(trip);
+    const stats = await fabricService.getDataStats();
+    return NextResponse.json(stats);
   } catch (error: any) {
+    console.error('Error fetching data stats:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create trip' },
+      { error: error.message || 'Failed to fetch data stats' },
       { status: 500 }
     );
   }

@@ -26,7 +26,7 @@ FABRIC_ACCESS_TOKEN=
 NEXT_PUBLIC_FABRIC_TOKEN=
 
 # Application Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:50001
 NEXT_PUBLIC_COMPANY_DOMAIN=@intersnack.com.vn
 
 # AI Configuration (optional)
@@ -51,7 +51,7 @@ echo "✅ Setup Complete!"
 echo ""
 echo "📋 Next Steps:"
 echo "1. Start the dev server: npm run dev"
-echo "2. Open: http://localhost:3000"
+echo "2. Open: http://localhost:50001"
 echo "3. Clear browser data (Important!):"
 echo "   - Open browser console (F12)"
 echo "   - Run: localStorage.clear(); sessionStorage.clear();"

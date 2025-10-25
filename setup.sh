@@ -84,7 +84,7 @@ if [ $? -eq 0 ]; then
     echo "   - Email service configuration"
     echo "3. Run 'npm run dev' to start the development server"
     echo ""
-    echo "🌐 Access the application at http://localhost:3000"
+    echo "🌐 Access the application at http://localhost:50001"
 else
     echo "❌ Build failed. Please check for errors above."
     exit 1

@@ -1,7 +1,7 @@
 // app/api/trips/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
-import { authService } from '@/lib/auth-service';
+import { getServerUser } from '@/lib/server-auth'; // ✅ FIXED: Changed from getUserFromRequest
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +29,15 @@ export async function POST(request: NextRequest) {
     const tripData = await request.json();
     
     // Validate user is authenticated
-    // In production, check session/token
+    const user = await getServerUser(request); // ✅ FIXED: Use getServerUser
+    
+    // Optional: Require authentication
+    // if (!user) {
+    //   return NextResponse.json(
+    //     { error: 'Unauthorized' },
+    //     { status: 401 }
+    //   );
+    // }
     
     const trip = await fabricService.createTrip(tripData);
     return NextResponse.json(trip);

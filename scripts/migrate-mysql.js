@@ -54,7 +54,7 @@ async function runMigration() {
     console.log('\n📝 Next steps:');
     console.log('  1. Update your .env.local with MySQL credentials');
     console.log('  2. Run: npm run dev');
-    console.log('  3. Access: http://localhost:3000');
+    console.log('  3. Access: http://localhost:50001');
     console.log('  4. PHPMyAdmin: http://localhost:8080 (if using Docker)\n');
 
   } catch (error) {
