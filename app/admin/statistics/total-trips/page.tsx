@@ -340,14 +340,14 @@ export default function TotalTripsPage() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Input
                 type="date"
                 className="w-[180px]"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
               />
-              
+
               {(statusFilter !== 'all' || dateFilter) && (
                 <Button
                   variant="ghost"
@@ -360,11 +360,73 @@ export default function TotalTripsPage() {
                 </Button>
               )}
             </div>
-            
+
             {filteredTrips.length > 0 && (
               <p className="text-sm text-gray-500 mt-4">
                 Showing {filteredTrips.length} of {trips.length} trips
               </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Trips List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Trips</CardTitle>
+            <CardDescription>Detailed list of all business trips</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredTrips.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Car className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No trips found matching the filters</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredTrips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold">{trip.userName}</span>
+                        <Badge variant="outline" className={
+                          trip.status === 'optimized' ? 'border-green-400 text-green-700' :
+                          trip.status === 'confirmed' ? 'border-blue-400 text-blue-700' :
+                          trip.status === 'pending' ? 'border-yellow-400 text-yellow-700' :
+                          'border-red-400 text-red-700'
+                        }>
+                          {trip.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{getLocationName(trip.departureLocation)}</span>
+                          <span className="mx-1">→</span>
+                          <span className="font-medium">{getLocationName(trip.destination)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>{new Date(trip.departureDate).toLocaleDateString('vi-VN')}</span>
+                          <span className="text-gray-400">at {trip.departureTime}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {trip.estimatedCost && (
+                        <div className="font-semibold text-lg">
+                          {formatCurrency(trip.estimatedCost)}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-500">
+                        {trip.vehicleType || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
