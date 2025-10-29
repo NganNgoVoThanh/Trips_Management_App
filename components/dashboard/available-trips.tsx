@@ -44,10 +44,12 @@ export function AvailableTrips() {
   const [joinReason, setJoinReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userRequests, setUserRequests] = useState<any[]>([])
+  const [userTrips, setUserTrips] = useState<Trip[]>([])
 
   useEffect(() => {
     loadAvailableTrips()
     loadUserJoinRequests()
+    loadUserTrips()
   }, [])
 
   useEffect(() => {
@@ -91,6 +93,18 @@ export function AvailableTrips() {
       }
     } catch (error) {
       console.error('Error loading join requests:', error)
+    }
+  }
+
+  const loadUserTrips = async () => {
+    try {
+      const user = authService.getCurrentUser()
+      if (user) {
+        const trips = await fabricService.getTrips({ userId: user.id })
+        setUserTrips(trips)
+      }
+    } catch (error) {
+      console.error('Error loading user trips:', error)
     }
   }
 
@@ -229,6 +243,40 @@ export function AvailableTrips() {
 
       return false
     })
+  }
+
+  // Check if user has trip on same date
+  const hasTripOnSameDate = (trip: any): boolean => {
+    return userTrips.some(userTrip =>
+      userTrip.departureDate === trip.departureDate &&
+      (userTrip.status === 'confirmed' || userTrip.status === 'optimized')
+    )
+  }
+
+  // Check if user is already in the optimized group
+  const isInOptimizedGroup = (trip: any): boolean => {
+    if (!trip.optimizedGroupId) return false
+    return userTrips.some(userTrip =>
+      userTrip.optimizedGroupId === trip.optimizedGroupId &&
+      (userTrip.status === 'confirmed' || userTrip.status === 'optimized')
+    )
+  }
+
+  // Check if user can request to join
+  const canRequestToJoin = (trip: any): { canJoin: boolean; reason?: string } => {
+    if (hasExistingRequest(trip.id)) {
+      return { canJoin: false, reason: 'You have a pending request' }
+    }
+    if (hasApprovedRequest(trip.id)) {
+      return { canJoin: false, reason: 'Request already approved' }
+    }
+    if (hasTripOnSameDate(trip)) {
+      return { canJoin: false, reason: 'You already have a trip on this date' }
+    }
+    if (isInOptimizedGroup(trip)) {
+      return { canJoin: false, reason: 'You are already in this group' }
+    }
+    return { canJoin: true }
   }
 
   const getRequestStatus = (tripIdOrGroupId: string): string | null => {
@@ -468,64 +516,86 @@ export function AvailableTrips() {
                         )}
                       </div>
                       
-                      <div className="flex gap-2">
-                        {/* Show Request to Join button only if no pending/approved request */}
-                        {!hasExistingRequest(trip.id) && !hasApprovedRequest(trip.id) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedTrip(trip)
-                              setShowJoinDialog(true)
-                            }}
-                          >
-                            <Send className="mr-1 h-3 w-3" />
-                            Request to Join
-                          </Button>
-                        )}
+                      <div className="flex flex-col gap-2">
+                        {(() => {
+                          const joinCheck = canRequestToJoin(trip)
 
-                        {/* Show Request Pending for pending requests */}
-                        {hasExistingRequest(trip.id) && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="bg-red-700 hover:bg-red-800 text-white"
-                              onClick={() => handleCancelRequest(trip.id)}
-                              disabled={isSubmitting}
-                            >
-                              {isSubmitting ? (
-                                <>
-                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                  Cancelling...
-                                </>
-                              ) : (
-                                <>
+                          // Show Request Pending for pending requests
+                          if (hasExistingRequest(trip.id)) {
+                            return (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="bg-red-700 hover:bg-red-800 text-white"
+                                  onClick={() => handleCancelRequest(trip.id)}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <>
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                      Cancelling...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <X className="mr-1 h-3 w-3" />
+                                      Cancel
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )
+                          }
+
+                          // Show Approved status
+                          if (hasApprovedRequest(trip.id)) {
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  disabled
+                                >
+                                  ✓ Approved
+                                </Button>
+                                <p className="text-xs text-muted-foreground">
+                                  Trip added to your schedule. <br />
+                                  View in <strong>My Trips</strong> to manage.
+                                </p>
+                              </div>
+                            )
+                          }
+
+                          // Show Request to Join button or disabled button with reason
+                          if (joinCheck.canJoin) {
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedTrip(trip)
+                                  setShowJoinDialog(true)
+                                }}
+                              >
+                                <Send className="mr-1 h-3 w-3" />
+                                Request to Join
+                              </Button>
+                            )
+                          } else {
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <Button size="sm" variant="outline" disabled>
                                   <X className="mr-1 h-3 w-3" />
-                                  Cancel
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        )}
-
-                        {/* Show Approved status - user should manage from My Trips */}
-                        {hasApprovedRequest(trip.id) && (
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              size="sm"
-                              variant="default"
-                              className="bg-green-600 hover:bg-green-700"
-                              disabled
-                            >
-                              ✓ Approved
-                            </Button>
-                            <p className="text-xs text-muted-foreground">
-                              Trip added to your schedule. <br />
-                              View in <strong>My Trips</strong> to manage.
-                            </p>
-                          </div>
-                        )}
+                                  Cannot Join
+                                </Button>
+                                <p className="text-xs text-amber-600">
+                                  {joinCheck.reason}
+                                </p>
+                              </div>
+                            )
+                          }
+                        })()}
                       </div>
                     </div>
                   </div>

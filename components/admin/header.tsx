@@ -32,13 +32,25 @@ export function AdminHeader() {
     setUser(currentUser)
   }, [])
 
-  const handleLogout = () => {
-    authService.logout()
-    toast({
-      title: "Logged out successfully",
-      description: "Redirecting to home page...",
-    })
-    setTimeout(() => router.push("/"), 1500)
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+      toast({
+        title: "Logged out successfully",
+        description: "Redirecting to home page...",
+      })
+      // Use hard reload to ensure cookies are fully cleared
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 500)
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast({
+        title: "Logout failed",
+        description: "Please try again",
+        variant: "destructive"
+      })
+    }
   }
 
   const getInitials = (name: string) => {

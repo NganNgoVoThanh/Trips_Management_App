@@ -165,11 +165,22 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    this.currentUser = null;
+    try {
+      // Call API logout endpoint to clear server-side cookies
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include', // Important: include cookies
+      });
 
-    // Cookie will be cleared by /api/auth/logout endpoint
-    // No need to manually delete here
-    await new Promise(resolve => setTimeout(resolve, 100));
+      if (!response.ok) {
+        console.error('Logout API failed:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear in-memory user even if API call fails
+      this.currentUser = null;
+    }
   }
 
   getCurrentUser(): User | null {

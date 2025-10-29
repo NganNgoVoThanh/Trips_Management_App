@@ -50,7 +50,7 @@ Trip Management System là ứng dụng quản lý chuyến đi công tác đư�
 ### Phần mềm
 - Node.js: >= 18.0.0
 - npm: >= 9.0.0
-- MySQL: 8.0+ (sử dụng database hiện tại: vnicc-lxdb001vh.isrk.local)
+- MySQL: 8.0+ (sử dụng database hiện tại: vnicc-lxwb001vh.isrk.local)
 - PM2: 5.0+ (nếu dùng PM2)
 - Docker: 20.10+ và Docker Compose: 2.0+ (nếu dùng Docker)
 
@@ -561,10 +561,10 @@ done
 
 ```bash
 # Backup MySQL
-mysqldump -h vnicc-lxdb001vh.isrk.local -u tripsmgm_rndus1 -p tripsmgm_mydb001 > backup_$(date +%Y%m%d_%H%M%S).sql
+mysqldump -h vnicc-lxwb001vh.isrk.local -u tripsmgm-rndus2 -p tripsmgm-mydb002 > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Restore
-mysql -h vnicc-lxdb001vh.isrk.local -u tripsmgm_rndus1 -p tripsmgm_mydb001 < backup_20250115_100000.sql
+mysql -h vnicc-lxwb001vh.isrk.local -u tripsmgm-rndus2 -p tripsmgm-mydb002 < backup_20250115_100000.sql
 ```
 
 ### 2. Backup Application
@@ -627,11 +627,11 @@ pm2 env 0
 **Kiểm tra:**
 ```bash
 # Test kết nối MySQL
-mysql -h vnicc-lxdb001vh.isrk.local -u tripsmgm_rndus1 -p
+mysql -h vnicc-lxwb001vh.isrk.local -u tripsmgm-rndus2 -p
 
 # Kiểm tra network
-ping vnicc-lxdb001vh.isrk.local
-telnet vnicc-lxdb001vh.isrk.local 3306
+ping vnicc-lxwb001vh.isrk.local
+telnet vnicc-lxwb001vh.isrk.local 3306
 ```
 
 **Giải pháp:**
@@ -683,7 +683,7 @@ top -p $(pgrep -f trips-management-system)
 **Kiểm tra:**
 ```bash
 # Network latency đến MySQL
-ping vnicc-lxdb001vh.isrk.local
+ping vnicc-lxwb001vh.isrk.local
 
 # Database performance
 # Chạy EXPLAIN cho các queries chậm

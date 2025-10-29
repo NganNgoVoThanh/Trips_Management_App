@@ -17,10 +17,10 @@ const getPool = async () => {
   
   const mysql = await import('mysql2/promise');
   pool = mysql.default.createPool({
-    host: process.env.DB_HOST || 'vnicc-lxdb001vh.isrk.local',
+    host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
     port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'tripsmgm_rndus1',
-    password: process.env.DB_PASSWORD || 'Z2drRklW3ehr',
+    user: process.env.DB_USER || 'tripsmgm-rndus2',
+    password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
     database: process.env.DB_NAME || 'trips_management',
     waitForConnections: true,
     connectionLimit: 20, // Tăng từ 10 lên 20 để xử lý nhiều concurrent connections

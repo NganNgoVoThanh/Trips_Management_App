@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DB_HOST: ${DB_HOST:-vnicc-lxdb001vh.isrk.local}
+      DB_HOST: ${DB_HOST:-vnicc-lxwb001vh.isrk.local}
       DB_PORT: ${DB_PORT:-3306}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}

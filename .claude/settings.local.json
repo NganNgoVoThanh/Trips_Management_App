@@ -4,7 +4,11 @@
       "Bash(npm run build:*)",
       "Bash(cat:*)",
       "Bash(npm run build:production:*)",
-      "Bash(npm run pm2:restart:*)"
+      "Bash(npm run pm2:restart:*)",
+      "Bash(chmod:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run pm2:restart:production:*)",
+      "Bash(pm2 restart:*)"
     ],
     "deny": [],
     "ask": []

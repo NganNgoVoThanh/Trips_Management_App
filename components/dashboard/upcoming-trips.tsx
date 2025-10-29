@@ -184,17 +184,25 @@ export function UpcomingTrips() {
                 <div key={trip.id} className="rounded-lg border p-4 shadow-sm transition-all hover:shadow">
                   <div className="flex flex-col justify-between gap-4 md:flex-row">
                     <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-medium">
                           {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                         </h3>
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={getStatusColor(trip.status)}
                         >
-                          {trip.status === 'optimized' ? 'Optimized' : 
+                          {trip.status === 'optimized' ? 'Optimized' :
                            trip.status === 'confirmed' ? 'Confirmed' : 'Pending'}
                         </Badge>
+                        {trip.parentTripId && (
+                          <Badge
+                            variant="default"
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            Joined via Request
+                          </Badge>
+                        )}
                       </div>
                       
                       <div className="flex flex-wrap gap-4 text-sm text-gray-500">
