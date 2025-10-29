@@ -59,21 +59,29 @@ export function AvailableTrips() {
   const loadAvailableTrips = async () => {
     try {
       setIsLoading(true)
-      
+
       // Load all confirmed and optimized trips
       const allTrips = await fabricService.getTrips()
-      
+
+      // Get current user to filter out their trips
+      const user = authService.getCurrentUser()
+
       // Filter for future trips with available seats
       const today = new Date()
-      const availableTrips = allTrips.filter((trip: { departureDate: string | number | Date; status: string }) => {
+      const availableTrips = allTrips.filter((trip: { departureDate: string | number | Date; status: string; userId: string }) => {
         const tripDate = new Date(trip.departureDate)
-        return tripDate >= today && 
-               (trip.status === 'confirmed' || trip.status === 'optimized')
+        const isFutureTrip = tripDate >= today
+        const isValidStatus = trip.status === 'confirmed' || trip.status === 'optimized'
+
+        // ✅ Exclude trips that belong to current user (to avoid showing duplicate)
+        const isNotUserTrip = !user || trip.userId !== user.id
+
+        return isFutureTrip && isValidStatus && isNotUserTrip
       })
-      
+
       // Group trips by optimization group to show available seats
       const groupedTrips = groupTrips(availableTrips)
-      
+
       setTrips(groupedTrips)
     } catch (error) {
       console.error('Error loading available trips:', error)
