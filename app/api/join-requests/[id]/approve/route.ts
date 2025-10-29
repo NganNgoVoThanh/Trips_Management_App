@@ -1,13 +1,15 @@
-// app/api/optimize/approve/route.ts
+// app/api/join-requests/[id]/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fabricService } from '@/lib/mysql-service';
-import { emailService } from '@/lib/email-service';
+import { joinRequestService } from '@/lib/join-request-service';
 import { getServerUser } from '@/lib/server-auth';
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const user = await getServerUser(request);
-    
+
     if (!user) {
       return NextResponse.json(
         { error: 'User not authenticated' },
@@ -22,106 +24,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { groupId } = await request.json();
-    
-    if (!groupId) {
-      return NextResponse.json(
-        { error: 'Group ID is required' },
-        { status: 400 }
-      );
-    }
+    const requestId = params.id;
+    const body = await request.json();
+    const { adminNotes } = body;
 
-    console.log('✅ [APPROVE] Received groupId:', groupId);
-    console.log('✅ [APPROVE] Admin:', user.email);
+    console.log('✅ [APPROVE JOIN REQUEST] Request ID:', requestId);
+    console.log('✅ [APPROVE JOIN REQUEST] Admin:', user.email);
+    console.log('✅ [APPROVE JOIN REQUEST] Notes:', adminNotes);
 
-    // ✅ FIX: Get optimization group details
-    const group = await fabricService.getOptimizationGroupById(groupId);
-    
-    if (!group) {
-      console.error('❌ [APPROVE] Group not found:', groupId);
-      
-      // 🔍 DEBUG: List all existing groups
-      const allGroups = await fabricService.getOptimizationGroups();
-      console.log('📋 [APPROVE] Available groups:', allGroups.map(g => g.id));
-      
-      return NextResponse.json(
-        { 
-          error: 'Optimization group not found',
-          groupId,
-          hint: 'This group may have been deleted or never created. Check console for available group IDs.'
-        },
-        { status: 404 }
-      );
-    }
-
-    console.log('✅ [APPROVE] Found group:', group.id, 'with', group.trips?.length, 'trips');
-
-    // Check if already approved/rejected
-    if (group.status !== 'proposed') {
-      console.warn('⚠️ [APPROVE] Group already processed:', group.status);
-      return NextResponse.json(
-        { error: `Optimization group is already ${group.status}` },
-        { status: 400 }
-      );
-    }
-
-    // Validate group has trips
-    if (!group.trips || group.trips.length === 0) {
-      console.error('❌ [APPROVE] Group has no trips');
-      return NextResponse.json(
-        { error: 'No trips found in optimization group' },
-        { status: 400 }
-      );
-    }
-
-    console.log('🔄 [APPROVE] Processing approval...');
-
-    // Approve the optimization
-    await fabricService.approveOptimization(groupId);
-    
-    console.log('✅ [APPROVE] Database updated successfully');
-
-    // Get updated trips for email notification
-    const finalTrips = await Promise.all(
-      group.trips.map(tripId => fabricService.getTripById(tripId))
-    );
-    
-    const validTrips = finalTrips.filter(t => t !== null);
-    
-    console.log('📧 [APPROVE] Sending notifications to', validTrips.length, 'users');
-
-    // Send notification emails
-    if (validTrips.length > 0 && emailService.isServiceConfigured()) {
-      try {
-        await emailService.sendOptimizationNotification(
-          validTrips as any,
-          group.proposedDepartureTime,
-          group.vehicleType,
-          group.estimatedSavings
-        );
-        console.log('✅ [APPROVE] Notifications sent');
-      } catch (emailError) {
-        console.error('⚠️ [APPROVE] Email failed:', emailError);
-        // Don't fail the approval if email fails
+    // Approve the join request
+    await joinRequestService.approveJoinRequest(
+      requestId,
+      adminNotes,
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        department: user.department,
+        employeeId: user.employeeId
       }
-    }
-    
+    );
+
+    console.log('✅ [APPROVE JOIN REQUEST] Successfully approved');
+
     return NextResponse.json({
       success: true,
-      groupId,
-      message: `Optimization approved for ${validTrips.length} trips`,
-      tripsUpdated: validTrips.length,
-      notificationsSent: emailService.isServiceConfigured() && validTrips.length > 0,
+      message: 'Join request approved successfully',
+      requestId,
       approvedBy: user.email,
       approvedAt: new Date().toISOString()
     });
-    
+
   } catch (error: any) {
-    console.error('❌ [APPROVE] Error:', error);
-    
+    console.error('❌ [APPROVE JOIN REQUEST] Error:', error);
+
     return NextResponse.json(
-      { 
-        error: error.message || 'Failed to approve optimization',
+      {
+        error: error.message || 'Failed to approve join request',
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }

@@ -1,6 +1,84 @@
 // lib/auth-helpers.ts
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { User } from './auth-service';
+
+/**
+ * Cookie configuration options for session management
+ * These settings ensure cookies work on both HTTP and HTTPS
+ */
+export interface CookieOptions {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'lax' | 'strict' | 'none';
+  maxAge: number;
+  path: string;
+}
+
+/**
+ * Get cookie configuration based on request URL and environment
+ *
+ * Priority order:
+ * 1. FORCE_SECURE_COOKIE env var (override everything)
+ * 2. Auto-detect from request URL (https:// = secure)
+ * 3. Default to false for flexibility
+ *
+ * Usage:
+ * - Development (HTTP): secure=false automatically
+ * - Production (HTTP): secure=false automatically
+ * - Production (HTTPS): secure=true automatically
+ * - Force secure on HTTP: Set FORCE_SECURE_COOKIE=false in .env
+ * - Force secure on HTTPS: Set FORCE_SECURE_COOKIE=true in .env
+ */
+export function getCookieConfig(request: NextRequest, maxAge: number = 60 * 60 * 24 * 7): CookieOptions {
+  // Check for explicit override from environment
+  const forceSecure = process.env.FORCE_SECURE_COOKIE;
+
+  let isSecure: boolean;
+
+  if (forceSecure !== undefined) {
+    // Environment override takes precedence
+    isSecure = forceSecure === 'true';
+  } else {
+    // Auto-detect from request URL
+    isSecure = request.url.startsWith('https://');
+  }
+
+  return {
+    httpOnly: true,
+    secure: isSecure, // Auto-detect or environment override
+    sameSite: 'lax', // 'lax' works for HTTP, 'none' requires secure=true
+    maxAge: maxAge, // Default: 7 days
+    path: '/',
+  };
+}
+
+/**
+ * Set session cookie with proper configuration
+ */
+export function setSessionCookie(response: NextResponse, request: NextRequest, user: User) {
+  const cookieConfig = getCookieConfig(request);
+  response.cookies.set('session', JSON.stringify(user), cookieConfig);
+}
+
+/**
+ * Clear session cookie with proper configuration
+ */
+export function clearSessionCookie(response: NextResponse, request: NextRequest) {
+  const isSecure = request.url.startsWith('https://');
+
+  // Method 1: Set with maxAge = 0
+  response.cookies.set('session', '', {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  // Method 2: Explicitly delete
+  response.cookies.delete('session');
+}
 
 /**
  * Extract user information from request headers (set by middleware)

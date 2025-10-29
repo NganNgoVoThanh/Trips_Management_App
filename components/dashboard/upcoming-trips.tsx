@@ -345,7 +345,7 @@ export function UpcomingTrips() {
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Trip</DialogTitle>
+            <DialogTitle>Cancel</DialogTitle>
             <DialogDescription>
               Are you sure you want to cancel this trip? This action cannot be undone.
             </DialogDescription>
@@ -381,7 +381,7 @@ export function UpcomingTrips() {
                   Cancelling...
                 </>
               ) : (
-                'Cancel Trip'
+                'Cancel'
               )}
             </Button>
           </DialogFooter>

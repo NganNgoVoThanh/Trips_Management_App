@@ -138,12 +138,12 @@ export function AvailableTrips() {
 
   const handleRequestToJoin = async () => {
     if (!selectedTrip) return
-    
+
     setIsSubmitting(true)
-    
+
     try {
       const user = authService.getCurrentUser()
-      
+
       if (!user) {
         toast({
           title: "Authentication Required",
@@ -153,9 +153,15 @@ export function AvailableTrips() {
         return
       }
 
+      // For optimized trips, use the first participant's trip ID (real trip ID in database)
+      // For individual trips, use the trip ID directly
+      const actualTripId = selectedTrip.participants && selectedTrip.participants.length > 0
+        ? selectedTrip.participants[0].id
+        : selectedTrip.id
+
       // Create join request
       await joinRequestService.createJoinRequest(
-        selectedTrip.id,
+        actualTripId,
         {
           departureLocation: selectedTrip.departureLocation,
           destination: selectedTrip.destination,
@@ -189,21 +195,54 @@ export function AvailableTrips() {
     }
   }
 
-  const hasExistingRequest = (tripId: string): boolean => {
-    return userRequests.some(req => 
-      req.tripId === tripId && 
-      req.status === 'pending'
-    )
+  const hasExistingRequest = (tripIdOrGroupId: string): boolean => {
+    // Check if any pending request matches this trip ID or has the same optimized group ID
+    return userRequests.some(req => {
+      // Only check pending requests
+      if (req.status !== 'pending') return false
+
+      // Direct match with trip ID
+      if (req.tripId === tripIdOrGroupId) return true
+
+      // Match by optimized group ID (for grouped trips)
+      if (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId) {
+        return true
+      }
+
+      return false
+    })
   }
 
-  const getRequestStatus = (tripId: string): string | null => {
-    const request = userRequests.find(req => req.tripId === tripId)
+  const hasApprovedRequest = (tripIdOrGroupId: string): boolean => {
+    // Check if any approved request matches this trip ID or has the same optimized group ID
+    return userRequests.some(req => {
+      // Only check approved requests
+      if (req.status !== 'approved') return false
+
+      // Direct match with trip ID
+      if (req.tripId === tripIdOrGroupId) return true
+
+      // Match by optimized group ID (for grouped trips)
+      if (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId) {
+        return true
+      }
+
+      return false
+    })
+  }
+
+  const getRequestStatus = (tripIdOrGroupId: string): string | null => {
+    const request = userRequests.find(req =>
+      req.tripId === tripIdOrGroupId ||
+      (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId)
+    )
     return request ? request.status : null
   }
 
-  const getPendingRequest = (tripId: string) => {
-    return userRequests.find(req => 
-      req.tripId === tripId && 
+  const getPendingRequest = (tripIdOrGroupId: string) => {
+    return userRequests.find(req =>
+      (req.tripId === tripIdOrGroupId ||
+       (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId)) &&
       req.status === 'pending'
     )
   }
@@ -430,45 +469,69 @@ export function AvailableTrips() {
                       </div>
                       
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedTrip(trip)
-                            setShowJoinDialog(true)
-                          }}
-                          disabled={hasExistingRequest(trip.id)}
-                        >
-                          {hasExistingRequest(trip.id) ? (
-                            'Request Pending'
-                          ) : (
-                            <>
-                              <Send className="mr-1 h-3 w-3" />
-                              Request to Join
-                            </>
-                          )}
-                        </Button>
-                        
-                        {hasExistingRequest(trip.id) && (
+                        {/* Show Request to Join button only if no pending/approved request */}
+                        {!hasExistingRequest(trip.id) && !hasApprovedRequest(trip.id) && (
                           <Button
                             size="sm"
-                            variant="destructive"
-                            className="bg-red-700 hover:bg-red-800 text-white"
-                            onClick={() => handleCancelRequest(trip.id)}
-                            disabled={isSubmitting}
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedTrip(trip)
+                              setShowJoinDialog(true)
+                            }}
                           >
-                            {isSubmitting ? (
-                              <>
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                Cancelling...
-                              </>
-                            ) : (
-                              <>
-                                <X className="mr-1 h-3 w-3" />
-                                Cancel
-                              </>
-                            )}
+                            <Send className="mr-1 h-3 w-3" />
+                            Request to Join
                           </Button>
+                        )}
+
+                        {/* Show Request Pending for pending requests */}
+                        {hasExistingRequest(trip.id) && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                            >
+                              Request Pending
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="bg-red-700 hover:bg-red-800 text-white"
+                              onClick={() => handleCancelRequest(trip.id)}
+                              disabled={isSubmitting}
+                            >
+                              {isSubmitting ? (
+                                <>
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  Cancelling...
+                                </>
+                              ) : (
+                                <>
+                                  <X className="mr-1 h-3 w-3" />
+                                  Cancel Request
+                                </>
+                              )}
+                            </Button>
+                          </>
+                        )}
+
+                        {/* Show Approved status - user should manage from My Trips */}
+                        {hasApprovedRequest(trip.id) && (
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="bg-green-600 hover:bg-green-700"
+                              disabled
+                            >
+                              ✓ Approved
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              Trip added to your schedule. <br />
+                              View in <strong>My Trips</strong> to manage or cancel.
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>

@@ -33,10 +33,10 @@ class FabricClientService {
     }
   }
 
-  async getTrips(filters?: { 
-    userId?: string; 
-    status?: string; 
-    includeTemp?: boolean 
+  async getTrips(filters?: {
+    userId?: string;
+    status?: string;
+    includeTemp?: boolean
   }): Promise<Trip[]> {
     if (!this.isClient) {
       console.warn('⚠️ getTrips called on server side - skipping');
@@ -48,9 +48,12 @@ class FabricClientService {
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.includeTemp) params.append('includeTemp', 'true');
+      // Add cache busting to ensure fresh data
+      params.append('_t', Date.now().toString());
 
       const response = await fetch(`${this.baseUrl}/trips?${params.toString()}`, {
         credentials: 'include', // ✅ FIX: Include cookies
+        cache: 'no-store', // ✅ FIX: Disable caching
         headers: {
           'Content-Type': 'application/json',
         }

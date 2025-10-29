@@ -123,7 +123,7 @@ class JoinRequestService {
   ): Promise<JoinRequest> {
     try {
       let user: RequestUser | null = null;
-      
+
       if (requestUser) {
         user = requestUser;
       } else if (typeof window !== 'undefined') {
@@ -139,19 +139,64 @@ class JoinRequestService {
           };
         }
       }
-      
+
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      const existingRequests = await this.getJoinRequests({ 
-        tripId, 
+      // Check for existing pending request for the same trip
+      const existingPendingRequests = await this.getJoinRequests({
+        tripId,
         requesterId: user.id,
         status: 'pending'
       });
 
-      if (existingRequests.length > 0) {
+      if (existingPendingRequests.length > 0) {
         throw new Error('You already have a pending request for this trip');
+      }
+
+      // Check for existing approved request for the same trip
+      const existingApprovedRequests = await this.getJoinRequests({
+        tripId,
+        requesterId: user.id,
+        status: 'approved'
+      });
+
+      if (existingApprovedRequests.length > 0) {
+        throw new Error('Your join request has already been approved for this trip. Check your trips list.');
+      }
+
+      // Check if user already has a trip at the same date and time
+      if (this.ensureServerSide('createJoinRequest - check conflicts')) {
+        const userTrips = await fabricService.getTrips({ userId: user.id });
+        const conflictingTrip = userTrips.find((trip: any) => {
+          // Check if it's on the same date
+          if (trip.departureDate !== tripDetails.departureDate) return false;
+
+          // Check if status is confirmed or optimized (not cancelled/draft)
+          if (trip.status !== 'confirmed' && trip.status !== 'optimized') return false;
+
+          return true;
+        });
+
+        if (conflictingTrip) {
+          throw new Error(
+            `You already have a trip scheduled on ${tripDetails.departureDate}. ` +
+            `Please cancel your existing trip before joining another one.`
+          );
+        }
+
+        // Check if user is already a participant in the optimized group
+        if (tripDetails.optimizedGroupId) {
+          const isAlreadyParticipant = userTrips.some((trip: any) =>
+            trip.optimizedGroupId === tripDetails.optimizedGroupId &&
+            (trip.status === 'confirmed' || trip.status === 'optimized')
+          );
+
+          if (isAlreadyParticipant) {
+            throw new Error('You are already a participant in this optimized trip group');
+          }
+        }
       }
 
       const joinRequest: JoinRequest = {
@@ -729,12 +774,54 @@ Trip Details:
 
   private async addUserToTrip(request: JoinRequest): Promise<void> {
     try {
-      const trip = await fabricService.getTripById(request.tripId);
-      if (trip) {
-        console.log(`✅ User ${request.requesterName} added to trip ${request.tripId}`);
+      // Get the original trip to copy details
+      const originalTrip = await fabricService.getTripById(request.tripId);
+
+      if (!originalTrip) {
+        throw new Error(`Trip ${request.tripId} not found`);
       }
+
+      console.log('📋 Creating new trip for user:', request.requesterName);
+      console.log('📋 Based on trip:', originalTrip.id);
+
+      // Create a new trip for the user with the same details as the original trip
+      const newTrip = {
+        userId: request.requesterId,
+        userName: request.requesterName,
+        userEmail: request.requesterEmail,
+        departureLocation: originalTrip.departureLocation,
+        destination: originalTrip.destination,
+        departureDate: originalTrip.departureDate,
+        departureTime: originalTrip.departureTime,
+        returnDate: originalTrip.returnDate,
+        returnTime: originalTrip.returnTime,
+        vehicleType: originalTrip.vehicleType,
+        estimatedCost: originalTrip.estimatedCost,
+        actualCost: originalTrip.actualCost,
+        status: originalTrip.status, // Keep same status (optimized or confirmed)
+        optimizedGroupId: originalTrip.optimizedGroupId, // Join the same optimized group
+        originalDepartureTime: originalTrip.originalDepartureTime,
+        notified: false, // New user hasn't been notified yet
+        dataType: 'final' as const,
+        parentTripId: originalTrip.id, // Track which trip this was joined from
+      };
+
+      // Create the trip
+      const createdTrip = await fabricService.createTrip(newTrip);
+
+      console.log('✅ User', request.requesterName, 'added to trip group', originalTrip.optimizedGroupId || originalTrip.id);
+      console.log('✅ New trip created with details:', {
+        id: createdTrip.id,
+        userId: createdTrip.userId,
+        userName: createdTrip.userName,
+        userEmail: createdTrip.userEmail,
+        status: createdTrip.status,
+        optimizedGroupId: createdTrip.optimizedGroupId,
+        departureDate: createdTrip.departureDate
+      });
     } catch (error) {
       console.error('Error adding user to trip:', error);
+      throw error; // Propagate error to prevent silent failure
     }
   }
 }

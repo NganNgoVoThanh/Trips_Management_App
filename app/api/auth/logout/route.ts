@@ -1,27 +1,17 @@
 // app/api/auth/logout/route.ts - COMPLETE FIX
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { clearSessionCookie } from '@/lib/auth-helpers';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     // Create response
-    const response = NextResponse.json({ 
+    const response = NextResponse.json({
       success: true,
-      message: 'Logged out successfully' 
+      message: 'Logged out successfully'
     });
-    
-    // ✅ FIX 1: Clear session cookie với MULTIPLE methods
-    // Method 1: Set với maxAge = 0
-    response.cookies.set('session', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-      expires: new Date(0),
-    });
-    
-    // Method 2: Explicitly delete
-    response.cookies.delete('session');
+
+    // ✅ Clear session cookie with proper HTTP/HTTPS detection
+    clearSessionCookie(response, request);
     
     // ✅ FIX 2: Set cache control headers để prevent caching
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -41,6 +31,6 @@ export async function POST() {
 }
 
 // Support GET method for direct logout links
-export async function GET() {
-  return POST();
+export async function GET(request: NextRequest) {
+  return POST(request);
 }

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/lib/auth-service';
 import { config } from '@/lib/config';
+import { setSessionCookie } from '@/lib/auth-helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,18 +20,12 @@ export async function POST(request: NextRequest) {
     // For now, simulate authentication
     const user = await authService.loginWithSSO(email, password);
     
-    // ✅ FIX: Create response with cookie
+    // ✅ Create response with cookie
     const response = NextResponse.json(user);
-    
-    // ✅ FIX: Set session cookie with user data
-    response.cookies.set('session', JSON.stringify(user), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
-    });
-    
+
+    // ✅ Set session cookie with proper HTTP/HTTPS detection
+    setSessionCookie(response, request, user);
+
     return response;
   } catch (error: any) {
     return NextResponse.json(
