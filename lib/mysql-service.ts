@@ -17,21 +17,24 @@ const getPool = async () => {
   
   const mysql = await import('mysql2/promise');
   pool = mysql.default.createPool({
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || 'vnicc-lxdb001vh.isrk.local',
     port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    user: process.env.DB_USER || 'tripsmgm_rndus1',
+    password: process.env.DB_PASSWORD || 'Z2drRklW3ehr',
     database: process.env.DB_NAME || 'trips_management',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
+    connectionLimit: 20, // Tăng từ 10 lên 20 để xử lý nhiều concurrent connections
+    queueLimit: 10, // Thay đổi từ 0 để queue requests thay vì reject ngay
+    maxIdle: 10, // Số connections tối đa được giữ idle
+    idleTimeout: 60000, // 60 giây trước khi đóng idle connection
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 10000, // 10 giây delay trước khi bắt đầu keep-alive
+    connectTimeout: 20000 // 20 giây timeout cho connection
   });
-  
+
   console.log('✓ MySQL Connection Pool initialized');
   console.log(`✓ Database: ${process.env.DB_NAME || 'trips_management'}`);
-  
+
   return pool;
 };
 
@@ -94,7 +97,7 @@ class MySQLService {
       console.log('✓ MySQL connection verified');
       this.isConnected = true;
     } catch (err: any) {
-      console.warn('âš ï¸ MySQL connection check failed:', err.message);
+      console.warn('X MySQL connection check failed:', err.message);
       this.isConnected = false;
     } finally {
       this.hasCheckedConnection = true;

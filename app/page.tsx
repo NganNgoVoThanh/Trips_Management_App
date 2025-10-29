@@ -5,8 +5,29 @@ import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
 import Image from "next/image";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { authService } from "@/lib/auth-service";
 
 export default function Page() {
+  const router = useRouter();
+
+  // ✅ Check if user is already logged in on mount
+  useEffect(() => {
+    const checkAuth = () => {
+      const user = authService.getCurrentUser();
+
+      if (user) {
+        // User is logged in - redirect to appropriate dashboard
+        const targetUrl = user.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+        router.replace(targetUrl);
+      }
+    };
+
+    // Small delay to ensure cookies are loaded
+    setTimeout(checkAuth, 100);
+  }, [router]);
+
   return (
     <div className="relative min-h-dvh flex flex-col">
       {/* MAIN */}

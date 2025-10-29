@@ -6,7 +6,7 @@ module.exports = {
       args: 'start -p 50001 -H 0.0.0.0',
       cwd: './',
       instances: 1,
-      exec_mode: 'cluster',
+      exec_mode: 'fork', // Đổi từ 'cluster' sang 'fork' để tránh vấn đề với database connection pool
       watch: false,
       max_memory_restart: '1G',
       env: {

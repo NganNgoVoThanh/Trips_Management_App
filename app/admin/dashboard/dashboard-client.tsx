@@ -8,6 +8,7 @@ import { AdminShell } from "@/components/admin/shell"
 import { TripOptimization } from "@/components/admin/trip-optimization"
 import { TripManagement } from "@/components/admin/trip-management"
 import { JoinRequestsManagement } from "@/components/admin/join-requests-management"
+import { SessionMonitor } from "@/components/session-monitor"
 import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
@@ -481,8 +482,10 @@ export function AdminDashboardClient() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <AdminHeader />
+    <>
+      <SessionMonitor />
+      <div className="flex min-h-screen flex-col bg-gray-50">
+        <AdminHeader />
       
       <div className="container flex-1 space-y-6 p-8 pt-6">
         {/* Admin Welcome Section with Logo */}
@@ -968,5 +971,6 @@ export function AdminDashboardClient() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   )
 }

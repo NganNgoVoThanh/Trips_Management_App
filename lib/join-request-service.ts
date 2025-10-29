@@ -25,10 +25,15 @@ const getPool = async () => {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'trips_management',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    connectionLimit: 20,
+    queueLimit: 10,
+    maxIdle: 10,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    connectTimeout: 20000
   });
-  
+
   return pool;
 };
 

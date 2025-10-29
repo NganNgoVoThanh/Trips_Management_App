@@ -1,5 +1,6 @@
 // lib/auth-service.ts
 import { config } from './config';
+import { getSessionFromCookie } from './cookie-utils';
 
 export interface User {
   id: string;
@@ -53,32 +54,29 @@ class AuthService {
   }
 
   private loadUserFromSession(): void {
-    // ✅ FIX: Only run on client side
+    // ✅ FIX: Read from cookie instead of sessionStorage
     if (typeof window === 'undefined') return;
-    
-    const userStr = sessionStorage.getItem('currentUser');
-    if (userStr) {
-      try {
-        this.currentUser = JSON.parse(userStr);
-        // Re-validate role based on email
-        if (this.currentUser) {
-          this.currentUser.role = this.determineRole(this.currentUser.email);
-          // Migration: ensure id/employeeId are stable by email
-          const stableId = this.stableUserIdFromEmail(this.currentUser.email);
-          const stableEmp = this.stableEmployeeIdFromEmail(this.currentUser.email);
-          if (this.currentUser.id !== stableId || this.currentUser.employeeId !== stableEmp) {
-            this.currentUser = {
-              ...this.currentUser,
-              id: stableId,
-              employeeId: stableEmp
-            };
-            sessionStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-          }
-        }
-      } catch (error) {
-        console.error('Failed to parse user from session:', error);
-        sessionStorage.removeItem('currentUser');
+
+    try {
+      // Read session from cookie (set by middleware)
+      const userData = getSessionFromCookie();
+
+      if (userData && userData.email) {
+        // Ensure stable IDs
+        const stableId = this.stableUserIdFromEmail(userData.email);
+        const stableEmp = this.stableEmployeeIdFromEmail(userData.email);
+
+        // Re-validate role based on email and set stable IDs
+        this.currentUser = {
+          ...userData,
+          id: stableId,
+          employeeId: stableEmp,
+          role: this.determineRole(userData.email)
+        };
       }
+    } catch (error) {
+      console.error('Failed to load user from session cookie:', error);
+      this.currentUser = null;
     }
   }
 
@@ -122,11 +120,9 @@ class AuthService {
         createdAt: new Date().toISOString()
       };
       
-      // ✅ FIX: Only store in sessionStorage on client side
+      // ✅ Session is stored in cookie by server (via /api/auth/login)
+      // No need to store in localStorage/sessionStorage
       this.currentUser = user;
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('currentUser', JSON.stringify(user));
-      }
       
       console.log('=== LOGIN DEBUG ===');
       console.log('Email:', user.email);
@@ -170,15 +166,17 @@ class AuthService {
 
   async logout(): Promise<void> {
     this.currentUser = null;
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('currentUser');
-    }
-    
-    // In production, also call SSO logout endpoint
+
+    // Cookie will be cleared by /api/auth/logout endpoint
+    // No need to manually delete here
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   getCurrentUser(): User | null {
+    // ✅ Always try to reload from cookie if currentUser is null
+    if (!this.currentUser && typeof window !== 'undefined') {
+      this.loadUserFromSession();
+    }
     return this.currentUser;
   }
 
@@ -195,7 +193,7 @@ class AuthService {
     if (!this.currentUser) {
       throw new Error('No user logged in');
     }
-    
+
     // In production, this would call API to update user profile
     this.currentUser = {
       ...this.currentUser,
@@ -204,11 +202,10 @@ class AuthService {
       email: this.normalizeEmail(this.currentUser.email),
       role: this.determineRole(this.currentUser.email) // Always re-check role
     };
-    
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-    }
-    
+
+    // Note: In production, the cookie would be updated by the server
+    // For now, just update in-memory
+
     return this.currentUser;
   }
 

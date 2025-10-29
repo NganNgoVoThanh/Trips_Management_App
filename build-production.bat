@@ -64,9 +64,25 @@ echo ========================================
 echo Build completed successfully!
 echo ========================================
 echo.
-echo Next steps:
-echo 1. Update .env.production with your settings
-echo 2. Run: start-production.bat
+echo ========================================
+echo IMPORTANT: Before starting the server
+echo ========================================
+echo.
+echo 1. Verify .env.production has correct settings:
+echo    - NEXT_PUBLIC_APP_URL=http://trip.intersnack.com.vn
+echo    - NEXTAUTH_URL=http://trip.intersnack.com.vn
+echo    - DB_HOST is accessible from production server
+echo.
+echo 2. Test database connection:
+echo    - Ensure DB_HOST can be reached from server
+echo    - Verify DB credentials are correct
+echo.
+echo 3. Start the server:
+echo    - Run: start-production.bat
+echo    - Or: npm run pm2:start
+echo.
+echo 4. Monitor logs:
+echo    - Run: npm run pm2:logs
 echo.
 
 pause

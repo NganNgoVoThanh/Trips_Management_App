@@ -48,23 +48,10 @@ export function LoginButton({
         return
       }
 
-      // ✅ FIX 1: Clear any existing session data FIRST
-      sessionStorage.removeItem('currentUser')
-      
-      // ✅ FIX 2: Also clear any stale cookies by calling logout first
-      try {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-        })
-      } catch {
-        // Ignore errors from logout - might not be logged in
-      }
-
-      // ✅ FIX 3: Call API login endpoint to set cookie
+      // ✅ Call API login endpoint - server will set session cookie
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'include', // Important: include cookies
         headers: {
           'Content-Type': 'application/json',
         },
@@ -77,22 +64,19 @@ export function LoginButton({
       }
 
       const user = await response.json()
-      
-      // ✅ FIX 4: Save to sessionStorage for client-side access
-      sessionStorage.setItem('currentUser', JSON.stringify(user))
-      
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.name}!`,
       })
 
       setOpen(false)
-      
-      // ✅ FIX 5: Use router.replace instead of router.push to prevent back navigation
-      // Also use window.location for hard navigation to ensure clean state
+
+      // ✅ Small delay to ensure cookie is fully set by browser
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // ✅ Hard reload to ensure cookie is read and new session starts
       const targetUrl = user.role === 'admin' ? '/admin/dashboard' : '/dashboard'
-      
-      // Hard navigation to ensure clean state
       window.location.href = targetUrl
 
     } catch (error: any) {

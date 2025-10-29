@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // output: 'standalone', // Disabled for PM2 compatibility - use next start instead
-  reactStrictMode: false, // Disable strict mode to prevent double renders
+  reactStrictMode: true, // Enable strict mode for better development experience
+  poweredByHeader: false, // Remove X-Powered-By header for security
+  compress: true, // Enable gzip compression
   images: {
     remotePatterns: [
       {
@@ -9,10 +11,12 @@ const nextConfig = {
         hostname: '**.intersnack.com.vn',
       },
     ],
+    formats: ['image/avif', 'image/webp'], // Modern image formats
   },
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:50001',
     NEXT_PUBLIC_COMPANY_DOMAIN: process.env.NEXT_PUBLIC_COMPANY_DOMAIN || '@intersnack.com.vn',
+    NEXT_PUBLIC_SESSION_MAX_AGE: process.env.SESSION_MAX_AGE || '1800',
   },
   webpack: (config, { isServer }) => {
     // Exclude Node.js modules from client bundle

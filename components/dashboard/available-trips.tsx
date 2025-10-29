@@ -489,13 +489,6 @@ export function AvailableTrips() {
                           <>
                             <Button
                               size="sm"
-                              variant="outline"
-                              disabled
-                            >
-                              Request Pending
-                            </Button>
-                            <Button
-                              size="sm"
                               variant="destructive"
                               className="bg-red-700 hover:bg-red-800 text-white"
                               onClick={() => handleCancelRequest(trip.id)}
@@ -509,7 +502,7 @@ export function AvailableTrips() {
                               ) : (
                                 <>
                                   <X className="mr-1 h-3 w-3" />
-                                  Cancel Request
+                                  Cancel
                                 </>
                               )}
                             </Button>
@@ -529,7 +522,7 @@ export function AvailableTrips() {
                             </Button>
                             <p className="text-xs text-muted-foreground">
                               Trip added to your schedule. <br />
-                              View in <strong>My Trips</strong> to manage or cancel.
+                              View in <strong>My Trips</strong> to manage.
                             </p>
                           </div>
                         )}

@@ -8,13 +8,14 @@ import { UpcomingTrips } from "@/components/dashboard/upcoming-trips"
 import { AvailableTrips } from "@/components/dashboard/available-trips"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { DashboardShell } from "@/components/dashboard/shell"
+import { SessionMonitor } from "@/components/session-monitor"
 import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency } from "@/lib/config"
-import { 
-  Car, 
-  TrendingDown, 
-  Calendar, 
+import {
+  Car,
+  TrendingDown,
+  Calendar,
   Users,
   MapPin,
   Clock,
@@ -234,10 +235,12 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <DashboardHeader />
-      
-      <div className="container flex-1 space-y-6 p-8 pt-6">
+    <>
+      <SessionMonitor />
+      <div className="flex min-h-screen flex-col bg-gray-50">
+        <DashboardHeader />
+
+        <div className="container flex-1 space-y-6 p-8 pt-6">
         {/* Database Warning Alert */}
         {!isDatabaseConfigured && (
           <Alert className="bg-yellow-50 border-yellow-200">
@@ -474,5 +477,6 @@ export function DashboardClient() {
         </Card>
       </div>
     </div>
+    </>
   )
 }

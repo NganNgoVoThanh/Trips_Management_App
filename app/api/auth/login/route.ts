@@ -26,6 +26,10 @@ export async function POST(request: NextRequest) {
     // ✅ Set session cookie with proper HTTP/HTTPS detection
     setSessionCookie(response, request, user);
 
+    console.log('✅ Login successful, cookie set for:', user.email);
+    console.log('✅ User role:', user.role);
+    console.log('✅ Redirect target:', user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+
     return response;
   } catch (error: any) {
     return NextResponse.json(
