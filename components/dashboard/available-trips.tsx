@@ -295,6 +295,13 @@ export function AvailableTrips() {
     return request ? request.status : null
   }
 
+  const getRequestDetails = (tripIdOrGroupId: string) => {
+    return userRequests.find(req =>
+      req.tripId === tripIdOrGroupId ||
+      (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId)
+    )
+  }
+
   const getPendingRequest = (tripIdOrGroupId: string) => {
     return userRequests.find(req =>
       (req.tripId === tripIdOrGroupId ||
@@ -522,6 +529,17 @@ export function AvailableTrips() {
                              This is an optimized group trip with cost savings
                           </div>
                         )}
+
+                        {/* Show admin notes for rejected requests */}
+                        {requestStatus === 'rejected' && (() => {
+                          const requestDetails = getRequestDetails(trip.id)
+                          return requestDetails?.adminNotes ? (
+                            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                              <p className="text-xs font-medium text-red-800 mb-1">Rejection Reason:</p>
+                              <p className="text-sm text-red-700">{requestDetails.adminNotes}</p>
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                       
                       <div className="flex flex-col gap-2">
@@ -557,6 +575,7 @@ export function AvailableTrips() {
 
                           // Show Approved status
                           if (hasApprovedRequest(trip.id)) {
+                            const requestDetails = getRequestDetails(trip.id)
                             return (
                               <div className="flex flex-col gap-1">
                                 <Button
@@ -567,7 +586,13 @@ export function AvailableTrips() {
                                 >
                                   ✓ Approved
                                 </Button>
-                                <p className="text-xs text-muted-foreground">
+                                {requestDetails?.adminNotes && (
+                                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                                    <p className="font-medium text-green-800 mb-1">Admin Note:</p>
+                                    <p className="text-green-700">{requestDetails.adminNotes}</p>
+                                  </div>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
                                   Trip added to your schedule. <br />
                                   View in <strong>My Trips</strong> to manage.
                                 </p>

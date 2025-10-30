@@ -369,6 +369,9 @@ export function JoinRequestsManagement() {
                               <DialogContent>
                                 <DialogHeader>
                                   <DialogTitle>Request Details</DialogTitle>
+                                  <DialogDescription>
+                                    View complete information about this join request
+                                  </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                   <div>

@@ -8,7 +8,11 @@
       "Bash(chmod:*)",
       "Bash(npm install:*)",
       "Bash(npm run pm2:restart:production:*)",
-      "Bash(pm2 restart:*)"
+      "Bash(pm2 restart:*)",
+      "Bash(npm run start:production:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

@@ -200,16 +200,16 @@ export function TripRegistration() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Departure Location */}
             <div className="space-y-2">
-              <Label htmlFor="departure">
+              <Label>
                 <MapPin className="inline h-4 w-4 mr-1" />
                 Departure Location *
               </Label>
-              <Select 
-                value={formData.departureLocation} 
+              <Select
+                value={formData.departureLocation}
                 onValueChange={(value) => handleInputChange('departureLocation', value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger id="departure">
                   <SelectValue placeholder="Select departure location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,16 +224,16 @@ export function TripRegistration() {
 
             {/* Destination */}
             <div className="space-y-2">
-              <Label htmlFor="destination">
+              <Label>
                 <MapPin className="inline h-4 w-4 mr-1" />
                 Destination *
               </Label>
-              <Select 
-                value={formData.destination} 
+              <Select
+                value={formData.destination}
                 onValueChange={(value) => handleInputChange('destination', value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger id="destination">
                   <SelectValue placeholder="Select destination" />
                 </SelectTrigger>
                 <SelectContent>
@@ -318,16 +318,16 @@ export function TripRegistration() {
 
             {/* Vehicle Type */}
             <div className="space-y-2">
-              <Label htmlFor="vehicle">
+              <Label>
                 <Car className="inline h-4 w-4 mr-1" />
                 Preferred Vehicle
               </Label>
-              <Select 
-                value={formData.vehicleType} 
+              <Select
+                value={formData.vehicleType}
                 onValueChange={(value) => handleInputChange('vehicleType', value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger id="vehicle">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

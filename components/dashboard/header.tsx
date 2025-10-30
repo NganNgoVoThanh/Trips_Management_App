@@ -13,8 +13,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Car, Calendar, LogOut, User, BarChart3 } from "lucide-react"
+import { Car, Calendar, LogOut, User, BarChart3, Home } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { useEffect, useState } from "react"
 import Image from "next/image"
@@ -67,7 +68,7 @@ export function DashboardHeader() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href={user?.role === 'admin' ? "/admin/dashboard" : "/dashboard"} className="flex items-center gap-2">
             <Image
               src="/intersnack-logo.png"
               alt="Intersnack"
@@ -75,43 +76,83 @@ export function DashboardHeader() {
               height={50}
               className="object-contain"
             />
+            {user?.role === 'admin' && (
+              <span className="font-bold text-red-600">ADMIN</span>
+            )}
           </Link>
           
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-2">
-            <Link href="/dashboard">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={cn(
-                  "transition-all",
-                  isActive('/dashboard') && !pathname?.startsWith('/management')
-                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                )}
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                Trips
-              </Button>
-            </Link>
-            
-            {/* Management link - only for admin */}
-            {user?.role === 'admin' && (
-              <Link href="/management">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={cn(
-                    "transition-all",
-                    isActive('/management')
-                      ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                      : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                  )}
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Management
-                </Button>
-              </Link>
+            {user?.role === 'admin' ? (
+              // Admin navigation - consistent with AdminHeader
+              <>
+                <Link href="/admin/dashboard">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "transition-all",
+                      isActive('/admin/dashboard')
+                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <Home className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+
+                <Link href="/management">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "transition-all",
+                      isActive('/management')
+                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Management
+                  </Button>
+                </Link>
+
+                <Link href="/dashboard">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "transition-all",
+                      isActive('/dashboard') && !pathname?.startsWith('/admin') && !pathname?.startsWith('/management')
+                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <Car className="mr-2 h-4 w-4" />
+                    User View
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              // Regular user navigation
+              <>
+                <Link href="/dashboard">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "transition-all",
+                      isActive('/dashboard') && !pathname?.startsWith('/management')
+                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Trips
+                  </Button>
+                </Link>
+              </>
             )}
           </nav>
         </div>
@@ -121,7 +162,7 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-red-100 text-red-600">
+                <AvatarFallback className={user?.role === 'admin' ? "bg-red-600 text-white" : "bg-red-100 text-red-600"}>
                   {getInitials(user?.name || 'User')}
                 </AvatarFallback>
               </Avatar>
@@ -134,6 +175,9 @@ export function DashboardHeader() {
                 <p className="text-xs leading-none text-muted-foreground">
                   {user?.email || 'user@intersnack.com.vn'}
                 </p>
+                {user?.role === 'admin' && (
+                  <Badge className="mt-1 w-fit bg-red-100 text-red-700">Administrator</Badge>
+                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

@@ -59,6 +59,8 @@ import {
 } from "@/components/ui/alert"
 import { AdminHeader } from "@/components/admin/header"
 import { DashboardHeader } from "@/components/dashboard/header"
+import { joinRequestService, JoinRequest } from "@/lib/join-request-client"
+import { AlertCircle, MessageSquare, CheckCircle2, XCircle } from "lucide-react"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -69,6 +71,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [trips, setTrips] = useState<Trip[]>([])
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([])
   const [stats, setStats] = useState({
     totalTrips: 0,
     totalSavings: 0,
@@ -172,6 +175,10 @@ export default function ProfilePage() {
       const userTrips = await fabricService.getTrips({ userId: currentUser.id })
       setTrips(userTrips)
       calculateStats(userTrips)
+
+      // Load join requests
+      const requests = await joinRequestService.getJoinRequests({ requesterId: currentUser.id })
+      setJoinRequests(requests)
     } catch (error) {
       console.error('Error loading profile:', error)
       toast({
@@ -489,6 +496,7 @@ export default function ProfilePage() {
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
             <TabsTrigger value="preferences">Preferences</TabsTrigger>
             <TabsTrigger value="history">Trip History</TabsTrigger>
+            <TabsTrigger value="requests">Join Requests</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
@@ -532,13 +540,13 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Select 
+                    <Label>Department</Label>
+                    <Select
                       value={profileData.department}
                       onValueChange={(value) => setProfileData({...profileData, department: value})}
                       disabled={!isEditing}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="department">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -822,6 +830,107 @@ export default function ProfilePage() {
                         Export History
                       </Button>
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Join Requests Tab */}
+          <TabsContent value="requests" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Join Requests History</CardTitle>
+                <CardDescription>View all your requests to join existing trips</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {joinRequests.length === 0 ? (
+                  <div className="text-center py-8">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-gray-500">No join requests yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Your join requests will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {joinRequests.map((request) => (
+                      <div key={request.id} className="p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-medium">
+                                {getLocationName(request.tripDetails.departureLocation)} → {getLocationName(request.tripDetails.destination)}
+                              </h3>
+                              <Badge
+                                variant={
+                                  request.status === 'approved' ? 'default' :
+                                  request.status === 'pending' ? 'outline' :
+                                  request.status === 'rejected' ? 'destructive' :
+                                  'secondary'
+                                }
+                                className={
+                                  request.status === 'approved' ? 'bg-green-600' :
+                                  request.status === 'rejected' ? 'bg-red-600' :
+                                  request.status === 'cancelled' ? 'bg-gray-500' :
+                                  ''
+                                }
+                              >
+                                {request.status === 'approved' && <CheckCircle2 className="mr-1 h-3 w-3" />}
+                                {request.status === 'rejected' && <XCircle className="mr-1 h-3 w-3" />}
+                                {request.status}
+                              </Badge>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(request.tripDetails.departureDate).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {request.tripDetails.departureTime}
+                              </span>
+                            </div>
+
+                            {request.reason && (
+                              <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                                <p className="text-gray-600 font-medium mb-1">Your reason:</p>
+                                <p className="text-gray-700">{request.reason}</p>
+                              </div>
+                            )}
+
+                            {request.adminNotes && (
+                              <div className={`mt-2 p-3 rounded border ${
+                                request.status === 'approved'
+                                  ? 'bg-green-50 border-green-200'
+                                  : 'bg-red-50 border-red-200'
+                              }`}>
+                                <p className={`text-sm font-medium mb-1 ${
+                                  request.status === 'approved' ? 'text-green-800' : 'text-red-800'
+                                }`}>
+                                  Admin Note:
+                                </p>
+                                <p className={`text-sm ${
+                                  request.status === 'approved' ? 'text-green-700' : 'text-red-700'
+                                }`}>
+                                  {request.adminNotes}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="text-xs text-gray-400 mt-2">
+                              Requested: {new Date(request.createdAt).toLocaleString()}
+                              {request.processedAt && (
+                                <span> • Processed: {new Date(request.processedAt).toLocaleString()}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
