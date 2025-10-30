@@ -49,16 +49,40 @@ export function DashboardClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDatabaseConfigured, setIsDatabaseConfigured] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null)
+  const [errorCount, setErrorCount] = useState(0)
+  const [pollingDelay, setPollingDelay] = useState(60000) // Start with 60s
 
   useEffect(() => {
     // Initial load
     loadDashboardData()
-    
+
+    // Visibility change handler - pause polling when tab is not visible
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden, clear interval
+        if (refreshInterval) {
+          clearInterval(refreshInterval)
+          setRefreshInterval(null)
+        }
+      } else {
+        // Tab is visible again, restart polling
+        if (isDatabaseConfigured && !refreshInterval) {
+          loadDashboardData(true) // Immediate refresh
+          const interval = setInterval(() => {
+            loadDashboardData(true)
+          }, pollingDelay)
+          setRefreshInterval(interval)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     // Setup refresh interval only if database is configured
-    if (isDatabaseConfigured) {
+    if (isDatabaseConfigured && !document.hidden) {
       const interval = setInterval(() => {
         loadDashboardData(true) // silent refresh
-      }, 30000)
+      }, pollingDelay)
       setRefreshInterval(interval)
     }
 
@@ -67,8 +91,9 @@ export function DashboardClient() {
       if (refreshInterval) {
         clearInterval(refreshInterval)
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [isDatabaseConfigured])
+  }, [isDatabaseConfigured, pollingDelay])
 
   const loadDashboardData = async (silentRefresh = false) => {
     try {
@@ -76,20 +101,20 @@ export function DashboardClient() {
       if (!silentRefresh) {
         setIsLoading(true)
       }
-      
+
       const currentUser = authService.getCurrentUser()
-      
+
       if (!currentUser) {
         router.push('/')
         return
       }
-      
+
       setUser(currentUser)
-      
+
       // Check if service is configured
       const isConfigured = fabricService.isServiceConfigured()
       setIsDatabaseConfigured(isConfigured)
-      
+
       if (!isConfigured) {
         // Show warning but continue with empty data
         if (!silentRefresh) {
@@ -104,14 +129,45 @@ export function DashboardClient() {
         setRecentActivity([])
         return
       }
-      
-      // Load trips from database with error handling
+
+      // Load trips from database with error handling and exponential backoff
       let trips: Trip[] = []
       try {
         trips = await fabricService.getTrips({ userId: currentUser.id })
+
+        // Success - reset error count and polling delay
+        setErrorCount(0)
+        setPollingDelay(60000) // Back to 60s
       } catch (error) {
         console.warn('Failed to load trips:', error)
         trips = []
+
+        // Increment error count and apply exponential backoff
+        const newErrorCount = errorCount + 1
+        setErrorCount(newErrorCount)
+
+        // Exponential backoff: 60s -> 120s -> 240s -> max 300s (5min)
+        const newDelay = Math.min(60000 * Math.pow(2, newErrorCount), 300000)
+        setPollingDelay(newDelay)
+
+        // Only show toast on repeated failures (not first error)
+        if (newErrorCount > 2 && !silentRefresh) {
+          toast({
+            title: "Connection Issue",
+            description: "Having trouble connecting to server. Will retry automatically.",
+            variant: "destructive"
+          })
+        }
+
+        // If too many errors, stop polling temporarily
+        if (newErrorCount >= 5) {
+          console.error('Too many consecutive errors, pausing polling')
+          if (refreshInterval) {
+            clearInterval(refreshInterval)
+            setRefreshInterval(null)
+          }
+          return
+        }
       }
       
       // Calculate real statistics

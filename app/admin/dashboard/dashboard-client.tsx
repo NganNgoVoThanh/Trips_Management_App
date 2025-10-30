@@ -86,31 +86,106 @@ export function AdminDashboardClient() {
   const [showTripDialog, setShowTripDialog] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null)
   const [approvalNote, setApprovalNote] = useState("")
+  const [errorCount, setErrorCount] = useState(0)
+  const [pollingDelay, setPollingDelay] = useState(120000) // Start with 120s for admin
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     loadAdminDashboard()
-    // Auto-refresh every 60 seconds
-    const interval = setInterval(loadAdminDashboard, 60000)
-    return () => clearInterval(interval)
-  }, [])
+
+    // Visibility change handler - pause polling when tab is not visible
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden, clear interval
+        if (refreshInterval) {
+          clearInterval(refreshInterval)
+          setRefreshInterval(null)
+        }
+      } else {
+        // Tab is visible again, restart polling
+        if (!refreshInterval) {
+          loadAdminDashboard() // Immediate refresh
+          const interval = setInterval(loadAdminDashboard, pollingDelay)
+          setRefreshInterval(interval)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Auto-refresh with dynamic delay, only when visible
+    if (!document.hidden) {
+      const interval = setInterval(loadAdminDashboard, pollingDelay)
+      setRefreshInterval(interval)
+    }
+
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [pollingDelay])
 
   const loadAdminDashboard = async () => {
     try {
       setIsLoading(true)
       const currentUser = authService.getCurrentUser()
-      
+
       if (!currentUser || currentUser.role !== 'admin') {
         router.push('/dashboard')
         return
       }
-      
+
       setUser(currentUser)
-      
-      // Load all trips from database
-      const allTrips = await fabricService.getTrips()
-      
-      // Load join requests statistics
-      const joinRequestStats = await joinRequestService.getJoinRequestStats()
+
+      // Load all trips from database with error handling
+      let allTrips: Trip[] = []
+      let joinRequestStats = { total: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 }
+
+      try {
+        allTrips = await fabricService.getTrips()
+
+        // Load join requests statistics
+        joinRequestStats = await joinRequestService.getJoinRequestStats()
+
+        // Success - reset error count and polling delay
+        setErrorCount(0)
+        setPollingDelay(120000) // Back to 120s
+      } catch (error) {
+        console.error('Failed to load admin dashboard data:', error)
+
+        // Increment error count and apply exponential backoff
+        const newErrorCount = errorCount + 1
+        setErrorCount(newErrorCount)
+
+        // Exponential backoff: 120s -> 240s -> 480s -> max 600s (10min)
+        const newDelay = Math.min(120000 * Math.pow(2, newErrorCount), 600000)
+        setPollingDelay(newDelay)
+
+        // Show toast on repeated failures
+        if (newErrorCount > 2) {
+          toast({
+            title: "Connection Issue",
+            description: "Having trouble connecting to server. Will retry automatically.",
+            variant: "destructive"
+          })
+        }
+
+        // If too many errors, stop polling temporarily
+        if (newErrorCount >= 5) {
+          console.error('Too many consecutive errors, pausing admin polling')
+          if (refreshInterval) {
+            clearInterval(refreshInterval)
+            setRefreshInterval(null)
+          }
+          setIsLoading(false)
+          return
+        }
+
+        // Continue with empty data
+        allTrips = []
+      }
       
       // Calculate real statistics
       const pending = allTrips.filter(t => t.status === 'pending')
@@ -191,10 +266,11 @@ export function AdminDashboardClient() {
       })))
       
     } catch (error) {
-      console.error('Error loading admin dashboard:', error)
+      console.error('Unexpected error in loadAdminDashboard:', error)
+      // This catch block handles any errors outside of the API calls
       toast({
         title: "Error",
-        description: "Failed to load dashboard data",
+        description: "An unexpected error occurred",
         variant: "destructive"
       })
     } finally {
