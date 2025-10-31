@@ -21,7 +21,7 @@ const getPool = async () => {
     port: parseInt(process.env.DB_PORT || '3306'),
     user: process.env.DB_USER || 'tripsmgm-rndus2',
     password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-    database: process.env.DB_NAME || 'trips_management',
+    database: process.env.DB_NAME || 'tripsmgm-mydb002',
     waitForConnections: true,
     connectionLimit: 20, // Tăng từ 10 lên 20 để xử lý nhiều concurrent connections
     queueLimit: 10, // Thay đổi từ 0 để queue requests thay vì reject ngay
@@ -33,7 +33,7 @@ const getPool = async () => {
   });
 
   console.log('✓ MySQL Connection Pool initialized');
-  console.log(`✓ Database: ${process.env.DB_NAME || 'trips_management'}`);
+  console.log(`✓ Database: ${process.env.DB_NAME || 'tripsmgm-mydb002'}`);
 
   return pool;
 };

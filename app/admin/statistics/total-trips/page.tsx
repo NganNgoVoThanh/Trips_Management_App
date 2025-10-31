@@ -125,15 +125,19 @@ export default function TotalTripsPage() {
 
   const filterTrips = () => {
     let filtered = [...trips]
-    
+
     if (statusFilter !== 'all') {
       filtered = filtered.filter(t => t.status === statusFilter)
     }
-    
+
     if (dateFilter) {
-      filtered = filtered.filter(t => t.departureDate === dateFilter)
+      // Compare date portion only, handling both YYYY-MM-DD format and ISO date strings
+      filtered = filtered.filter(t => {
+        const tripDate = t.departureDate.split('T')[0] // Get YYYY-MM-DD portion
+        return tripDate === dateFilter
+      })
     }
-    
+
     setFilteredTrips(filtered)
   }
 

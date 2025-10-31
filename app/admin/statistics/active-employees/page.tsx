@@ -386,7 +386,7 @@ export default function ActiveEmployeesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {employees.slice(0, 5).map((emp, index) => (
+                {filteredEmployees.slice(0, 5).map((emp, index) => (
                   <div key={emp.userId} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border">
                     <div className="flex items-center gap-3">
                       <div className="text-lg font-bold text-gray-400">#{index + 1}</div>
@@ -413,7 +413,7 @@ export default function ActiveEmployeesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[...employees].sort((a, b) => b.savings - a.savings).slice(0, 5).map((emp, index) => (
+                {[...filteredEmployees].sort((a, b) => b.savings - a.savings).slice(0, 5).map((emp, index) => (
                   <div key={emp.userId} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border">
                     <div className="flex items-center gap-3">
                       <div className="text-lg font-bold text-gray-400">#{index + 1}</div>

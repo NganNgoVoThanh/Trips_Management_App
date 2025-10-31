@@ -12,7 +12,9 @@
       "Bash(npm run start:production:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(dir:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

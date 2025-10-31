@@ -15,11 +15,11 @@ export async function GET() {
     },
     checks: {} as any,
     environment: {
-      DB_HOST: process.env.DB_HOST || 'NOT_SET',
-      DB_PORT: process.env.DB_PORT || 'NOT_SET',
-      DB_USER: process.env.DB_USER || 'NOT_SET',
-      DB_NAME: process.env.DB_NAME || 'NOT_SET',
-      DB_PASSWORD: process.env.DB_PASSWORD ? '***SET***' : 'NOT_SET'
+      DB_HOST: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+      DB_PORT: process.env.DB_PORT || '3306',
+      DB_USER: process.env.DB_USER || 'tripsmgm-rndus2',
+      DB_NAME: process.env.DB_NAME || 'tripsmgm-mydb002',
+      DB_PASSWORD: process.env.DB_PASSWORD ? 'wXKBvt0SRytjvER4e2Hp' : 'wXKBvt0SRytjvER4e2Hp'
     }
   };
 
