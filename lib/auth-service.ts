@@ -159,6 +159,8 @@ class AuthService {
       return 'Marketing';
     } else if (username.includes('production') || username.includes('factory')) {
       return 'Production';
+    } else if (username.includes('rd')) {
+      return 'Process RD & Optimization';
     } else {
       return 'General';
     }

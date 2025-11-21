@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TripRegistration } from "@/components/dashboard/trip-registration"
@@ -48,11 +48,17 @@ export function DashboardClient() {
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDatabaseConfigured, setIsDatabaseConfigured] = useState(true)
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null)
   const [errorCount, setErrorCount] = useState(0)
   const [pollingDelay, setPollingDelay] = useState(60000) // Start with 60s
 
+  // Use refs to avoid stale closure issues
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
+
   useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true
+
     // Initial load
     loadDashboardData()
 
@@ -60,18 +66,17 @@ export function DashboardClient() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Tab is hidden, clear interval
-        if (refreshInterval) {
-          clearInterval(refreshInterval)
-          setRefreshInterval(null)
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
         }
       } else {
         // Tab is visible again, restart polling
-        if (isDatabaseConfigured && !refreshInterval) {
+        if (isDatabaseConfigured && !intervalRef.current) {
           loadDashboardData(true) // Immediate refresh
-          const interval = setInterval(() => {
+          intervalRef.current = setInterval(() => {
             loadDashboardData(true)
           }, pollingDelay)
-          setRefreshInterval(interval)
         }
       }
     }
@@ -80,16 +85,17 @@ export function DashboardClient() {
 
     // Setup refresh interval only if database is configured
     if (isDatabaseConfigured && !document.hidden) {
-      const interval = setInterval(() => {
+      intervalRef.current = setInterval(() => {
         loadDashboardData(true) // silent refresh
       }, pollingDelay)
-      setRefreshInterval(interval)
     }
 
     // Cleanup
     return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval)
+      isMountedRef.current = false
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -97,6 +103,9 @@ export function DashboardClient() {
 
   const loadDashboardData = async (silentRefresh = false) => {
     try {
+      // Check if component is still mounted
+      if (!isMountedRef.current) return
+
       // Only show loading spinner on initial load
       if (!silentRefresh) {
         setIsLoading(true)
@@ -109,10 +118,12 @@ export function DashboardClient() {
         return
       }
 
+      if (!isMountedRef.current) return
       setUser(currentUser)
 
       // Check if service is configured
       const isConfigured = fabricService.isServiceConfigured()
+      if (!isMountedRef.current) return
       setIsDatabaseConfigured(isConfigured)
 
       if (!isConfigured) {
@@ -120,6 +131,7 @@ export function DashboardClient() {
         if (!silentRefresh) {
           console.warn('Database not configured - running in limited mode')
         }
+        if (!isMountedRef.current) return
         setStats({
           totalTrips: 0,
           upcomingTrips: 0,
@@ -136,11 +148,14 @@ export function DashboardClient() {
         trips = await fabricService.getTrips({ userId: currentUser.id })
 
         // Success - reset error count and polling delay
+        if (!isMountedRef.current) return
         setErrorCount(0)
         setPollingDelay(60000) // Back to 60s
       } catch (error) {
         console.warn('Failed to load trips:', error)
         trips = []
+
+        if (!isMountedRef.current) return
 
         // Increment error count and apply exponential backoff
         const newErrorCount = errorCount + 1
@@ -162,9 +177,9 @@ export function DashboardClient() {
         // If too many errors, stop polling temporarily
         if (newErrorCount >= 5) {
           console.error('Too many consecutive errors, pausing polling')
-          if (refreshInterval) {
-            clearInterval(refreshInterval)
-            setRefreshInterval(null)
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
           }
           return
         }
@@ -196,14 +211,15 @@ export function DashboardClient() {
         }
         return sum
       }, 0)
-      
+
+      if (!isMountedRef.current) return
       setStats({
         totalTrips: trips.length,
         upcomingTrips: upcoming.length,
         savedAmount: savings,
         optimizationRate: trips.length > 0 ? (optimized.length / trips.length) * 100 : 0
       })
-      
+
       // Get recent activity from real trips
       const sortedTrips = [...trips].sort((a, b) => {
         try {
@@ -212,7 +228,8 @@ export function DashboardClient() {
           return 0
         }
       })
-      
+
+      if (!isMountedRef.current) return
       setRecentActivity(sortedTrips.slice(0, 5).map(t => ({
         id: t.id,
         type: t.status === 'optimized' ? 'optimized' : 'registered',
@@ -235,7 +252,9 @@ export function DashboardClient() {
         })
       }
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -293,10 +312,10 @@ export function DashboardClient() {
   return (
     <>
       <SessionMonitor />
-      <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="flex min-h-dvh flex-col bg-gray-50">
         <DashboardHeader />
 
-        <div className="container flex-1 space-y-6 p-8 pt-6">
+        <div className="container flex-1 space-y-4 p-8 pt-6">
         {/* Database Warning Alert */}
         {!isDatabaseConfigured && (
           <Alert className="bg-yellow-50 border-yellow-200">
@@ -532,6 +551,17 @@ export function DashboardClient() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
+            <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>
+            <span className="hidden text-gray-400 md:inline">•</span>
+            <p className="text-sm text-gray-500">Support: rd@intersnack.com.sg</p>
+          </div>
+        </div>
+      </footer>
     </div>
     </>
   )

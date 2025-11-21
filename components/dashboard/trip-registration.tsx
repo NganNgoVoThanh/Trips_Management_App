@@ -149,10 +149,11 @@ export function TripRegistration() {
       const savedTrip = await fabricService.createTrip(tripData)
       console.log('Saved Trip:', savedTrip)
 
-      // Success notification
+      // Success notification with more details
       toast({
-        title: "Trip Registered Successfully",
-        description: `Trip ${savedTrip.id} has been submitted for approval`,
+        title: "✅ Trip Registered Successfully!",
+        description: `Your trip from ${getLocationName(formData.departureLocation)} to ${getLocationName(formData.destination)} on ${formData.departureDate} has been submitted for approval. You will receive a notification once it's reviewed.`,
+        duration: 5000,
       })
 
       // Reset form after successful submission

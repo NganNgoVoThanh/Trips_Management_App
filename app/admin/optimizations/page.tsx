@@ -44,24 +44,27 @@ export default function OptimizationsPage() {
           }
           return sum
         }, 0)
-        
+
         return {
           ...group,
           tripDetails: trips,
           totalSavings,
-          route: trips.length > 0 ? 
-            `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` : 
+          route: trips.length > 0 ?
+            `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` :
             'N/A',
           date: trips.length > 0 ? trips[0].departureDate : 'N/A'
         }
       })
-      
+
+      // Filter out optimizations with 0 savings
+      const filteredOptimizations = optimizationData.filter(opt => opt.totalSavings > 0)
+
       // Sort by most recent
-      optimizationData.sort((a, b) => 
+      filteredOptimizations.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
-      
-      setOptimizations(optimizationData)
+
+      setOptimizations(filteredOptimizations)
     } catch (error) {
       console.error('Error loading optimizations:', error)
       toast({
@@ -88,8 +91,8 @@ export default function OptimizationsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <AdminHeader />
-      
-      <div className="container mx-auto p-6 space-y-6">
+
+      <div className="container mx-auto p-6 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
@@ -165,7 +168,15 @@ export default function OptimizationsPage() {
                       
                       <div className="text-sm text-gray-600">
                         <p>Route: {opt.route}</p>
-                        <p>Departure Time: {opt.proposedDepartureTime}</p>
+                        <p>Departure Time: {
+                          opt.proposedDepartureTime.includes('T')
+                            ? new Date(`1970-01-01T${opt.proposedDepartureTime.split('T')[1]}`).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false
+                              })
+                            : opt.proposedDepartureTime
+                        }</p>
                       </div>
                       
                       {opt.tripDetails && opt.tripDetails.length > 0 && (

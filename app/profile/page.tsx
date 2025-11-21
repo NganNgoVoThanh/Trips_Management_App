@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { 
-  Mail, 
+import {
+  Mail,
   Calendar,
   Shield,
   Car,
@@ -23,16 +23,12 @@ import {
   Loader2,
   CheckCircle,
   Users,
-  Download,
-  Eye,
-  EyeOff,
-  Key,
-  Smartphone,
-  History
+  Download
 } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency, getLocationName } from "@/lib/config"
+import { exportToCsv } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -81,18 +77,6 @@ export default function ProfilePage() {
     carbonSaved: 0
   })
   
-  // Dialog states
-  const [show2FADialog, setShow2FADialog] = useState(false)
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
-  const [showLoginHistoryDialog, setShowLoginHistoryDialog] = useState(false)
-  const [twoFACode, setTwoFACode] = useState("")
-  const [passwordData, setPasswordData] = useState({
-    current: "",
-    new: "",
-    confirm: ""
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [loginHistory, setLoginHistory] = useState<any[]>([])
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: true,
     shareStatistics: true,
@@ -111,14 +95,6 @@ export default function ProfilePage() {
     emergencyPhone: ''
   })
 
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    smsNotifications: false,
-    tripReminders: true,
-    optimizationAlerts: true,
-    weeklyReports: false
-  })
-
   useEffect(() => {
     loadProfileData()
   }, [])
@@ -133,43 +109,57 @@ export default function ProfilePage() {
       }
       setUser(currentUser)
       setIsAdmin(currentUser.role === 'admin')
-      
-      // Load profile data
-      setProfileData({
-        name: currentUser.name,
-        email: currentUser.email,
-        phone: localStorage.getItem(`phone_${currentUser.id}`) || '+84 xxx xxx xxx',
-        department: currentUser.department || 'General',
-        employeeId: currentUser.employeeId || '',
-        preferredVehicle: localStorage.getItem(`vehicle_${currentUser.id}`) || 'car-4',
-        preferredDepartureTime: localStorage.getItem(`departure_${currentUser.id}`) || '08:00',
-        emergencyContact: localStorage.getItem(`emergency_contact_${currentUser.id}`) || '',
-        emergencyPhone: localStorage.getItem(`emergency_phone_${currentUser.id}`) || ''
-      })
-      
-      // Load notification preferences
-      const savedNotifications = localStorage.getItem(`notifications_${currentUser.id}`)
-      if (savedNotifications) {
-        setNotifications(JSON.parse(savedNotifications))
-      }
-      
-      // Load privacy settings
-      const savedPrivacy = localStorage.getItem(`privacy_${currentUser.id}`)
-      if (savedPrivacy) {
-        setPrivacySettings(JSON.parse(savedPrivacy))
-      }
-      
-      // Load login history
-      const savedHistory = localStorage.getItem(`login_history_${currentUser.id}`)
-      if (savedHistory) {
-        setLoginHistory(JSON.parse(savedHistory))
-      } else {
-        // Create sample login history
-        setLoginHistory([
-          { date: new Date().toISOString(), device: 'Chrome - Windows', ip: '192.168.1.1', location: 'Ho Chi Minh City' },
-          { date: new Date(Date.now() - 86400000).toISOString(), device: 'Safari - iPhone', ip: '192.168.1.2', location: 'Ho Chi Minh City' },
-          { date: new Date(Date.now() - 172800000).toISOString(), device: 'Chrome - Windows', ip: '192.168.1.1', location: 'Ho Chi Minh City' }
-        ])
+
+      // Load profile data from MySQL
+      try {
+        const userResponse = await fetch(`/api/users/${currentUser.id}`)
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          setProfileData({
+            name: userData.name || currentUser.name,
+            email: userData.email || currentUser.email,
+            phone: userData.phone || '',
+            department: userData.department || currentUser.department || 'General',
+            employeeId: userData.employee_id || currentUser.employeeId || '',
+            preferredVehicle: userData.preferred_vehicle || 'car-4',
+            preferredDepartureTime: userData.preferred_departure_time || '08:00',
+            emergencyContact: userData.emergency_contact || '',
+            emergencyPhone: userData.emergency_phone || ''
+          })
+
+          setPrivacySettings({
+            profileVisibility: userData.profile_visibility ?? true,
+            shareStatistics: userData.share_statistics ?? true,
+            locationTracking: userData.location_tracking ?? false
+          })
+        } else {
+          // Fallback to authService data if API fails
+          setProfileData({
+            name: currentUser.name,
+            email: currentUser.email,
+            phone: '',
+            department: currentUser.department || 'General',
+            employeeId: currentUser.employeeId || '',
+            preferredVehicle: 'car-4',
+            preferredDepartureTime: '08:00',
+            emergencyContact: '',
+            emergencyPhone: ''
+          })
+        }
+      } catch (error) {
+        console.error('Error loading profile from API:', error)
+        // Fallback to authService data
+        setProfileData({
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: '',
+          department: currentUser.department || 'General',
+          employeeId: currentUser.employeeId || '',
+          preferredVehicle: 'car-4',
+          preferredDepartureTime: '08:00',
+          emergencyContact: '',
+          emergencyPhone: ''
+        })
       }
       
       const userTrips = await fabricService.getTrips({ userId: currentUser.id })
@@ -233,16 +223,29 @@ export default function ProfilePage() {
   const handleSaveProfile = async () => {
     setIsSaving(true)
     try {
-      // Save to localStorage (in production, save to database)
       const userId = user.id
-      localStorage.setItem(`phone_${userId}`, profileData.phone)
-      localStorage.setItem(`vehicle_${userId}`, profileData.preferredVehicle)
-      localStorage.setItem(`departure_${userId}`, profileData.preferredDepartureTime)
-      localStorage.setItem(`emergency_contact_${userId}`, profileData.emergencyContact)
-      localStorage.setItem(`emergency_phone_${userId}`, profileData.emergencyPhone)
-      
+
+      // Save to MySQL via API
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: profileData.phone,
+          emergency_contact: profileData.emergencyContact,
+          emergency_phone: profileData.emergencyPhone,
+          preferred_vehicle: profileData.preferredVehicle,
+          preferred_departure_time: profileData.preferredDepartureTime
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile')
+      }
+
       await authService.updateUserProfile(profileData)
-      
+
       toast({
         title: "Profile Updated",
         description: "Your settings have been saved successfully",
@@ -263,13 +266,26 @@ export default function ProfilePage() {
     setIsSaving(true)
     try {
       const userId = user.id
-      localStorage.setItem(`notifications_${userId}`, JSON.stringify(notifications))
-      localStorage.setItem(`vehicle_${userId}`, profileData.preferredVehicle)
-      localStorage.setItem(`departure_${userId}`, profileData.preferredDepartureTime)
-      
+
+      // Save to MySQL via API
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferred_vehicle: profileData.preferredVehicle,
+          preferred_departure_time: profileData.preferredDepartureTime
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update preferences')
+      }
+
       toast({
         title: "Preferences Saved",
-        description: "Your preferences have been updated successfully",
+        description: "Your trip preferences have been updated successfully",
       })
     } catch (error) {
       toast({
@@ -283,7 +299,7 @@ export default function ProfilePage() {
   }
 
   const handleExportHistory = () => {
-    const csv = [
+    const csvData = [
       ['Date', 'Route', 'Time', 'Status', 'Cost', 'Savings'],
       ...trips.map(t => [
         t.departureDate,
@@ -293,77 +309,48 @@ export default function ProfilePage() {
         t.estimatedCost || '',
         t.status === 'optimized' && t.actualCost ? ((t.estimatedCost || 0) - t.actualCost) : ''
       ])
-    ].map(row => row.join(',')).join('\n')
+    ]
 
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `trip-history-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    
+    exportToCsv(csvData, `trip-history-${new Date().toISOString().split('T')[0]}.csv`)
+
     toast({
       title: "Export Successful",
       description: "Your trip history has been exported",
     })
   }
 
-  const handleEnable2FA = async () => {
-    if (twoFACode.length === 6) {
-      // Simulate 2FA setup
-      localStorage.setItem(`2fa_enabled_${user.id}`, 'true')
-      setShow2FADialog(false)
-      setTwoFACode("")
-      
-      toast({
-        title: "2FA Enabled",
-        description: "Two-factor authentication has been enabled for your account",
-      })
-    } else {
-      toast({
-        title: "Invalid Code",
-        description: "Please enter a valid 6-digit code",
-        variant: "destructive"
-      })
-    }
-  }
+  const handleSavePrivacySettings = async () => {
+    try {
+      const userId = user.id
 
-  const handleChangePassword = async () => {
-    if (passwordData.new !== passwordData.confirm) {
-      toast({
-        title: "Password Mismatch",
-        description: "New passwords do not match",
-        variant: "destructive"
+      // Save to MySQL via API
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile_visibility: privacySettings.profileVisibility,
+          share_statistics: privacySettings.shareStatistics,
+          location_tracking: privacySettings.locationTracking
+        })
       })
-      return
-    }
-    
-    if (passwordData.new.length < 8) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 8 characters",
-        variant: "destructive"
-      })
-      return
-    }
-    
-    // Simulate password change
-    localStorage.setItem(`password_changed_${user.id}`, new Date().toISOString())
-    setShowPasswordDialog(false)
-    setPasswordData({ current: "", new: "", confirm: "" })
-    
-    toast({
-      title: "Password Changed",
-      description: "Your password has been updated successfully",
-    })
-  }
 
-  const handleSavePrivacySettings = () => {
-    localStorage.setItem(`privacy_${user.id}`, JSON.stringify(privacySettings))
-    toast({
-      title: "Privacy Settings Updated",
-      description: "Your privacy preferences have been saved",
-    })
+      if (!response.ok) {
+        throw new Error('Failed to update privacy settings')
+      }
+
+      toast({
+        title: "Privacy Settings Updated",
+        description: "Your privacy preferences have been saved",
+      })
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to save privacy settings",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleLogout = async () => {
@@ -387,9 +374,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
       {isAdmin ? <AdminHeader /> : <DashboardHeader />}
-      <div className="container mx-auto p-6 space-y-6 max-w-7xl flex-1">
+      <div className="container mx-auto p-6 space-y-4 max-w-7xl flex-1">
         {/* Header */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-lg p-6 text-white">
           <div className="flex items-center justify-between">
@@ -558,6 +545,7 @@ export default function ProfilePage() {
                         <SelectItem value="IT">Information Technology</SelectItem>
                         <SelectItem value="Sales">Sales</SelectItem>
                         <SelectItem value="Marketing">Marketing</SelectItem>
+                        <SelectItem value="Process RD & Optimization">Process RD & Optimization</SelectItem>
                         <SelectItem value="General">General</SelectItem>
                       </SelectContent>
                     </Select>
@@ -656,88 +644,35 @@ export default function ProfilePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-                <CardDescription>Manage how you receive updates</CardDescription>
+                <CardTitle>Email Notifications</CardTitle>
+                <CardDescription>Automatic notifications for trip updates</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Notifications</Label>
-                    <p className="text-sm text-gray-500">Receive trip updates via email</p>
+                <Alert>
+                  <Mail className="h-4 w-4" />
+                  <AlertTitle>Automatic Notifications</AlertTitle>
+                  <AlertDescription>
+                    You will automatically receive email notifications for trip confirmations, status changes, and optimizations at <strong>{user?.email}</strong>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Trip confirmation emails</span>
                   </div>
-                  <Switch
-                    checked={notifications.emailNotifications}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, emailNotifications: checked})
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>SMS Notifications</Label>
-                    <p className="text-sm text-gray-500">Get SMS alerts for important updates</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Optimization alerts</span>
                   </div>
-                  <Switch
-                    checked={notifications.smsNotifications}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, smsNotifications: checked})
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Trip Reminders</Label>
-                    <p className="text-sm text-gray-500">Remind me 1 day before trips</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Status change notifications</span>
                   </div>
-                  <Switch
-                    checked={notifications.tripReminders}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, tripReminders: checked})
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Optimization Alerts</Label>
-                    <p className="text-sm text-gray-500">Notify when trips are optimized</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Cancellation notices</span>
                   </div>
-                  <Switch
-                    checked={notifications.optimizationAlerts}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, optimizationAlerts: checked})
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Weekly Reports</Label>
-                    <p className="text-sm text-gray-500">Receive weekly trip summaries</p>
-                  </div>
-                  <Switch
-                    checked={notifications.weeklyReports}
-                    onCheckedChange={(checked) => 
-                      setNotifications({...notifications, weeklyReports: checked})
-                    }
-                  />
-                </div>
-                <div className="pt-4">
-                  <Button 
-                    onClick={handleSavePreferences}
-                    className="bg-red-600 hover:bg-red-700"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Preferences
-                      </>
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1037,147 +972,50 @@ export default function ProfilePage() {
           <TabsContent value="security" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your account security and privacy</CardDescription>
+                <CardTitle>Security & Account</CardTitle>
+                <CardDescription>Manage your account security via SSO and privacy settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Alert>
+                  <Shield className="h-4 w-4" />
+                  <AlertTitle>SSO Authentication</AlertTitle>
+                  <AlertDescription>
+                    Your account is secured via Single Sign-On (SSO). Authentication and password management are handled by your organization's identity provider.
+                  </AlertDescription>
+                </Alert>
+
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50">
                     <div className="flex items-center gap-3">
-                      <Shield className="h-5 w-5 text-gray-400" />
+                      <Mail className="h-5 w-5 text-green-600" />
                       <div>
-                        <p className="font-medium">Two-Factor Authentication</p>
-                        <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={() => setShow2FADialog(true)}
-                    >
-                      {localStorage.getItem(`2fa_enabled_${user?.id}`) === 'true' ? 'Manage 2FA' : 'Enable 2FA'}
-                    </Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium">Email Verification</p>
-                        <p className="text-sm text-green-600 flex items-center gap-1">
+                        <p className="font-medium text-green-900">Email Verified</p>
+                        <p className="text-sm text-green-700 flex items-center gap-1">
                           <CheckCircle className="h-3 w-3" />
-                          Verified
+                          {user?.email}
                         </p>
                       </div>
                     </div>
-                    <Badge className="bg-green-50 text-green-700 border-green-200">
-                      Verified
+                    <Badge className="bg-green-100 text-green-800 border-green-200">
+                      Verified via SSO
                     </Badge>
                   </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium">Last Login</p>
-                        <p className="text-sm text-gray-500">
-                          {new Date().toLocaleDateString('en-US', { 
-                            weekday: 'long',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium">Login History</p>
-                        <p className="text-sm text-gray-500">View your recent login activity</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setShowLoginHistoryDialog(true)}>
-                      View History
-                    </Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium">Password</p>
-                        <p className="text-sm text-gray-500">Last changed 30 days ago</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setShowPasswordDialog(true)}>
-                      Change Password
-                    </Button>
-                  </div>
-                  
+
                   <div className="flex items-center justify-between p-4 border rounded-lg bg-red-50">
                     <div className="flex items-center gap-3">
                       <LogOut className="h-5 w-5 text-red-600" />
                       <div>
                         <p className="font-medium text-red-900">Sign Out</p>
-                        <p className="text-sm text-red-600">Sign out from all devices</p>
+                        <p className="text-sm text-red-600">Sign out from this device</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="text-red-600 border-red-200 hover:bg-red-100"
                       onClick={handleLogout}
                     >
                       Sign Out
                     </Button>
-                  </div>
-                </div>
-                
-                {/* Privacy Settings */}
-                <div className="pt-6 border-t">
-                  <h3 className="font-medium mb-4">Privacy Settings</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Profile Visibility</Label>
-                        <p className="text-sm text-gray-500">Allow other employees to see your trips</p>
-                      </div>
-                      <Switch 
-                        checked={privacySettings.profileVisibility}
-                        onCheckedChange={(checked) => {
-                          setPrivacySettings({...privacySettings, profileVisibility: checked})
-                          handleSavePrivacySettings()
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Share Statistics</Label>
-                        <p className="text-sm text-gray-500">Include your data in company reports</p>
-                      </div>
-                      <Switch 
-                        checked={privacySettings.shareStatistics}
-                        onCheckedChange={(checked) => {
-                          setPrivacySettings({...privacySettings, shareStatistics: checked})
-                          handleSavePrivacySettings()
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Location Tracking</Label>
-                        <p className="text-sm text-gray-500">Allow tracking during trips for safety</p>
-                      </div>
-                      <Switch 
-                        checked={privacySettings.locationTracking}
-                        onCheckedChange={(checked) => {
-                          setPrivacySettings({...privacySettings, locationTracking: checked})
-                          handleSavePrivacySettings()
-                        }}
-                      />
-                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1186,154 +1024,16 @@ export default function ProfilePage() {
         </Tabs>
       </div>
 
-      {/* 2FA Dialog */}
-      <Dialog open={show2FADialog} onOpenChange={setShow2FADialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
-            <DialogDescription>
-              Scan the QR code with your authenticator app and enter the verification code
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex justify-center p-4 bg-white rounded-lg">
-              <div className="w-48 h-48 bg-gray-200 flex items-center justify-center">
-                <Smartphone className="h-16 w-16 text-gray-400" />
-                <p className="text-xs text-gray-500 absolute mt-24">QR Code</p>
-              </div>
-            </div>
-            <Alert>
-              <Shield className="h-4 w-4" />
-              <AlertTitle>Backup Code</AlertTitle>
-              <AlertDescription className="font-mono">
-                XXXX-XXXX-XXXX-XXXX
-              </AlertDescription>
-            </Alert>
-            <div className="space-y-2">
-              <Label htmlFor="2fa-code">Verification Code</Label>
-              <Input
-                id="2fa-code"
-                placeholder="Enter 6-digit code"
-                maxLength={6}
-                value={twoFACode}
-                onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
-              />
-            </div>
+      {/* Footer */}
+      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
+            <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>
+            <span className="hidden text-gray-400 md:inline">•</span>
+            <p className="text-sm text-gray-500">Support: rd@intersnack.com.sg</p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShow2FADialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEnable2FA} className="bg-red-600 hover:bg-red-700">
-              Enable 2FA
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Change Password Dialog */}
-      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
-            <DialogDescription>
-              Enter your current password and choose a new one
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <div className="relative">
-                <Input
-                  id="current-password"
-                  type={showPassword ? "text" : "password"}
-                  value={passwordData.current}
-                  onChange={(e) => setPasswordData({...passwordData, current: e.target.value})}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type={showPassword ? "text" : "password"}
-                value={passwordData.new}
-                onChange={(e) => setPasswordData({...passwordData, new: e.target.value})}
-              />
-              <p className="text-xs text-gray-500">Minimum 8 characters</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
-                id="confirm-password"
-                type={showPassword ? "text" : "password"}
-                value={passwordData.confirm}
-                onChange={(e) => setPasswordData({...passwordData, confirm: e.target.value})}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowPasswordDialog(false)
-              setPasswordData({ current: "", new: "", confirm: "" })
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleChangePassword} className="bg-red-600 hover:bg-red-700">
-              <Key className="mr-2 h-4 w-4" />
-              Change Password
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Login History Dialog */}
-      <Dialog open={showLoginHistoryDialog} onOpenChange={setShowLoginHistoryDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Login History</DialogTitle>
-            <DialogDescription>
-              Recent login activity for your account
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
-            {loginHistory.map((login, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`h-2 w-2 rounded-full ${index === 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  <div>
-                    <p className="font-medium">{login.device}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(login.date).toLocaleString()}
-                      </span>
-                      <span>{login.location}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-sm text-gray-500">
-                  IP: {login.ip}
-                </div>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoginHistoryDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </footer>
     </div>
   )
 }

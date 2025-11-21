@@ -14,7 +14,10 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(dir:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(nul)",
+      "Bash(find:*)",
+      "Bash(pm2 list:*)"
     ],
     "deny": [],
     "ask": []

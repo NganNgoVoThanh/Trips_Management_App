@@ -65,9 +65,13 @@ export default function OptimizationRatePage() {
       // Monthly optimization breakdown
       const monthlyMap: { [key: string]: MonthlyOptimization } = {}
       allTrips.forEach(trip => {
+        // Validate date before processing
+        if (!trip.departureDate) return
         const date = new Date(trip.departureDate)
+        if (isNaN(date.getTime())) return // Skip invalid dates
+
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        
+
         if (!monthlyMap[monthKey]) {
           monthlyMap[monthKey] = {
             month: monthKey,
@@ -76,7 +80,7 @@ export default function OptimizationRatePage() {
             rate: 0
           }
         }
-        
+
         monthlyMap[monthKey].total += 1
         if (trip.status === 'optimized') {
           monthlyMap[monthKey].optimized += 1
@@ -97,33 +101,40 @@ export default function OptimizationRatePage() {
       const bestMonth = sortedByRate[0] || { month: 'N/A', rate: 0 }
       const worstMonth = sortedByRate[sortedByRate.length - 1] || { month: 'N/A', rate: 0 }
 
-      // Status breakdown
+      // Helper function to safely calculate percentage
+      const safePercentage = (part: number, total: number) =>
+        total > 0 ? (part / total) * 100 : 0
+
+      // Status breakdown - with safe division
       const statusData = [
-        { 
-          status: 'Optimized', 
-          count: optimizedTrips.length, 
-          percentage: (optimizedTrips.length / allTrips.length) * 100,
+        {
+          status: 'Optimized',
+          count: optimizedTrips.length,
+          percentage: safePercentage(optimizedTrips.length, allTrips.length),
           color: 'bg-blue-800'
         },
-        { 
-          status: 'Confirmed', 
-          count: confirmedTrips.length, 
-          percentage: (confirmedTrips.length / allTrips.length) * 100,
+        {
+          status: 'Confirmed',
+          count: confirmedTrips.length,
+          percentage: safePercentage(confirmedTrips.length, allTrips.length),
           color: 'bg-green-500'
         },
-        { 
-          status: 'Pending', 
-          count: pendingTrips.length, 
-          percentage: (pendingTrips.length / allTrips.length) * 100,
+        {
+          status: 'Pending',
+          count: pendingTrips.length,
+          percentage: safePercentage(pendingTrips.length, allTrips.length),
           color: 'bg-yellow-500'
         },
-        { 
-          status: 'Cancelled', 
-          count: cancelledTrips.length, 
-          percentage: (cancelledTrips.length / allTrips.length) * 100,
+        {
+          status: 'Cancelled',
+          count: cancelledTrips.length,
+          percentage: safePercentage(cancelledTrips.length, allTrips.length),
           color: 'bg-red-500'
         }
       ]
+
+      // Calculate trips that can be optimized (confirmed but not yet in optimization group)
+      const pendingOptimizationTrips = confirmedTrips.filter(t => !t.optimizedGroupId)
 
       const targetRate = 75
       const improvementNeeded = Math.max(0, targetRate - overallRate)
@@ -132,7 +143,7 @@ export default function OptimizationRatePage() {
         overallRate,
         totalTrips: allTrips.length,
         optimizedTrips: optimizedTrips.length,
-        pendingOptimization: confirmedTrips.length,
+        pendingOptimization: pendingOptimizationTrips.length, // Fixed: only count confirmed trips without optimization group
         confirmedTrips: confirmedTrips.length,
         cancelledTrips: cancelledTrips.length,
         targetRate,
@@ -222,8 +233,8 @@ export default function OptimizationRatePage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <AdminHeader />
-      
-      <div className="container mx-auto p-6 space-y-6">
+
+      <div className="container mx-auto p-6 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
@@ -307,11 +318,11 @@ export default function OptimizationRatePage() {
                 <div className="flex-1">
                   <h3 className="font-medium text-red-900">Room for Improvement</h3>
                   <p className="text-sm text-red-700 mt-1">
-                    To reach the target optimization rate of {stats.targetRate}%, you need to optimize <strong>{Math.ceil((stats.improvementNeeded / 100) * stats.totalTrips)} more trips</strong>.
-                    {stats.pendingOptimization > 0 && ` You currently have ${stats.pendingOptimization} confirmed trips that can be optimized.`}
+                    To reach the target optimization rate of {stats.targetRate}%, you need to optimize <strong>{Math.max(0, Math.ceil((stats.targetRate * stats.totalTrips / 100) - stats.optimizedTrips))} more trips</strong>.
+                    {stats.pendingOptimization > 0 && ` You currently have ${stats.pendingOptimization} confirmed trips ready for optimization.`}
                   </p>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="mt-3 bg-red-600 hover:bg-red-700"
                     onClick={() => router.push('/admin/dashboard')}
                   >

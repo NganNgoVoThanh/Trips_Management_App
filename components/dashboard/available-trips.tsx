@@ -60,7 +60,7 @@ export function AvailableTrips() {
     try {
       setIsLoading(true)
 
-      // Load all confirmed and optimized trips
+      // Load all trips (including pending trips that haven't been grouped yet)
       const allTrips = await fabricService.getTrips()
 
       // Get current user to filter out their trips
@@ -68,10 +68,15 @@ export function AvailableTrips() {
 
       // Filter for future trips with available seats
       const today = new Date()
+      today.setHours(0, 0, 0, 0) // Reset time to start of day for accurate comparison
+
       const availableTrips = allTrips.filter((trip: { departureDate: string | number | Date; status: string; userId: string }) => {
         const tripDate = new Date(trip.departureDate)
+        tripDate.setHours(0, 0, 0, 0)
         const isFutureTrip = tripDate >= today
-        const isValidStatus = trip.status === 'confirmed' || trip.status === 'optimized'
+
+        // Show confirmed, optimized, AND pending trips (so users can see all upcoming trips)
+        const isValidStatus = trip.status === 'confirmed' || trip.status === 'optimized' || trip.status === 'pending'
 
         // ✅ Exclude trips that belong to current user (to avoid showing duplicate)
         const isNotUserTrip = !user || trip.userId !== user.id
@@ -80,7 +85,7 @@ export function AvailableTrips() {
       })
 
       // Group trips by optimization group to show available seats
-      const groupedTrips = groupTrips(availableTrips)
+      const groupedTrips = await groupTrips(availableTrips)
 
       setTrips(groupedTrips)
     } catch (error) {
@@ -116,9 +121,9 @@ export function AvailableTrips() {
     }
   }
 
-  const groupTrips = (trips: Trip[]): Trip[] => {
+  const groupTrips = async (trips: Trip[]): Promise<Trip[]> => {
     const groups = new Map<string, Trip[]>()
-    
+
     trips.forEach(trip => {
       if (trip.optimizedGroupId) {
         if (!groups.has(trip.optimizedGroupId)) {
@@ -130,15 +135,23 @@ export function AvailableTrips() {
         groups.set(trip.id, [trip])
       }
     })
-    
+
     // Create aggregated trip objects
     const aggregatedTrips: Trip[] = []
-    
+
     groups.forEach((groupTrips, groupId) => {
       const baseTrip = groupTrips[0]
       const vehicle = config.vehicles[baseTrip.vehicleType as keyof typeof config.vehicles] || config.vehicles['car-4']
-      const availableSeats = vehicle.capacity - groupTrips.length
-      
+
+      // Total passengers = group size only
+      // NOTE: When admin approves a join request, a new trip is created in the database
+      // with the same optimizedGroupId, so groupTrips.length already includes:
+      // - Original participants who submitted trips
+      // - Users who joined via approved join requests (they now have trips in DB)
+      const totalPassengers = groupTrips.length
+      const availableSeats = vehicle.capacity - totalPassengers
+
+      // Only show trips with available seats
       if (availableSeats > 0) {
         aggregatedTrips.push({
           ...baseTrip,
@@ -149,12 +162,12 @@ export function AvailableTrips() {
           // Add custom properties for display
           availableSeats,
           totalSeats: vehicle.capacity,
-          groupSize: groupTrips.length,
-          participants: groupTrips // Keep list of participants
+          groupSize: totalPassengers, // Updated to include join requests
+          participants: groupTrips // Keep list of original participants
         } as any)
       }
     })
-    
+
     return aggregatedTrips
   }
 

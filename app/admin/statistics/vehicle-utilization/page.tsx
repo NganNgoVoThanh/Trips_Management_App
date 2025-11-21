@@ -87,17 +87,27 @@ export default function VehicleUtilizationPage() {
 
       for (const [type, config] of Object.entries(vehicleConfigs)) {
         const vehicleTrips = filteredTrips.filter(t => t.vehicleType === type)
-        
+
         if (vehicleTrips.length > 0) {
-          // Calculate passengers (assuming each trip has passengers based on optimization)
-          const totalPassengers = vehicleTrips.reduce((sum, trip) => {
-            // If optimized, assume multiple passengers
-            if (trip.status === 'optimized' && trip.optimizedGroupId) {
+          // Calculate passengers correctly
+          // Each trip represents 1 person, regardless of optimization status
+          // When trips are optimized and grouped together, they share one vehicle
+          // but each trip row still represents one individual passenger
+          const processedGroups = new Set<string>()
+          let totalPassengers = 0
+
+          vehicleTrips.forEach(trip => {
+            if (trip.optimizedGroupId && !processedGroups.has(trip.optimizedGroupId)) {
+              // Count all trips in this optimized group (each trip = 1 person)
               const groupTrips = filteredTrips.filter(t => t.optimizedGroupId === trip.optimizedGroupId)
-              return sum + Math.min(groupTrips.length, config.capacity)
+              totalPassengers += groupTrips.length
+              processedGroups.add(trip.optimizedGroupId)
+            } else if (!trip.optimizedGroupId) {
+              // Individual trip = 1 person
+              totalPassengers += 1
             }
-            return sum + 1 // Single passenger for non-optimized trips
-          }, 0)
+            // Skip if already counted in a group
+          })
 
           const totalCapacity = vehicleTrips.length * config.capacity
           const utilizationRate = (totalPassengers / totalCapacity) * 100
@@ -224,8 +234,8 @@ export default function VehicleUtilizationPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <AdminHeader />
-      
-      <div className="container mx-auto p-6 space-y-6">
+
+      <div className="container mx-auto p-6 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 

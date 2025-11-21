@@ -212,7 +212,7 @@ export default function ActiveEmployeesPage() {
         emp.totalCost,
         emp.savings,
         emp.mostFrequentRoute,
-        emp.lastTripDate
+        new Date(emp.lastTripDate).toLocaleDateString('vi-VN')
       ])
     ].map(row => row.join(',')).join('\n')
     
@@ -251,8 +251,8 @@ export default function ActiveEmployeesPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <AdminHeader />
-      
-      <div className="container mx-auto p-6 space-y-6">
+
+      <div className="container mx-auto p-6 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button 
@@ -483,7 +483,7 @@ export default function ActiveEmployeesPage() {
                           </div>
                           <div>
                             <p className="text-gray-500">Last Trip</p>
-                            <p className="font-medium">{emp.lastTripDate}</p>
+                            <p className="font-medium">{new Date(emp.lastTripDate).toLocaleDateString('vi-VN')}</p>
                           </div>
                         </div>
                       </div>

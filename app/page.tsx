@@ -29,10 +29,10 @@ export default function Page() {
   }, [router]);
 
   return (
-    <div className="relative min-h-dvh flex flex-col">
+    <div className="relative min-h-screen flex flex-col">
       {/* MAIN */}
-      <section className="flex-1">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-16 lg:py-4">
+      <main className="flex-1">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-12 lg:py-6">
           <div className="grid items-center gap-12 xl:gap-20 lg:grid-cols-[1.1fr_0.9fr]">
             {/* LEFT */}
             <motion.div
@@ -113,7 +113,7 @@ export default function Page() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.05 }}
-            className="mt-20"
+            className="mt-12"
           >
             <h2 className="mb-8 text-center text-2xl font-bold text-[#dc2626] sm:text-3xl">
               Key Features
@@ -138,7 +138,7 @@ export default function Page() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="mt-20"
+            className="mt-12 mb-8"
           >
             <h2 className="mb-8 text-center text-2xl font-bold text-[#dc2626] sm:text-3xl">
               Our Locations
@@ -169,10 +169,10 @@ export default function Page() {
             </div>
           </motion.div>
         </div>
-      </section>
+      </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-gray-200 bg-gray-50 py-5">
+      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
         <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
             <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>

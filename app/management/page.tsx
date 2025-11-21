@@ -282,10 +282,10 @@ export default function ManagementDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-dvh flex-col bg-gray-50">
       {isAdmin ? <AdminHeader /> : <DashboardHeader />}
-      
-      <div className="container mx-auto p-6 space-y-6">
+
+      <div className="container mx-auto p-6 space-y-4 flex-1">
         {/* Header Actions */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -638,7 +638,7 @@ export default function ManagementDashboard() {
                             <td className="p-3">{userTrips.length}</td>
                             <td className="p-3">{optimized}</td>
                             <td className="p-3 text-green-600">{formatCurrency(savings)}</td>
-                            <td className="p-3">{userTrips[userTrips.length - 1].departureDate}</td>
+                            <td className="p-3">{new Date(userTrips[userTrips.length - 1].departureDate).toLocaleDateString('vi-VN')}</td>
                           </tr>
                         )
                       })}
@@ -774,13 +774,13 @@ export default function ManagementDashboard() {
                   <div>
                     <Label className="text-xs text-gray-500">Departure</Label>
                     <p className="font-medium">
-                      {selectedTrip.departureDate} at {selectedTrip.departureTime}
+                      {new Date(selectedTrip.departureDate).toLocaleDateString('vi-VN')} at {selectedTrip.departureTime}
                     </p>
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Return</Label>
                     <p className="font-medium">
-                      {selectedTrip.returnDate} at {selectedTrip.returnTime}
+                      {new Date(selectedTrip.returnDate).toLocaleDateString('vi-VN')} at {selectedTrip.returnTime}
                     </p>
                   </div>
                 </div>
@@ -826,6 +826,17 @@ export default function ManagementDashboard() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
+            <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>
+            <span className="hidden text-gray-400 md:inline">•</span>
+            <p className="text-sm text-gray-500">Support: rd@intersnack.com.sg</p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

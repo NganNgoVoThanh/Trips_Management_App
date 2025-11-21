@@ -159,15 +159,15 @@ export function getCurrentVietnamTime(): string {
  */
 export function toMySQLDateTime(dateInput: string | Date | null | undefined): string {
   if (!dateInput) return getCurrentVietnamTime();
-  
+
   try {
     const date = new Date(dateInput);
-    
+
     if (isNaN(date.getTime())) {
       console.error('Invalid date input:', dateInput);
       return getCurrentVietnamTime();
     }
-    
+
     // Create formatter for Vietnam timezone
     const formatter = new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
@@ -179,19 +179,52 @@ export function toMySQLDateTime(dateInput: string | Date | null | undefined): st
       hour12: false,
       timeZone: 'Asia/Ho_Chi_Minh'
     });
-    
+
     const parts = formatter.formatToParts(date);
     const values: any = {};
-    
+
     parts.forEach(part => {
       values[part.type] = part.value;
     });
-    
+
     // Format for MySQL
     return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
-    
+
   } catch (error) {
     console.error('Error converting to MySQL datetime:', error);
     return getCurrentVietnamTime();
   }
+}
+
+/**
+ * Escape CSV field - handles commas, quotes, and newlines
+ * Ensures proper Excel compatibility with Vietnamese characters
+ */
+export function escapeCsvField(field: any): string {
+  if (field === null || field === undefined) return ''
+  const str = String(field)
+  // Escape fields containing comma, quote, or newline
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+/**
+ * Export data to CSV with proper UTF-8 encoding for Excel
+ * Automatically adds BOM for Vietnamese character support
+ */
+export function exportToCsv(data: any[][], filename: string): void {
+  // Convert to CSV with proper escaping
+  const csv = data.map(row => row.map(escapeCsvField).join(',')).join('\n')
+
+  // Add UTF-8 BOM for proper Excel encoding
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  window.URL.revokeObjectURL(url)
 }

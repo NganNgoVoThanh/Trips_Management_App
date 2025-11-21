@@ -4,6 +4,7 @@ const nextConfig = {
   reactStrictMode: true, // Enable strict mode for better development experience
   poweredByHeader: false, // Remove X-Powered-By header for security
   compress: true, // Enable gzip compression
+  productionBrowserSourceMaps: false, // Disable source maps in production to avoid 404 warnings
   images: {
     remotePatterns: [
       {

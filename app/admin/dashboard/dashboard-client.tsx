@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminHeader } from "@/components/admin/header"
@@ -15,7 +15,7 @@ import { joinRequestService } from "@/lib/join-request-client"
 import { aiOptimizer } from "@/lib/ai-optimizer"
 import { emailService } from "@/lib/email-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
-import { formatDate, formatTime, formatDateTime } from "@/lib/utils"
+import { formatDate, formatTime, formatDateTime, exportToCsv } from "@/lib/utils"
 import { 
   Users, 
   Car, 
@@ -88,25 +88,30 @@ export function AdminDashboardClient() {
   const [approvalNote, setApprovalNote] = useState("")
   const [errorCount, setErrorCount] = useState(0)
   const [pollingDelay, setPollingDelay] = useState(120000) // Start with 120s for admin
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null)
+
+  // Use refs to avoid stale closure issues
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
   useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true
+
     loadAdminDashboard()
 
     // Visibility change handler - pause polling when tab is not visible
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Tab is hidden, clear interval
-        if (refreshInterval) {
-          clearInterval(refreshInterval)
-          setRefreshInterval(null)
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
         }
       } else {
         // Tab is visible again, restart polling
-        if (!refreshInterval) {
+        if (!intervalRef.current) {
           loadAdminDashboard() // Immediate refresh
-          const interval = setInterval(loadAdminDashboard, pollingDelay)
-          setRefreshInterval(interval)
+          intervalRef.current = setInterval(loadAdminDashboard, pollingDelay)
         }
       }
     }
@@ -115,13 +120,14 @@ export function AdminDashboardClient() {
 
     // Auto-refresh with dynamic delay, only when visible
     if (!document.hidden) {
-      const interval = setInterval(loadAdminDashboard, pollingDelay)
-      setRefreshInterval(interval)
+      intervalRef.current = setInterval(loadAdminDashboard, pollingDelay)
     }
 
     return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval)
+      isMountedRef.current = false
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -129,6 +135,9 @@ export function AdminDashboardClient() {
 
   const loadAdminDashboard = async () => {
     try {
+      // Check if component is still mounted
+      if (!isMountedRef.current) return
+
       setIsLoading(true)
       const currentUser = authService.getCurrentUser()
 
@@ -137,6 +146,7 @@ export function AdminDashboardClient() {
         return
       }
 
+      if (!isMountedRef.current) return
       setUser(currentUser)
 
       // Load all trips from database with error handling
@@ -150,10 +160,13 @@ export function AdminDashboardClient() {
         joinRequestStats = await joinRequestService.getJoinRequestStats()
 
         // Success - reset error count and polling delay
+        if (!isMountedRef.current) return
         setErrorCount(0)
         setPollingDelay(120000) // Back to 120s
       } catch (error) {
         console.error('Failed to load admin dashboard data:', error)
+
+        if (!isMountedRef.current) return
 
         // Increment error count and apply exponential backoff
         const newErrorCount = errorCount + 1
@@ -175,11 +188,13 @@ export function AdminDashboardClient() {
         // If too many errors, stop polling temporarily
         if (newErrorCount >= 5) {
           console.error('Too many consecutive errors, pausing admin polling')
-          if (refreshInterval) {
-            clearInterval(refreshInterval)
-            setRefreshInterval(null)
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
           }
-          setIsLoading(false)
+          if (isMountedRef.current) {
+            setIsLoading(false)
+          }
           return
         }
 
@@ -225,7 +240,8 @@ export function AdminDashboardClient() {
       
       const actualPassengers = allTrips.length
       const vehicleUtilization = totalCapacity > 0 ? (actualPassengers / totalCapacity) * 100 : 0
-      
+
+      if (!isMountedRef.current) return
       setStats({
         totalTrips: allTrips.length,
         pendingApprovals: pending.length,
@@ -237,8 +253,9 @@ export function AdminDashboardClient() {
         averageSavings: optimized.length > 0 ? totalSavings / optimized.length : 0,
         pendingJoinRequests: joinRequestStats.pending
       })
-      
+
       // Set pending actions with real data - FIX: Use formatDate and formatTime
+      if (!isMountedRef.current) return
       setPendingActions(pending.slice(0, 5).map(t => ({
         id: t.id,
         type: 'approval',
@@ -251,20 +268,49 @@ export function AdminDashboardClient() {
         trip: t
       })))
       
-      // Recent optimizations with real data - FIX: Use formatDate
-      const recentOpt = optimized
+      // Recent optimizations with real data - FIX: Group by optimizedGroupId to avoid duplicates
+      // Group trips by optimizedGroupId first
+      const groupedOptimizations = new Map<string, Trip[]>()
+
+      optimized.forEach(trip => {
+        if (trip.optimizedGroupId) {
+          if (!groupedOptimizations.has(trip.optimizedGroupId)) {
+            groupedOptimizations.set(trip.optimizedGroupId, [])
+          }
+          groupedOptimizations.get(trip.optimizedGroupId)!.push(trip)
+        }
+      })
+
+      // Convert to array and sort by most recent updatedAt within each group
+      const optimizationGroups = Array.from(groupedOptimizations.entries())
+        .map(([groupId, trips]) => {
+          // Sort trips within group by updatedAt to get most recent
+          const sortedTrips = trips.sort((a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )
+          const latestTrip = sortedTrips[0]
+
+          // Calculate total savings for the entire group
+          const totalSavings = trips.reduce((sum, t) =>
+            sum + ((t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0)), 0
+          )
+
+          return {
+            id: groupId,
+            groupId: groupId,
+            trips: trips.length,
+            savings: totalSavings,
+            date: formatDate(latestTrip.updatedAt),
+            route: `${getLocationName(latestTrip.departureLocation)} → ${getLocationName(latestTrip.destination)}`,
+            updatedAt: latestTrip.updatedAt
+          }
+        })
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 5)
-      
-      setRecentOptimizations(recentOpt.map(t => ({
-        id: t.id,
-        groupId: t.optimizedGroupId,
-        trips: allTrips.filter(trip => trip.optimizedGroupId === t.optimizedGroupId).length,
-        savings: (t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0),
-        date: formatDate(t.updatedAt),
-        route: `${getLocationName(t.departureLocation)} → ${getLocationName(t.destination)}`
-      })))
-      
+
+      if (!isMountedRef.current) return
+      setRecentOptimizations(optimizationGroups)
+
     } catch (error) {
       console.error('Unexpected error in loadAdminDashboard:', error)
       // This catch block handles any errors outside of the API calls
@@ -274,7 +320,9 @@ export function AdminDashboardClient() {
         variant: "destructive"
       })
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -402,8 +450,8 @@ export function AdminDashboardClient() {
         }))
       }
       
-      // Convert to CSV
-      const csv = [
+      // Prepare CSV data
+      const csvData = [
         ['Admin Dashboard Report - ' + formatDate(new Date())],
         [],
         ['Summary Statistics'],
@@ -442,15 +490,10 @@ export function AdminDashboardClient() {
           jr.status,
           jr.reason
         ])
-      ].map(row => row.join(',')).join('\n')
-      
-      // Download file
-      const blob = new Blob([csv], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `admin-report-${new Date().toISOString().split('T')[0]}.csv`
-      a.click()
+      ]
+
+      // Export with proper encoding
+      exportToCsv(csvData, `admin-report-${new Date().toISOString().split('T')[0]}.csv`)
       
       toast({
         title: "Report Exported",
@@ -560,10 +603,10 @@ export function AdminDashboardClient() {
   return (
     <>
       <SessionMonitor />
-      <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="flex min-h-dvh flex-col bg-gray-50">
         <AdminHeader />
-      
-      <div className="container flex-1 space-y-6 p-8 pt-6">
+
+      <div className="container flex-1 space-y-4 p-8 pt-6">
         {/* Admin Welcome Section with Logo */}
         <div className="bg-gradient-to-r from-red-700 to-red-800 rounded-xl p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
@@ -574,7 +617,6 @@ export function AdminDashboardClient() {
                 width={100}
                 height={50}
                 className="object-contain bg-white p-2 rounded"
-                priority
               />
               <div>
                 <h1 className="text-3xl font-bold">Admin Dashboard</h1>
@@ -990,13 +1032,13 @@ export function AdminDashboardClient() {
                 <div>
                   <Label className="text-xs text-gray-500">Departure</Label>
                   <p className="font-medium">
-                    {selectedTrip.departureDate} at {selectedTrip.departureTime}
+                    {new Date(selectedTrip.departureDate).toLocaleDateString('vi-VN')} at {selectedTrip.departureTime}
                   </p>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500">Return</Label>
                   <p className="font-medium">
-                    {selectedTrip.returnDate} at {selectedTrip.returnTime}
+                    {new Date(selectedTrip.returnDate).toLocaleDateString('vi-VN')} at {selectedTrip.returnTime}
                   </p>
                 </div>
               </div>
@@ -1046,6 +1088,17 @@ export function AdminDashboardClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
+            <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>
+            <span className="hidden text-gray-400 md:inline">•</span>
+            <p className="text-sm text-gray-500">Support: rd@intersnack.com.sg</p>
+          </div>
+        </div>
+      </footer>
     </div>
     </>
   )

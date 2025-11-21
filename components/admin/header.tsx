@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Car, LogOut, Settings, User, BarChart3, Home } from "lucide-react"
+import { Car, LogOut, Settings, User, BarChart3, Home, Shield } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { useEffect, useState } from "react"
 import Image from "next/image"
@@ -71,7 +71,7 @@ export function AdminHeader() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           {/* Logo */}
-          <Link href="/admin/dashboard" className="flex items-center gap-2">
+          <Link href="/admin/dashboard" className="flex items-center gap-3">
             <Image
               src="/intersnack-logo.png"
               alt="Intersnack"
@@ -79,7 +79,6 @@ export function AdminHeader() {
               height={50}
               className="object-contain"
             />
-            <span className="font-bold text-red-600">ADMIN</span>
           </Link>
           
           {/* Navigation Links */}
@@ -135,16 +134,24 @@ export function AdminHeader() {
         </div>
         
         {/* Admin Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-red-600 text-white">
-                  {getInitials(user?.name || 'Admin')}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border-red-200 text-red-700 font-medium">
+            <Shield className="h-3.5 w-3.5" />
+            Admin
+          </Badge>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full relative">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-red-600 text-white">
+                    {getInitials(user?.name || 'Admin')}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Small admin indicator on avatar for mobile */}
+                <div className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-600 border-2 border-background sm:hidden" />
+              </Button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
@@ -178,6 +185,7 @@ export function AdminHeader() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
     </header>
   )
