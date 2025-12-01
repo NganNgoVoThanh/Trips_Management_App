@@ -17,7 +17,10 @@
       "Bash(awk:*)",
       "Bash(nul)",
       "Bash(find:*)",
-      "Bash(pm2 list:*)"
+      "Bash(pm2 list:*)",
+      "Bash(git checkout:*)",
+      "Bash(del componentsuiapp-footer.tsx)",
+      "Bash(if exist componentsuiapp-footer.tsx del componentsuiapp-footer.tsx)"
     ],
     "deny": [],
     "ask": []
