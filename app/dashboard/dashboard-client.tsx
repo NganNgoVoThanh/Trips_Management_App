@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TripRegistration } from "@/components/dashboard/trip-registration"
@@ -9,7 +10,6 @@ import { AvailableTrips } from "@/components/dashboard/available-trips"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { SessionMonitor } from "@/components/session-monitor"
-import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency } from "@/lib/config"
 import {
@@ -38,7 +38,7 @@ import { useToast } from "@/components/ui/use-toast"
 export function DashboardClient() {
   const router = useRouter()
   const { toast } = useToast()
-  const [user, setUser] = useState<any>(null)
+  const { data: session, status } = useSession()
   const [stats, setStats] = useState({
     totalTrips: 0,
     upcomingTrips: 0,
@@ -59,47 +59,50 @@ export function DashboardClient() {
     // Set mounted flag
     isMountedRef.current = true
 
-    // Initial load
-    loadDashboardData()
+    // ✅ Only load data when session is available
+    if (status === "authenticated" && session?.user) {
+      // Initial load
+      loadDashboardData()
 
-    // Visibility change handler - pause polling when tab is not visible
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab is hidden, clear interval
+      // Visibility change handler - pause polling when tab is not visible
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          // Tab is hidden, clear interval
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
+          }
+        } else {
+          // Tab is visible again, restart polling
+          if (isDatabaseConfigured && !intervalRef.current) {
+            loadDashboardData(true) // Immediate refresh
+            intervalRef.current = setInterval(() => {
+              loadDashboardData(true)
+            }, pollingDelay)
+          }
+        }
+      }
+
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+
+      // Setup refresh interval only if database is configured
+      if (isDatabaseConfigured && !document.hidden) {
+        intervalRef.current = setInterval(() => {
+          loadDashboardData(true) // silent refresh
+        }, pollingDelay)
+      }
+
+      // Cleanup
+      return () => {
+        isMountedRef.current = false
         if (intervalRef.current) {
           clearInterval(intervalRef.current)
           intervalRef.current = null
         }
-      } else {
-        // Tab is visible again, restart polling
-        if (isDatabaseConfigured && !intervalRef.current) {
-          loadDashboardData(true) // Immediate refresh
-          intervalRef.current = setInterval(() => {
-            loadDashboardData(true)
-          }, pollingDelay)
-        }
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
       }
     }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Setup refresh interval only if database is configured
-    if (isDatabaseConfigured && !document.hidden) {
-      intervalRef.current = setInterval(() => {
-        loadDashboardData(true) // silent refresh
-      }, pollingDelay)
-    }
-
-    // Cleanup
-    return () => {
-      isMountedRef.current = false
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [isDatabaseConfigured, pollingDelay])
+  }, [status, session, isDatabaseConfigured, pollingDelay])
 
   const loadDashboardData = async (silentRefresh = false) => {
     try {
@@ -111,15 +114,15 @@ export function DashboardClient() {
         setIsLoading(true)
       }
 
-      const currentUser = authService.getCurrentUser()
-
-      if (!currentUser) {
-        router.push('/')
+      // ✅ Use NextAuth session instead of authService
+      if (!session?.user) {
+        // Session not available yet, will retry when session loads
         return
       }
 
+      const currentUser = session.user
+
       if (!isMountedRef.current) return
-      setUser(currentUser)
 
       // Check if service is configured
       const isConfigured = fabricService.isServiceConfigured()
@@ -295,18 +298,27 @@ export function DashboardClient() {
     }
   }
 
-  if (isLoading) {
+  // ✅ Show loading while checking authentication or loading initial data
+  if (status === "loading" || (status === "authenticated" && isLoading)) {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
         <DashboardHeader />
         <div className="flex items-center justify-center flex-1">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-red-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading dashboard...</p>
+            <p className="text-gray-600">
+              {status === "loading" ? "Checking authentication..." : "Loading dashboard..."}
+            </p>
           </div>
         </div>
       </div>
     )
+  }
+
+  // ✅ Redirect to login if not authenticated
+  if (status === "unauthenticated") {
+    router.push('/')
+    return null
   }
 
   return (
@@ -353,7 +365,7 @@ export function DashboardClient() {
                 }}
               />
               <div>
-                <h1 className="text-3xl font-bold">Welcome back, {user?.name?.split(' ')[0]}!</h1>
+                <h1 className="text-3xl font-bold">Welcome back, {session?.user?.name?.split(' ')[0]}!</h1>
                 <p className="text-red-100 mt-1">
                   Manage your business trips and travel schedules
                 </p>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
-import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency, calculateDistance } from "@/lib/config"
 import { Calendar, Clock, MapPin, Users, Search, Filter, Loader2, Send, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -31,13 +31,14 @@ import {
 
 export function AvailableTrips() {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const [trips, setTrips] = useState<Trip[]>([])
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [locationFilter, setLocationFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("")
-  
+
   // Join Request Dialog State
   const [showJoinDialog, setShowJoinDialog] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<any>(null)
@@ -47,10 +48,12 @@ export function AvailableTrips() {
   const [userTrips, setUserTrips] = useState<Trip[]>([])
 
   useEffect(() => {
-    loadAvailableTrips()
-    loadUserJoinRequests()
-    loadUserTrips()
-  }, [])
+    if (session?.user) {
+      loadAvailableTrips()
+      loadUserJoinRequests()
+      loadUserTrips()
+    }
+  }, [session])
 
   useEffect(() => {
     filterTrips()
@@ -63,8 +66,8 @@ export function AvailableTrips() {
       // Load all trips (including pending trips that haven't been grouped yet)
       const allTrips = await fabricService.getTrips()
 
-      // Get current user to filter out their trips
-      const user = authService.getCurrentUser()
+      // ✅ Get current user from NextAuth session
+      const user = session?.user
 
       // Filter for future trips with available seats
       const today = new Date()
@@ -97,7 +100,8 @@ export function AvailableTrips() {
 
   const loadUserJoinRequests = async () => {
     try {
-      const user = authService.getCurrentUser()
+      // ✅ Use NextAuth session
+      const user = session?.user
       if (user) {
         const requests = await joinRequestService.getJoinRequests({
           requesterId: user.id
@@ -111,7 +115,8 @@ export function AvailableTrips() {
 
   const loadUserTrips = async () => {
     try {
-      const user = authService.getCurrentUser()
+      // ✅ Use NextAuth session
+      const user = session?.user
       if (user) {
         const trips = await fabricService.getTrips({ userId: user.id })
         setUserTrips(trips)
@@ -177,7 +182,8 @@ export function AvailableTrips() {
     setIsSubmitting(true)
 
     try {
-      const user = authService.getCurrentUser()
+      // ✅ Use NextAuth session
+      const user = session?.user
 
       if (!user) {
         toast({

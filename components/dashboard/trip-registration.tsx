@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,12 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Calendar, Clock, MapPin, Car, Loader2 } from "lucide-react"
-import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { config, getLocationName, calculateDistance, formatCurrency } from "@/lib/config"
 
 export function TripRegistration() {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [availableTrips, setAvailableTrips] = useState<Trip[]>([])
   
@@ -109,9 +110,10 @@ export function TripRegistration() {
     setIsLoading(true)
 
     try {
-      const user = authService.getCurrentUser()
-      
-      if (!user) {
+      // ✅ Use NextAuth session
+      const user = session?.user
+
+      if (!user || !user.email || !user.name) {
         toast({
           title: "Authentication Error",
           description: "Please sign in to register a trip",

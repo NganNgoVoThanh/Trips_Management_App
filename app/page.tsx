@@ -2,31 +2,47 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
-import { LoginButton } from "@/components/login-button";
+import { LoginButton } from "@/components/login-button-azuread";
 import Image from "next/image";
-import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { authService } from "@/lib/auth-service";
+import { useEffect, useRef } from "react";
+
+// ✅ Force dynamic rendering (don't statically generate this page)
+export const dynamic = 'force-dynamic';
 
 export default function Page() {
+  const { data: session, status } = useSession();
   const router = useRouter();
+  const redirectInitiated = useRef(false);
 
-  // ✅ Check if user is already logged in on mount
+  // ✅ Redirect authenticated users immediately (only once)
   useEffect(() => {
-    const checkAuth = () => {
-      const user = authService.getCurrentUser();
+    if (status === "authenticated" && session?.user && !redirectInitiated.current) {
+      redirectInitiated.current = true;
+      const targetPath = session.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
+      console.log(`🔄 Redirecting to ${targetPath}`);
 
-      if (user) {
-        // User is logged in - redirect to appropriate dashboard
-        const targetUrl = user.role === 'admin' ? '/admin/dashboard' : '/dashboard';
-        router.replace(targetUrl);
-      }
-    };
+      // Small delay to ensure session is fully loaded
+      setTimeout(() => {
+        router.replace(targetPath);
+      }, 100);
+    }
+  }, [status, router]);
 
-    // Small delay to ensure cookies are loaded
-    setTimeout(checkAuth, 100);
-  }, [router]);
+  // Show loading spinner while checking session OR redirecting
+  if (status === "loading" || status === "authenticated") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#dc2626] border-r-transparent"></div>
+          <p className="text-gray-600">
+            {status === "loading" ? "Loading..." : "Redirecting to dashboard..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen flex flex-col">

@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { AlertCircle, Calendar, Clock, MapPin, Car, Users, Loader2 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
 import { emailService } from "@/lib/email-service"
 import {
@@ -27,6 +27,7 @@ import {
 
 export function UpcomingTrips() {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const [trips, setTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [cancellingTripId, setCancellingTripId] = useState<string | null>(null)
@@ -34,14 +35,17 @@ export function UpcomingTrips() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null)
 
   useEffect(() => {
-    loadTrips()
-  }, [])
+    if (session?.user) {
+      loadTrips()
+    }
+  }, [session])
 
   const loadTrips = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
-      
+      // ✅ Use NextAuth session
+      const user = session?.user
+
       if (!user) {
         toast({
           title: "Error",

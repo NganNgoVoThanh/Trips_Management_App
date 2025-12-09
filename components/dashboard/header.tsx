@@ -3,6 +3,7 @@
 
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
+import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -16,8 +17,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { Car, Calendar, LogOut, User, BarChart3, Home } from "lucide-react"
-import { authService } from "@/lib/auth-service"
-import { useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
@@ -25,24 +24,21 @@ export function DashboardHeader() {
   const router = useRouter()
   const pathname = usePathname()
   const { toast } = useToast()
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser()
-    setUser(currentUser)
-  }, [])
+  const { data: session } = useSession()
+  const user = session?.user
 
   const handleLogout = async () => {
     try {
-      await authService.logout()
       toast({
-        title: "Logged out successfully",
-        description: "Redirecting to home page...",
+        title: "Signing out...",
+        description: "Please wait",
       })
-      // Use hard reload to ensure cookies are fully cleared
-      setTimeout(() => {
-        window.location.href = "/"
-      }, 500)
+
+      // ✅ Use NextAuth signOut
+      await signOut({
+        callbackUrl: '/',
+        redirect: true
+      })
     } catch (error) {
       console.error('Logout error:', error)
       toast({
