@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +26,6 @@ import {
   Users,
   Download
 } from "lucide-react"
-import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { exportToCsv } from "@/lib/utils"
@@ -61,6 +61,7 @@ import { AlertCircle, MessageSquare, CheckCircle2, XCircle } from "lucide-react"
 export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -96,17 +97,24 @@ export default function ProfilePage() {
   })
 
   useEffect(() => {
-    loadProfileData()
-  }, [])
+    if (status === "authenticated" && session?.user) {
+      loadProfileData()
+    } else if (status === "unauthenticated") {
+      router.push('/')
+    }
+  }, [status, session])
 
   const loadProfileData = async () => {
     try {
       setIsLoading(true)
-      const currentUser = authService.getCurrentUser()
-      if (!currentUser) {
+
+      // ✅ Use NextAuth session
+      const currentUser = session?.user
+      if (!currentUser || !currentUser.email) {
         router.push('/')
         return
       }
+
       setUser(currentUser)
       setIsAdmin(currentUser.role === 'admin')
 
@@ -133,10 +141,10 @@ export default function ProfilePage() {
             locationTracking: userData.location_tracking ?? false
           })
         } else {
-          // Fallback to authService data if API fails
+          // Fallback to session data if API fails
           setProfileData({
-            name: currentUser.name,
-            email: currentUser.email,
+            name: currentUser.name || 'User',
+            email: currentUser.email || '',
             phone: '',
             department: currentUser.department || 'General',
             employeeId: currentUser.employeeId || '',
@@ -148,10 +156,10 @@ export default function ProfilePage() {
         }
       } catch (error) {
         console.error('Error loading profile from API:', error)
-        // Fallback to authService data
+        // Fallback to session data
         setProfileData({
-          name: currentUser.name,
-          email: currentUser.email,
+          name: currentUser.name || 'User',
+          email: currentUser.email || '',
           phone: '',
           department: currentUser.department || 'General',
           employeeId: currentUser.employeeId || '',
@@ -243,8 +251,6 @@ export default function ProfilePage() {
       if (!response.ok) {
         throw new Error('Failed to update profile')
       }
-
-      await authService.updateUserProfile(profileData)
 
       toast({
         title: "Profile Updated",
@@ -354,7 +360,8 @@ export default function ProfilePage() {
   }
 
   const handleLogout = async () => {
-    await authService.logout()
+    // Logout is handled by header component using NextAuth signOut
+    // This is just a fallback
     router.push('/')
   }
 
@@ -362,7 +369,8 @@ export default function ProfilePage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
-  if (isLoading) {
+  // ✅ Show loading while checking authentication
+  if (status === "loading" || (status === "authenticated" && isLoading)) {
     return (
       <div className="flex min-h-screen flex-col">
         {isAdmin ? <AdminHeader /> : <DashboardHeader />}
@@ -371,6 +379,12 @@ export default function ProfilePage() {
         </div>
       </div>
     )
+  }
+
+  // ✅ Redirect if not authenticated
+  if (status === "unauthenticated" || !session?.user) {
+    router.push('/')
+    return null
   }
 
   return (
