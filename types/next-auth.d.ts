@@ -14,6 +14,8 @@ declare module "next-auth" {
       role: 'admin' | 'user';
       department?: string;
       employeeId?: string;
+      phone?: string;
+      jobTitle?: string;
     } & DefaultSession["user"];
   }
 
@@ -25,6 +27,8 @@ declare module "next-auth" {
     role: 'admin' | 'user';
     department?: string;
     employeeId?: string;
+    phone?: string;
+    jobTitle?: string;
   }
 }
 
@@ -37,6 +41,8 @@ declare module "next-auth/jwt" {
     role: 'admin' | 'user';
     department?: string;
     employeeId?: string;
+    phone?: string;
+    jobTitle?: string;
     accessToken?: string;
   }
 }

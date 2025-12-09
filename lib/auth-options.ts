@@ -121,8 +121,18 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         const normalizedEmail = normalizeEmail(user.email || '');
         const role = determineRole(normalizedEmail);
-        const department = getDepartmentFromEmail(normalizedEmail);
-        const employeeId = stableEmployeeIdFromEmail(normalizedEmail);
+
+        // 🔍 DEBUG: Log entire Azure AD profile to see what fields are available
+        const azureProfile = profile as any;
+        console.log('=== Azure AD Profile Data ===');
+        console.log('Full profile:', JSON.stringify(azureProfile, null, 2));
+        console.log('Available keys:', Object.keys(azureProfile || {}));
+
+        // ✅ Extract Azure AD profile fields with fallbacks
+        const department = azureProfile?.department || getDepartmentFromEmail(normalizedEmail);
+        const employeeId = azureProfile?.employeeId || azureProfile?.id || stableEmployeeIdFromEmail(normalizedEmail);
+        const phone = azureProfile?.mobilePhone || (azureProfile?.businessPhones && azureProfile.businessPhones[0]) || '';
+        const jobTitle = azureProfile?.jobTitle || '';
 
         token.id = user.id;
         token.email = normalizedEmail;
@@ -130,23 +140,29 @@ export const authOptions: NextAuthOptions = {
         token.role = role;
         token.department = department;
         token.employeeId = employeeId;
+        token.phone = phone;
+        token.jobTitle = jobTitle;
 
-        // DO NOT store access_token - it's too large and causes session cookie to exceed 4096 bytes
-        // if (account?.access_token) {
-        //   token.accessToken = account.access_token;
-        // }
+        // ✅ Store avatar/picture from Azure AD (if available and not too long)
+        const avatarUrl = user.image || azureProfile?.picture;
+        if (avatarUrl && avatarUrl.length < 200) {
+          token.picture = avatarUrl;
+        }
 
         console.log('=== JWT Token Created ===');
         console.log('Email:', token.email);
         console.log('Role:', token.role);
         console.log('Department:', token.department);
         console.log('Employee ID:', token.employeeId);
+        console.log('Phone:', token.phone || 'none');
+        console.log('Job Title:', token.jobTitle || 'none');
+        console.log('Avatar URL:', token.picture || 'none');
       }
 
-      // Remove large fields to prevent cookie size issues
-      delete token.picture;
-      delete token.image;
-      delete token.sub;
+      // Remove very large fields to prevent cookie size issues
+      // Keep picture if it's short enough
+      delete token.image; // Remove duplicate field
+      delete token.sub; // Remove duplicate ID field
 
       if (trigger === "update") {
         if (token.email) {
@@ -165,6 +181,19 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as 'admin' | 'user';
         session.user.department = token.department as string;
         session.user.employeeId = token.employeeId as string;
+
+        // ✅ Add Azure AD profile fields to session
+        if (token.phone) {
+          session.user.phone = token.phone as string;
+        }
+        if (token.jobTitle) {
+          session.user.jobTitle = token.jobTitle as string;
+        }
+
+        // ✅ Add avatar URL to session
+        if (token.picture) {
+          session.user.image = token.picture as string;
+        }
       }
 
       return session;

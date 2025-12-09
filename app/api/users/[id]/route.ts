@@ -1,6 +1,7 @@
 // app/api/users/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import mysql from 'mysql2/promise'
+import { getServerUser } from '@/lib/server-auth'
 
 // Create connection helper
 async function getDbConnection() {
@@ -20,7 +21,25 @@ export async function GET(
 ) {
   let connection
   try {
+    // ✅ Check authentication
+    const currentUser = await getServerUser(request)
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const { id } = params
+
+    // ✅ Users can only access their own profile (unless admin)
+    if (currentUser.id !== id && currentUser.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden - You can only access your own profile' },
+        { status: 403 }
+      )
+    }
+
     connection = await getDbConnection()
 
     const [rows] = await connection.query(
@@ -63,7 +82,25 @@ export async function PUT(
 ) {
   let connection
   try {
+    // ✅ Check authentication
+    const currentUser = await getServerUser(request)
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const { id } = params
+
+    // ✅ Users can only update their own profile (unless admin)
+    if (currentUser.id !== id && currentUser.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden - You can only update your own profile' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
 
     const {

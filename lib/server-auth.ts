@@ -1,9 +1,9 @@
 // lib/server-auth.ts
-// Server-side authentication helper
-// Extracts user info from request headers (set by middleware)
+// Server-side authentication helper using NextAuth
 
 import { NextRequest } from 'next/server';
-import { headers, cookies } from 'next/headers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from './auth-options';
 
 export interface ServerUser {
   id: string;
@@ -15,71 +15,29 @@ export interface ServerUser {
 }
 
 /**
- * Get authenticated user from Next.js API route request
- * This reads from headers injected by middleware
- * 
- * IMPORTANT: Use this in API routes, not getUserFromRequest
+ * Get authenticated user from Next.js API route using NextAuth
+ *
+ * IMPORTANT: Use this in API routes to get current user
  */
 export async function getServerUser(request?: NextRequest): Promise<ServerUser | null> {
   try {
-    // Method 1: From request headers (if request object provided)
-    if (request) {
-      const userId = request.headers.get('x-user-id');
-      const userEmail = request.headers.get('x-user-email');
-      const userRole = request.headers.get('x-user-role');
-      
-      if (userId && userEmail && userRole) {
-        // Get full user data from session cookie
-        const session = request.cookies.get('session');
-        if (session?.value) {
-          try {
-            const userData = JSON.parse(session.value);
-            return userData as ServerUser;
-          } catch (e) {
-            console.error('Failed to parse session:', e);
-          }
-        }
-        
-        // Fallback: construct user from headers
-        return {
-          id: userId,
-          email: userEmail,
-          name: userEmail.split('@')[0],
-          role: userRole as 'admin' | 'user'
-        };
-      }
+    // ✅ Use NextAuth getServerSession
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user) {
+      return null;
     }
-    
-    // Method 2: From headers() in Route Handlers (Next.js 13+)
-    const headersList = await headers();
-    const userId = headersList.get('x-user-id');
-    const userEmail = headersList.get('x-user-email');
-    const userRole = headersList.get('x-user-role');
-    
-    if (userId && userEmail && userRole) {
-      // Get full user data from cookies
-      const cookieStore = await cookies();
-      const session = cookieStore.get('session');
-      
-      if (session?.value) {
-        try {
-          const userData = JSON.parse(session.value);
-          return userData as ServerUser;
-        } catch (e) {
-          console.error('Failed to parse session:', e);
-        }
-      }
-      
-      // Fallback: construct user from headers
-      return {
-        id: userId,
-        email: userEmail,
-        name: userEmail.split('@')[0],
-        role: userRole as 'admin' | 'user'
-      };
-    }
-    
-    return null;
+
+    // Map NextAuth session to ServerUser
+    return {
+      id: session.user.id,
+      email: session.user.email || '',
+      name: session.user.name || '',
+      role: session.user.role || 'user',
+      department: session.user.department,
+      employeeId: session.user.employeeId
+    } as ServerUser;
+
   } catch (error) {
     console.error('Error getting server user:', error);
     return null;

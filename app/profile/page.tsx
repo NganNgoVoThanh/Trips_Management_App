@@ -126,7 +126,7 @@ export default function ProfilePage() {
           setProfileData({
             name: userData.name || currentUser.name,
             email: userData.email || currentUser.email,
-            phone: userData.phone || '',
+            phone: userData.phone || currentUser.phone || '',
             department: userData.department || currentUser.department || 'General',
             employeeId: userData.employee_id || currentUser.employeeId || '',
             preferredVehicle: userData.preferred_vehicle || 'car-4',
@@ -145,7 +145,7 @@ export default function ProfilePage() {
           setProfileData({
             name: currentUser.name || 'User',
             email: currentUser.email || '',
-            phone: '',
+            phone: currentUser.phone || '',
             department: currentUser.department || 'General',
             employeeId: currentUser.employeeId || '',
             preferredVehicle: 'car-4',
@@ -160,7 +160,7 @@ export default function ProfilePage() {
         setProfileData({
           name: currentUser.name || 'User',
           email: currentUser.email || '',
-          phone: '',
+          phone: currentUser.phone || '',
           department: currentUser.department || 'General',
           employeeId: currentUser.employeeId || '',
           preferredVehicle: 'car-4',
@@ -396,14 +396,21 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20 border-4 border-white">
-                <AvatarImage src={`https://ui-avatars.com/api/?name=${user?.name}&background=fff&color=dc2626`} />
+                {/* ✅ Priority: Azure AD avatar > UI Avatars > Initials fallback */}
+                <AvatarImage
+                  src={user?.image || `https://ui-avatars.com/api/?name=${user?.name}&background=fff&color=dc2626`}
+                  alt={user?.name || 'User'}
+                />
                 <AvatarFallback className="bg-white text-red-600 text-xl">
                   {getInitials(user?.name || 'U')}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <h1 className="text-2xl font-bold">{user?.name}</h1>
-                <p className="text-red-100">{user?.department}</p>
+                <p className="text-red-100">
+                  {user?.jobTitle && <span>{user.jobTitle} • </span>}
+                  {user?.department}
+                </p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge className="bg-white text-red-600">
                     {user?.role === 'admin' ? 'Administrator' : 'Employee'}

@@ -158,6 +158,18 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
+                {user?.image && (
+                  <img
+                    src={user.image}
+                    alt={user.name || 'User'}
+                    className="h-full w-full object-cover rounded-full"
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                )}
                 <AvatarFallback className={user?.role === 'admin' ? "bg-red-600 text-white" : "bg-red-100 text-red-600"}>
                   {getInitials(user?.name || 'User')}
                 </AvatarFallback>
