@@ -122,17 +122,24 @@ export const authOptions: NextAuthOptions = {
         const normalizedEmail = normalizeEmail(user.email || '');
         const role = determineRole(normalizedEmail);
 
-        // 🔍 DEBUG: Log entire Azure AD profile to see what fields are available
+        // ✅ Extract Azure AD profile fields
         const azureProfile = profile as any;
-        console.log('=== Azure AD Profile Data ===');
-        console.log('Full profile:', JSON.stringify(azureProfile, null, 2));
-        console.log('Available keys:', Object.keys(azureProfile || {}));
 
-        // ✅ Extract Azure AD profile fields with fallbacks
+        // Use Azure AD Object ID (oid) as Employee ID - this is the real unique identifier
+        const employeeId = azureProfile?.oid || stableEmployeeIdFromEmail(normalizedEmail);
+
+        // Department: Azure AD basic profile doesn't include this, use email-based fallback
         const department = azureProfile?.department || getDepartmentFromEmail(normalizedEmail);
-        const employeeId = azureProfile?.employeeId || azureProfile?.id || stableEmployeeIdFromEmail(normalizedEmail);
+
+        // Phone and JobTitle: Not available with User.Read scope, would need Graph API call
         const phone = azureProfile?.mobilePhone || (azureProfile?.businessPhones && azureProfile.businessPhones[0]) || '';
         const jobTitle = azureProfile?.jobTitle || '';
+
+        console.log('=== Azure AD Profile Extracted ===');
+        console.log('OID (Employee ID):', employeeId);
+        console.log('Department:', department);
+        console.log('Phone:', phone || 'not available');
+        console.log('Job Title:', jobTitle || 'not available');
 
         token.id = user.id;
         token.email = normalizedEmail;
