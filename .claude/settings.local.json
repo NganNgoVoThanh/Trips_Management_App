@@ -20,7 +20,9 @@
       "Bash(pm2 list:*)",
       "Bash(git checkout:*)",
       "Bash(del componentsuiapp-footer.tsx)",
-      "Bash(if exist componentsuiapp-footer.tsx del componentsuiapp-footer.tsx)"
+      "Bash(if exist componentsuiapp-footer.tsx del componentsuiapp-footer.tsx)",
+      "Bash(del README-PERMISSIONS.md DE-XUAT-PHAN-QUYEN-PERMISSIONS.md flowchart-permissions-workflow.csv permissions-schema-update.sql)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
