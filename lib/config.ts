@@ -11,6 +11,25 @@ export const config = {
     // Add more admin emails as needed
   ],
   
+  // Company departments
+  departments: [
+    'Management',
+    'Operations',
+    'Human Resources',
+    'Finance',
+    'Information Technology',
+    'Sales',
+    'Marketing',
+    'Production',
+    'R&D',
+    'Quality Control',
+    'Supply Chain',
+    'Procurement',
+    'Customer Service',
+    'Logistics',
+    'Warehouse',
+  ],
+
   // Company locations with full addresses
   locations: {
     'HCM Office': {

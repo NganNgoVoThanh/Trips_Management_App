@@ -4,6 +4,7 @@
 import { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import { config } from "@/lib/config";
+import { createOrUpdateUserOnLogin } from "@/lib/user-service";
 
 // ========================================
 // ADMIN CONFIGURATION
@@ -156,9 +157,44 @@ export const authOptions: NextAuthOptions = {
           token.picture = avatarUrl;
         }
 
+        // ✅ Load admin_type and admin_location_id from database
+        // This enables Super Admin and Location Admin functionality
+        try {
+          const { createOrUpdateUserOnLogin } = await import('@/lib/user-service');
+          const mysql = await import('mysql2/promise');
+          const connection = await mysql.default.createConnection({
+            host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+            port: parseInt(process.env.DB_PORT || '3306'),
+            user: process.env.DB_USER || 'tripsmgm-rndus2',
+            password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
+            database: process.env.DB_NAME || 'tripsmgm-mydb002',
+          });
+
+          const [rows] = await connection.query<any[]>(
+            'SELECT admin_type, admin_location_id FROM users WHERE email = ? LIMIT 1',
+            [normalizedEmail]
+          );
+
+          await connection.end();
+
+          if (Array.isArray(rows) && rows.length > 0) {
+            token.adminType = rows[0].admin_type || 'none';
+            token.adminLocationId = rows[0].admin_location_id || undefined;
+            console.log(`✅ Admin Type loaded from DB: ${token.adminType}${token.adminLocationId ? ` (Location: ${token.adminLocationId})` : ''}`);
+          } else {
+            token.adminType = 'none';
+            token.adminLocationId = undefined;
+          }
+        } catch (error) {
+          console.error('❌ Failed to load admin_type from database:', error);
+          token.adminType = 'none';
+          token.adminLocationId = undefined;
+        }
+
         console.log('=== JWT Token Created ===');
         console.log('Email:', token.email);
         console.log('Role:', token.role);
+        console.log('Admin Type:', token.adminType);
         console.log('Department:', token.department);
         console.log('Employee ID:', token.employeeId);
         console.log('Phone:', token.phone || 'none');
@@ -188,6 +224,14 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as 'admin' | 'user';
         session.user.department = token.department as string;
         session.user.employeeId = token.employeeId as string;
+
+        // ✅ Add admin type fields to session (for Super Admin & Location Admin)
+        if (token.adminType) {
+          session.user.adminType = token.adminType as 'super_admin' | 'location_admin' | 'none';
+        }
+        if (token.adminLocationId) {
+          session.user.adminLocationId = token.adminLocationId as string;
+        }
 
         // ✅ Add Azure AD profile fields to session
         if (token.phone) {
@@ -236,6 +280,36 @@ export const authOptions: NextAuthOptions = {
   events: {
     async signIn({ user, account, profile, isNewUser }) {
       console.log(`✅ User signed in: ${user.email} via ${account?.provider}`);
+
+      // ✅ Tạo/cập nhật user record trong database
+      if (user.email) {
+        try {
+          const azureProfile = profile as any;
+          const normalizedEmail = normalizeEmail(user.email);
+          const role = determineRole(normalizedEmail);
+          const azureId = azureProfile?.oid || azureProfile?.sub || user.id;
+          const employeeId = azureProfile?.oid ? `EMP${azureProfile.oid.slice(0, 6).toUpperCase()}` : stableEmployeeIdFromEmail(normalizedEmail);
+          const department = azureProfile?.department || getDepartmentFromEmail(normalizedEmail);
+          const officeLocation = azureProfile?.officeLocation || null;
+          const jobTitle = azureProfile?.jobTitle || null;
+
+          await createOrUpdateUserOnLogin({
+            azureId,
+            email: normalizedEmail,
+            name: user.name || normalizedEmail.split('@')[0],
+            employeeId,
+            role,
+            department,
+            officeLocation,
+            jobTitle,
+          });
+
+          console.log(`✅ User record created/updated for ${normalizedEmail}`);
+        } catch (error: any) {
+          console.error(`❌ Failed to create/update user record:`, error.message);
+          // Không throw error để không block login
+        }
+      }
     },
     async signOut({ token, session }) {
       console.log(`👋 User signed out: ${token?.email || session?.user?.email}`);

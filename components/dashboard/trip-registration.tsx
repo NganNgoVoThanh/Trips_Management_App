@@ -26,6 +26,9 @@ export function TripRegistration() {
     returnDate: "",
     returnTime: "",
     vehicleType: "car-4",
+    purpose: "",
+    ccEmails: [] as string[],
+    ccEmailInput: "",
     notes: ""
   })
 
@@ -128,11 +131,8 @@ export function TripRegistration() {
       console.log('Form Data:', formData)
       console.log('Estimated Cost:', estimatedCost)
 
-      // Create trip object with all required fields
+      // Create trip object with email approval fields
       const tripData = {
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
         departureLocation: formData.departureLocation,
         destination: formData.destination,
         departureDate: formData.departureDate,
@@ -140,22 +140,36 @@ export function TripRegistration() {
         returnDate: formData.returnDate,
         returnTime: formData.returnTime,
         vehicleType: formData.vehicleType,
-        status: 'pending' as const,
-        notified: false,
+        purpose: formData.purpose,
+        ccEmails: formData.ccEmails,
         estimatedCost: estimatedCost > 0 ? estimatedCost : 0
       }
 
-      console.log('Trip Data to Save:', tripData)
+      console.log('Trip Data to Submit:', tripData)
 
-      // Save to database
-      const savedTrip = await fabricService.createTrip(tripData)
-      console.log('Saved Trip:', savedTrip)
+      // Submit via new email approval endpoint
+      const response = await fetch('/api/trips/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData),
+      })
 
-      // Success notification with more details
+      const result = await response.json()
+      console.log('Submission Result:', result)
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to submit trip')
+      }
+
+      // Success notification with approval status
       toast({
-        title: "✅ Trip Registered Successfully!",
-        description: `Your trip from ${getLocationName(formData.departureLocation)} to ${getLocationName(formData.destination)} on ${formData.departureDate} has been submitted for approval. You will receive a notification once it's reviewed.`,
-        duration: 5000,
+        title: result.trip.autoApproved ? "✅ Trip Auto-Approved!" : "✅ Trip Submitted!",
+        description: result.trip.autoApproved
+          ? `Your trip has been auto-approved (no manager assigned). Departure: ${formData.departureDate}`
+          : result.trip.isUrgent
+          ? `⚠️ URGENT trip submitted! Approval email sent to your manager and admin. Departure: ${formData.departureDate}`
+          : `Approval email sent to your manager. You will be notified once approved. Departure: ${formData.departureDate}`,
+        duration: 6000,
       })
 
       // Reset form after successful submission
@@ -167,6 +181,9 @@ export function TripRegistration() {
         returnDate: "",
         returnTime: "",
         vehicleType: "car-4",
+        purpose: "",
+        ccEmails: [],
+        ccEmailInput: "",
         notes: ""
       })
       
@@ -343,17 +360,94 @@ export function TripRegistration() {
               </Select>
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes</Label>
+            {/* Purpose */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="purpose">
+                Trip Purpose
+              </Label>
               <Input
-                id="notes"
-                placeholder="Optional notes or special requirements"
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
+                id="purpose"
+                placeholder="Example: Customer meeting, Factory inspection, Training..."
+                value={formData.purpose}
+                onChange={(e) => handleInputChange('purpose', e.target.value)}
                 disabled={isLoading}
               />
             </div>
+          </div>
+
+          {/* CC Emails Section */}
+          <div className="space-y-2">
+            <Label htmlFor="ccEmails">
+              CC Email (Approval Copy Recipients)
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="ccEmailInput"
+                type="email"
+                placeholder="Enter email (e.g., admin@intersnack.com.vn)"
+                value={formData.ccEmailInput}
+                onChange={(e) => handleInputChange('ccEmailInput', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const email = formData.ccEmailInput.trim()
+                    if (email && email.includes('@')) {
+                      setFormData(prev => ({
+                        ...prev,
+                        ccEmails: [...prev.ccEmails, email],
+                        ccEmailInput: ''
+                      }))
+                    }
+                  }
+                }}
+                disabled={isLoading}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const email = formData.ccEmailInput.trim()
+                  if (email && email.includes('@')) {
+                    setFormData(prev => ({
+                      ...prev,
+                      ccEmails: [...prev.ccEmails, email],
+                      ccEmailInput: ''
+                    }))
+                  }
+                }}
+                disabled={isLoading || !formData.ccEmailInput.trim().includes('@')}
+              >
+                + Add
+              </Button>
+            </div>
+            {formData.ccEmails.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {formData.ccEmails.map((email, index) => (
+                  <div
+                    key={index}
+                    className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          ccEmails: prev.ccEmails.filter((_, i) => i !== index)
+                        }))
+                      }}
+                      className="text-blue-600 hover:text-blue-800 font-bold"
+                      disabled={isLoading}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              These people will receive a copy of the approval email sent to your manager
+            </p>
           </div>
 
           {/* Cost Estimate */}

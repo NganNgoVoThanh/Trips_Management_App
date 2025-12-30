@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Car, LogOut, Settings, User, BarChart3, Home, Shield } from "lucide-react"
+import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle } from "lucide-react"
 import { authService } from "@/lib/auth-service"
 import { useEffect, useState } from "react"
 import Image from "next/image"
@@ -100,9 +100,9 @@ export function AdminHeader() {
             </Link>
             
             <Link href="/management">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className={cn(
                   "transition-all",
                   isActive('/management')
@@ -114,11 +114,43 @@ export function AdminHeader() {
                 Management
               </Button>
             </Link>
-            
+
+            <Link href="/admin/vehicles">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "transition-all",
+                  isActive('/admin/vehicles')
+                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                )}
+              >
+                <Car className="mr-2 h-4 w-4" />
+                Providers
+              </Button>
+            </Link>
+
+            <Link href="/admin/manual-override">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "transition-all",
+                  isActive('/admin/manual-override')
+                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                )}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Override
+              </Button>
+            </Link>
+
             <Link href="/dashboard">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className={cn(
                   "transition-all",
                   isActive('/dashboard') && !pathname?.startsWith('/admin')
@@ -126,7 +158,7 @@ export function AdminHeader() {
                     : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
                 )}
               >
-                <Car className="mr-2 h-4 w-4" />
+                <Home className="mr-2 h-4 w-4" />
                 User View
               </Button>
             </Link>

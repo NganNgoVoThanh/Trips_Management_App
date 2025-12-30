@@ -35,7 +35,15 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 
-export function DashboardClient() {
+interface DashboardClientProps {
+  pendingManagerConfirmation?: boolean;
+  pendingManagerEmail?: string;
+}
+
+export function DashboardClient({
+  pendingManagerConfirmation = false,
+  pendingManagerEmail = ''
+}: DashboardClientProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { data: session, status } = useSession()
@@ -343,6 +351,20 @@ export function DashboardClient() {
               >
                 Setup Guide →
               </a>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Manager Confirmation Pending Warning */}
+        {pendingManagerConfirmation && (
+          <Alert className="border-yellow-500 bg-yellow-50">
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <strong>Manager Confirmation Pending</strong>
+              <p className="mt-1">
+                A confirmation email has been sent to <strong>{pendingManagerEmail}</strong>.
+                You can browse the system, but trip submission will be enabled after your manager confirms.
+              </p>
             </AlertDescription>
           </Alert>
         )}

@@ -190,6 +190,56 @@ export default function OptimizationDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Cost Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Cost Breakdown & Savings Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-1">Individual Trips Total</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatCurrency(optimization.tripDetails.reduce((sum: number, t: Trip) => sum + (t.estimatedCost || 0), 0))}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">{optimization.tripDetails.length} trips × car-4</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-1">Optimized Group Cost</p>
+                  <p className="text-xl font-bold text-blue-700">
+                    {formatCurrency(optimization.tripDetails.reduce((sum: number, t: Trip) => sum + (t.estimatedCost || 0), 0) - optimization.totalSavings)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">1 trip × {optimization.vehicleType}</p>
+                </div>
+                <div className="text-center border-l-2 border-green-300">
+                  <p className="text-sm text-gray-600 mb-1">Total Savings</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatCurrency(optimization.totalSavings)}
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    {Math.round((optimization.totalSavings / optimization.tripDetails.reduce((sum: number, t: Trip) => sum + (t.estimatedCost || 0), 0)) * 100)}% saved
+                  </p>
+                </div>
+              </div>
+
+              {/* Explanation */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-900 mb-2">💡 How Savings Are Calculated</h4>
+                <p className="text-sm text-amber-800">
+                  By combining {optimization.tripDetails.length} individual trips into one shared {optimization.vehicleType} vehicle,
+                  we eliminate duplicate routes and reduce the number of trips from {optimization.tripDetails.length} to 1.
+                  This results in significant cost savings while maintaining service quality.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Trip Details */}
         <Card>
           <CardHeader>
@@ -211,14 +261,11 @@ export default function OptimizationDetailPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">Estimated Cost</p>
+                      <p className="text-sm text-gray-500">Original Cost (car-4)</p>
                       <p className="font-medium">{formatCurrency(trip.estimatedCost || 0)}</p>
-                      {trip.actualCost && (
-                        <>
-                          <p className="text-sm text-gray-500 mt-1">Actual Cost</p>
-                          <p className="font-medium text-green-600">{formatCurrency(trip.actualCost)}</p>
-                        </>
-                      )}
+                      <p className="text-xs text-green-600 mt-1">
+                        Saved: ~{formatCurrency((trip.estimatedCost || 0) - ((trip.estimatedCost || 0) / optimization.tripDetails.length))}
+                      </p>
                     </div>
                   </div>
                 </div>

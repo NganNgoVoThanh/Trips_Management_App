@@ -49,7 +49,7 @@ export interface Trip {
   departureTime: string;
   returnDate: string;
   returnTime: string;
-  status: 'pending' | 'confirmed' | 'optimized' | 'cancelled' | 'draft';
+  status: 'pending' | 'confirmed' | 'optimized' | 'cancelled' | 'draft' | 'approved' | 'rejected';
   vehicleType?: string;
   estimatedCost?: number;
   actualCost?: number;
@@ -60,6 +60,15 @@ export interface Trip {
   updatedAt: string;
   dataType?: 'raw' | 'temp' | 'final';
   parentTripId?: string;
+  // Email approval workflow fields
+  manager_approval_status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  manager_approval_token?: string;
+  manager_approval_at?: string;
+  manager_approved_by?: string;
+  cc_emails?: string;
+  is_urgent?: boolean;
+  auto_approved?: boolean;
+  purpose?: string;
 }
 
 export interface OptimizationGroup {
@@ -229,7 +238,7 @@ class MySQLService {
           departure_time TIME NOT NULL,
           return_date DATE NOT NULL,
           return_time TIME NOT NULL,
-          status ENUM('pending', 'confirmed', 'optimized', 'cancelled', 'draft') DEFAULT 'pending',
+          status ENUM('pending', 'confirmed', 'optimized', 'cancelled', 'draft', 'approved', 'rejected') DEFAULT 'pending',
           vehicle_type VARCHAR(50),
           estimated_cost DECIMAL(10, 2),
           actual_cost DECIMAL(10, 2),

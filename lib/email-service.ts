@@ -3,9 +3,11 @@ import { Trip } from './mysql-service';
 import { config, getLocationName, formatCurrency } from './config';
 
 interface EmailNotification {
-  to: string[];
+  to: string | string[];
+  cc?: string[];
   subject: string;
-  body: string;
+  body?: string;
+  text?: string;
   html?: string;
 }
 
@@ -391,7 +393,7 @@ Intersnack Trips Management Team
   /**
    * Core email sending function
    */
-  private async sendEmail(notification: EmailNotification): Promise<void> {
+  async sendEmail(notification: EmailNotification): Promise<void> {
     // Store email for later processing if not configured
     if (!this.isConfigured) {
       console.log('📧 Email queued (service not configured):', notification.subject);
@@ -400,9 +402,13 @@ Intersnack Trips Management Team
     }
 
     try {
+      // Normalize to array
+      const toArray = Array.isArray(notification.to) ? notification.to : [notification.to];
+      const bodyText = notification.text || notification.body || '';
+
       // In production, integrate with actual email service
       // Options: SendGrid, AWS SES, Mailgun, SMTP, etc.
-      
+
       if (process.env.EMAIL_SERVICE_URL) {
         // Example: External email API
         const response = await fetch(process.env.EMAIL_SERVICE_URL, {
@@ -412,9 +418,10 @@ Intersnack Trips Management Team
             'Authorization': `Bearer ${process.env.EMAIL_API_KEY}`
           },
           body: JSON.stringify({
-            to: notification.to,
+            to: toArray,
+            cc: notification.cc || [],
             subject: notification.subject,
-            text: notification.body,
+            text: bodyText,
             html: notification.html
           })
         });
@@ -425,14 +432,17 @@ Intersnack Trips Management Team
       } else {
         // Development: Log emails to console
         console.log('📧 Email sent (dev mode):');
-        console.log('To:', notification.to.join(', '));
+        console.log('To:', toArray.join(', '));
+        if (notification.cc && notification.cc.length > 0) {
+          console.log('CC:', notification.cc.join(', '));
+        }
         console.log('Subject:', notification.subject);
-        console.log('Body:', notification.body.substring(0, 200) + '...');
+        console.log('Body:', bodyText.substring(0, 200) + '...');
       }
-      
+
       // Mark trips as notified in database
       // This would be handled by the backend service
-      
+
     } catch (error) {
       console.error('Failed to send email:', error);
       // In production, implement retry logic or queue for later
@@ -468,3 +478,20 @@ Intersnack Trips Management Team
 }
 
 export const emailService = new EmailService();
+
+/**
+ * Helper function to send generic email
+ */
+export async function sendEmail(params: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  cc?: string[];
+}): Promise<void> {
+  return emailService.sendEmail({
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    cc: params.cc,
+  });
+}

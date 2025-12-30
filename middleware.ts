@@ -19,6 +19,13 @@ const adminPaths = [
   '/api/optimize/approve',
   '/api/optimize/reject',
   '/api/join-requests/stats',
+  '/api/admin', // New admin API routes
+]
+
+// Super Admin only paths
+const superAdminPaths = [
+  '/admin/manage-admins',
+  '/api/admin/manage',
 ]
 
 export default withAuth(
@@ -26,17 +33,25 @@ export default withAuth(
     const { pathname } = req.nextUrl
     const token = req.nextauth.token
 
-    // ✅ DETAILED LOGGING for debugging
-    console.log(`📍 Middleware running for: ${pathname}`)
-    console.log(`🔑 Token exists: ${!!token}`)
-    if (token) {
-      console.log(`🔐 ${token.email} accessing ${pathname} (role: ${token.role})`)
-    }
-
     // ✅ Allow authenticated users to access home page (client-side will handle redirect)
     // This prevents infinite redirect loop between middleware and client-side router
     if (pathname === '/') {
       return NextResponse.next()
+    }
+
+    // Check super admin-only paths
+    const isSuperAdminPath = superAdminPaths.some(path => pathname.startsWith(path))
+
+    if (isSuperAdminPath && token?.adminType !== 'super_admin') {
+      if (pathname.startsWith('/api')) {
+        return NextResponse.json(
+          { error: 'Forbidden - Super Admin access required' },
+          { status: 403 }
+        )
+      }
+      const url = req.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
     }
 
     // Check admin-only paths
@@ -92,7 +107,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public files (images, etc.)
+     * - manifest.json, sw.js (PWA files)
+     * - CSS and JS files
      */
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|manifest.json|sw.js|\\.well-known|.*\\.css|.*\\.js|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.ico|.*\\.webp).*)',
   ],
 }

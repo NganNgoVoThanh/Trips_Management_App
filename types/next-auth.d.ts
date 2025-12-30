@@ -16,6 +16,8 @@ declare module "next-auth" {
       employeeId?: string;
       phone?: string;
       jobTitle?: string;
+      adminType?: 'super_admin' | 'location_admin' | 'none';
+      adminLocationId?: string;
     } & DefaultSession["user"];
   }
 
@@ -44,5 +46,7 @@ declare module "next-auth/jwt" {
     phone?: string;
     jobTitle?: string;
     accessToken?: string;
+    adminType?: 'super_admin' | 'location_admin' | 'none';
+    adminLocationId?: string;
   }
 }

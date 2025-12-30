@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#C00000" rx="64"/>
+  <g transform="translate(256, 256)">
+    <!-- Car icon in white -->
+    <path fill="#ffffff" transform="translate(-120, -60)" d="M96 16c-11.7 0-21.3 9.6-21.3 21.3v10.7H32c-17.7 0-32 14.3-32 32v64c0 17.7 14.3 32 32 32h10.7v32c0 11.7 9.6 21.3 21.3 21.3s21.3-9.6 21.3-21.3v-32h128v32c0 11.7 9.6 21.3 21.3 21.3s21.3-9.6 21.3-21.3v-32H266c17.7 0 32-14.3 32-32V80c0-17.7-14.3-32-32-32H224V37.3c0-11.7-9.6-21.3-21.3-21.3H96zm0 42.7h85.3V69.3H96V58.7zM32 90.7H266v53.3H32V90.7zm21.3 85.3c0-11.7 9.6-21.3 21.3-21.3s21.3 9.6 21.3 21.3s-9.6 21.3-21.3 21.3s-21.3-9.6-21.3-21.3zm170.7 0c0-11.7 9.6-21.3 21.3-21.3s21.3 9.6 21.3 21.3s-9.6 21.3-21.3 21.3s-21.3-9.6-21.3-21.3z"/>
+    <!-- Text "TRIPS" -->
+    <text x="0" y="100" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="#ffffff" text-anchor="middle">TRIPS</text>
+  </g>
+</svg>

@@ -187,16 +187,6 @@ export default function Page() {
         </div>
       </main>
 
-      {/* FOOTER */}
-      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-center gap-1 text-center">
-            <p className="text-xs text-gray-600">version: 02.06</p>
-            <p className="text-sm text-gray-600">Process RD & Optimization</p>
-            <p className="text-sm text-gray-600">Intersnack Cashew Vietnam</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

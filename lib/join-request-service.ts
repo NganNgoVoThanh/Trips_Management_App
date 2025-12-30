@@ -63,6 +63,8 @@ export interface JoinRequest {
   requesterName: string;
   requesterEmail: string;
   requesterDepartment?: string;
+  requesterManagerEmail?: string;  // 🔥 NEW: For CC notifications
+  requesterManagerName?: string;   // 🔥 NEW: For CC notifications
   reason?: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   adminNotes?: string;
@@ -149,6 +151,32 @@ class JoinRequestService {
         throw new Error('User not authenticated');
       }
 
+      // 🔥 NEW: Get user's manager info for CC notifications
+      let managerEmail: string | null = null;
+      let managerName: string | null = null;
+
+      if (this.ensureServerSide('createJoinRequest - get manager info')) {
+        try {
+          const poolInstance = await getPool();
+          const connection = await poolInstance.getConnection();
+          const [userRows] = await connection.query(
+            'SELECT manager_email, manager_name FROM users WHERE id = ? LIMIT 1',
+            [user.id]
+          ) as any[];
+          connection.release();
+
+          if (Array.isArray(userRows) && userRows.length > 0) {
+            managerEmail = userRows[0].manager_email;
+            managerName = userRows[0].manager_name;
+            console.log(`📧 Manager info for ${user.email}: ${managerName} (${managerEmail})`);
+          } else {
+            console.log(`⚠️ No manager found for user ${user.email}`);
+          }
+        } catch (dbError) {
+          console.warn('⚠️ Could not fetch manager info:', dbError);
+        }
+      }
+
       // Check for existing pending request for the same trip
       const existingPendingRequests = await this.getJoinRequests({
         tripId,
@@ -212,6 +240,8 @@ class JoinRequestService {
         requesterName: user.name,
         requesterEmail: user.email,
         requesterDepartment: user.department,
+        requesterManagerEmail: managerEmail || undefined,  // 🔥 NEW
+        requesterManagerName: managerName || undefined,    // 🔥 NEW
         reason,
         status: 'pending',
         createdAt: getCurrentVietnamTime(), // ✅ Use Vietnam time
@@ -660,26 +690,65 @@ class JoinRequestService {
 
   private async notifyAdminNewRequest(request: JoinRequest): Promise<void> {
     try {
-      // ✅ FIX: Use sendOptimizationNotification pattern with array for 'to'
-      const subject = 'New Trip Join Request';
+      const subject = '🔔 New Trip Join Request';
       const body = `New join request from ${request.requesterName} for trip ${request.tripId}
-      
+
 Trip Details:
 • From: ${request.tripDetails.departureLocation}
 • To: ${request.tripDetails.destination}
 • Date: ${request.tripDetails.departureDate}
 • Time: ${request.tripDetails.departureTime}
 ${request.reason ? `• Reason: ${request.reason}` : ''}
+${request.requesterManagerName ? `• Manager: ${request.requesterManagerName} (${request.requesterManagerEmail})` : '• Manager: Not assigned'}
 
 Please review this request in the admin panel.`;
 
-      const html = `<p>New join request from <strong>${request.requesterName}</strong></p>
-               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
-               <p>Date: ${request.tripDetails.departureDate} at ${request.tripDetails.departureTime}</p>
-               ${request.reason ? `<p><strong>Reason:</strong> ${request.reason}</p>` : ''}`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2196f3;">🔔 New Trip Join Request</h2>
+          <p>New join request from <strong>${request.requesterName}</strong> (${request.requesterEmail})</p>
 
-      // Call private method through reflection or use a workaround
-      console.log('📧 Would send admin notification:', { to: ['admin@company.com'], subject, body });
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2196f3;">
+            <h3 style="margin-top: 0; color: #1565c0;">Trip Details</h3>
+            <p><strong>From:</strong> ${request.tripDetails.departureLocation}</p>
+            <p><strong>To:</strong> ${request.tripDetails.destination}</p>
+            <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+            <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
+            ${request.reason ? `<p><strong>Reason:</strong> ${request.reason}</p>` : ''}
+          </div>
+
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0;"><strong>Requester Manager:</strong> ${request.requesterManagerName || 'Not assigned'} ${request.requesterManagerEmail ? `(${request.requesterManagerEmail})` : ''}</p>
+          </div>
+
+          <p style="color: #666;">Please review this request in the admin panel.</p>
+          <a href="${process.env.NEXTAUTH_URL || 'http://localhost:50001'}/admin/join-requests"
+             style="display: inline-block; background: #2196f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 10px;">
+            Review Join Requests
+          </a>
+        </div>
+      `;
+
+      // 🔥 NEW: CC Manager if exists
+      const ccRecipients = request.requesterManagerEmail
+        ? [request.requesterManagerEmail]
+        : [];
+
+      // Send to admin (you may need to configure admin email in env)
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@intersnack.com.vn';
+
+      if (emailService.isServiceConfigured()) {
+        await emailService.sendEmail({
+          to: adminEmail,
+          cc: ccRecipients,
+          subject,
+          text: body,
+          html
+        });
+        console.log(`✅ Admin notification sent to ${adminEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+      } else {
+        console.log('📧 [DRY RUN] Would send admin notification to:', adminEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+      }
     } catch (error) {
       console.error('Error sending admin notification:', error);
     }
@@ -689,7 +758,7 @@ Please review this request in the admin panel.`;
     try {
       const subject = 'Trip Join Request Submitted';
       const body = `Your request to join the trip has been submitted and is awaiting admin approval.
-      
+
 Trip Details:
 • From: ${request.tripDetails.departureLocation}
 • To: ${request.tripDetails.destination}
@@ -699,11 +768,42 @@ Trip Details:
 
 You will receive another email once your request has been reviewed.`;
 
-      const html = `<p>Your request to join the trip has been submitted.</p>
-               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
-               <p>Status: <strong>Pending Approval</strong></p>`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #C00000;">Trip Join Request Submitted</h2>
+          <p>Your request to join the trip has been submitted and is awaiting admin approval.</p>
 
-      console.log('📧 Would send confirmation to:', request.requesterEmail, { subject, body });
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Trip Details</h3>
+            <p><strong>From:</strong> ${request.tripDetails.departureLocation}</p>
+            <p><strong>To:</strong> ${request.tripDetails.destination}</p>
+            <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+            <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
+            ${request.reason ? `<p><strong>Reason:</strong> ${request.reason}</p>` : ''}
+          </div>
+
+          <p style="color: #666;">Status: <strong style="color: #ff9800;">Pending Approval</strong></p>
+          <p>You will receive another email once your request has been reviewed.</p>
+        </div>
+      `;
+
+      // 🔥 NEW: CC Manager if exists
+      const ccRecipients = request.requesterManagerEmail
+        ? [request.requesterManagerEmail]
+        : [];
+
+      if (emailService.isServiceConfigured()) {
+        await emailService.sendEmail({
+          to: request.requesterEmail,
+          cc: ccRecipients,
+          subject,
+          text: body,
+          html
+        });
+        console.log(`✅ Join request confirmation sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+      } else {
+        console.log('📧 [DRY RUN] Would send confirmation to:', request.requesterEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+      }
     } catch (error) {
       console.error('Error sending confirmation:', error);
     }
@@ -711,9 +811,9 @@ You will receive another email once your request has been reviewed.`;
 
   private async sendApprovalNotification(request: JoinRequest): Promise<void> {
     try {
-      const subject = 'Trip Join Request Approved';
+      const subject = '✅ Trip Join Request Approved';
       const body = `Great news! Your request to join the trip has been approved.
-      
+
 Trip Details:
 • From: ${request.tripDetails.departureLocation}
 • To: ${request.tripDetails.destination}
@@ -723,12 +823,46 @@ ${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
 
 See you on the trip!`;
 
-      const html = `<p>Great news! Your request to join the trip has been <strong>approved</strong>.</p>
-               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>
-               <p>Date: ${request.tripDetails.departureDate} at ${request.tripDetails.departureTime}</p>
-               ${request.adminNotes ? `<p><strong>Admin Notes:</strong> ${request.adminNotes}</p>` : ''}`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4caf50;">✅ Trip Join Request Approved</h2>
+          <p>Great news! Your request to join the trip has been <strong style="color: #4caf50;">approved</strong>.</p>
 
-      console.log('📧 Would send approval to:', request.requesterEmail, { subject, body });
+          <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4caf50;">
+            <h3 style="margin-top: 0; color: #2e7d32;">Trip Details</h3>
+            <p><strong>From:</strong> ${request.tripDetails.departureLocation}</p>
+            <p><strong>To:</strong> ${request.tripDetails.destination}</p>
+            <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+            <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
+          </div>
+
+          ${request.adminNotes ? `
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Admin Notes:</strong> ${request.adminNotes}</p>
+            </div>
+          ` : ''}
+
+          <p style="color: #2e7d32; font-weight: bold;">See you on the trip! 🚗</p>
+        </div>
+      `;
+
+      // 🔥 NEW: CC Manager if exists
+      const ccRecipients = request.requesterManagerEmail
+        ? [request.requesterManagerEmail]
+        : [];
+
+      if (emailService.isServiceConfigured()) {
+        await emailService.sendEmail({
+          to: request.requesterEmail,
+          cc: ccRecipients,
+          subject,
+          text: body,
+          html
+        });
+        console.log(`✅ Join request approval sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+      } else {
+        console.log('📧 [DRY RUN] Would send approval to:', request.requesterEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+      }
     } catch (error) {
       console.error('Error sending approval notification:', error);
     }
@@ -736,9 +870,9 @@ See you on the trip!`;
 
   private async sendRejectionNotification(request: JoinRequest): Promise<void> {
     try {
-      const subject = 'Trip Join Request Rejected';
+      const subject = '❌ Trip Join Request Rejected';
       const body = `Your request to join the trip has been rejected.
-      
+
 Trip Details:
 • From: ${request.tripDetails.departureLocation}
 • To: ${request.tripDetails.destination}
@@ -747,11 +881,45 @@ ${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
 
 If you have questions, please contact the admin team.`;
 
-      const html = `<p>Your request to join the trip has been rejected.</p>
-               ${request.adminNotes ? `<p><strong>Admin Notes:</strong> ${request.adminNotes}</p>` : ''}
-               <p>Trip: ${request.tripDetails.departureLocation} → ${request.tripDetails.destination}</p>`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #f44336;">❌ Trip Join Request Rejected</h2>
+          <p>Your request to join the trip has been rejected.</p>
 
-      console.log('📧 Would send rejection to:', request.requesterEmail, { subject, body });
+          <div style="background: #ffebee; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f44336;">
+            <h3 style="margin-top: 0; color: #c62828;">Trip Details</h3>
+            <p><strong>From:</strong> ${request.tripDetails.departureLocation}</p>
+            <p><strong>To:</strong> ${request.tripDetails.destination}</p>
+            <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+          </div>
+
+          ${request.adminNotes ? `
+            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Admin Notes:</strong> ${request.adminNotes}</p>
+            </div>
+          ` : ''}
+
+          <p style="color: #666;">If you have questions, please contact the admin team.</p>
+        </div>
+      `;
+
+      // 🔥 NEW: CC Manager if exists
+      const ccRecipients = request.requesterManagerEmail
+        ? [request.requesterManagerEmail]
+        : [];
+
+      if (emailService.isServiceConfigured()) {
+        await emailService.sendEmail({
+          to: request.requesterEmail,
+          cc: ccRecipients,
+          subject,
+          text: body,
+          html
+        });
+        console.log(`✅ Join request rejection sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+      } else {
+        console.log('📧 [DRY RUN] Would send rejection to:', request.requesterEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+      }
     } catch (error) {
       console.error('Error sending rejection notification:', error);
     }

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AdminHeader } from "@/components/admin/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, Zap, TrendingDown, Users, Calendar, Loader2 } from "lucide-react"
+import { ChevronLeft, Zap, TrendingDown, Users, Calendar, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { fabricService, OptimizationGroup, Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
@@ -18,6 +18,7 @@ export default function OptimizationsPage() {
   const { toast } = useToast()
   const [optimizations, setOptimizations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [processingGroupId, setProcessingGroupId] = useState<string | null>(null)
 
   useEffect(() => {
     loadOptimizations()
@@ -74,6 +75,80 @@ export default function OptimizationsPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleApprove = async (groupId: string) => {
+    try {
+      setProcessingGroupId(groupId)
+
+      const response = await fetch('/api/optimize/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to approve optimization')
+      }
+
+      toast({
+        title: "✅ Optimization Approved",
+        description: data.message || `Optimization group approved successfully`,
+      })
+
+      // Reload optimizations
+      await loadOptimizations()
+    } catch (error: any) {
+      console.error('Error approving optimization:', error)
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to approve optimization',
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingGroupId(null)
+    }
+  }
+
+  const handleReject = async (groupId: string) => {
+    if (!confirm('Are you sure you want to reject this optimization? This will delete temporary data and preserve original trips.')) {
+      return
+    }
+
+    try {
+      setProcessingGroupId(groupId)
+
+      const response = await fetch('/api/optimize/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject optimization')
+      }
+
+      toast({
+        title: "❌ Optimization Rejected",
+        description: data.message || 'Optimization group rejected successfully',
+      })
+
+      // Reload optimizations
+      await loadOptimizations()
+    } catch (error: any) {
+      console.error('Error rejecting optimization:', error)
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to reject optimization',
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingGroupId(null)
     }
   }
 
@@ -166,9 +241,9 @@ export default function OptimizationsPage() {
                         </div>
                       </div>
                       
-                      <div className="text-sm text-gray-600">
-                        <p>Route: {opt.route}</p>
-                        <p>Departure Time: {
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p><strong>Route:</strong> {opt.route}</p>
+                        <p><strong>Departure Time:</strong> {
                           opt.proposedDepartureTime.includes('T')
                             ? new Date(`1970-01-01T${opt.proposedDepartureTime.split('T')[1]}`).toLocaleTimeString('vi-VN', {
                                 hour: '2-digit',
@@ -177,6 +252,30 @@ export default function OptimizationsPage() {
                               })
                             : opt.proposedDepartureTime
                         }</p>
+                      </div>
+
+                      {/* Cost Breakdown Summary */}
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-gray-600">Original Cost:</p>
+                            <p className="font-semibold text-gray-900">
+                              {formatCurrency(opt.tripDetails.reduce((sum: number, t: any) => sum + (t.estimatedCost || 0), 0))}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Optimized Cost:</p>
+                            <p className="font-semibold text-blue-700">
+                              {formatCurrency(opt.tripDetails.reduce((sum: number, t: any) => sum + (t.estimatedCost || 0), 0) - opt.totalSavings)}
+                            </p>
+                          </div>
+                          <div className="border-l pl-2 border-green-300">
+                            <p className="text-gray-600">Savings:</p>
+                            <p className="font-semibold text-green-600">
+                              {formatCurrency(opt.totalSavings)} ({Math.round((opt.totalSavings / opt.tripDetails.reduce((sum: number, t: any) => sum + (t.estimatedCost || 0), 0)) * 100)}%)
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       
                       {opt.tripDetails && opt.tripDetails.length > 0 && (
@@ -192,6 +291,38 @@ export default function OptimizationsPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Action Buttons - Only show for proposed status */}
+                    {opt.status === 'proposed' && (
+                      <div className="flex flex-col gap-2 ml-4">
+                        <Button
+                          onClick={() => handleApprove(opt.id)}
+                          disabled={processingGroupId === opt.id}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          size="sm"
+                        >
+                          {processingGroupId === opt.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => handleReject(opt.id)}
+                          disabled={processingGroupId === opt.id}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          {processingGroupId === opt.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Reject
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
