@@ -585,17 +585,6 @@ export function DashboardClient({
           </CardContent>
         </Card>
       </div>
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-gray-200 bg-gray-50 py-6">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row">
-            <p className="text-sm text-gray-600">© Intersnack Cashew Vietnam. All rights reserved.</p>
-            <span className="hidden text-gray-400 md:inline">•</span>
-            <p className="text-sm text-gray-500">Support: rd@intersnack.com.sg</p>
-          </div>
-        </div>
-      </footer>
     </div>
     </>
   )

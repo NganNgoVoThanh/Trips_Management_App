@@ -66,6 +66,73 @@ async function getDbConnection() {
 }
 
 // ========================================
+// ADMIN EMAIL CACHE (for middleware)
+// ========================================
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let adminEmailsCache: string[] | null = null;
+let cacheTimestamp = 0;
+
+/**
+ * Get list of all active admin emails (with cache)
+ * Used by middleware and auth-options to determine if user is admin
+ */
+export async function getActiveAdminEmails(): Promise<string[]> {
+  const now = Date.now();
+
+  // Return cached result if still valid
+  if (adminEmailsCache && (now - cacheTimestamp) < CACHE_TTL) {
+    return adminEmailsCache;
+  }
+
+  const connection = await getDbConnection();
+
+  try {
+    const [rows] = await connection.query<any[]>(`
+      SELECT DISTINCT email
+      FROM users
+      WHERE role = 'admin'
+        AND admin_type IN ('super_admin', 'location_admin')
+      ORDER BY email
+    `);
+
+    const emails = rows.map(r => r.email);
+
+    // Update cache
+    adminEmailsCache = emails;
+    cacheTimestamp = now;
+
+    console.log(`📋 Admin emails loaded from database: ${emails.length} admins`);
+
+    return emails;
+  } catch (error) {
+    console.error('❌ Error fetching admin emails from database:', error);
+
+    // Fallback to cache if error (stale data better than no data)
+    if (adminEmailsCache) {
+      console.warn('⚠️  Using stale cache due to database error');
+      return adminEmailsCache;
+    }
+
+    // No cache available, return empty array
+    console.error('❌ No cache available, returning empty admin list');
+    return [];
+  } finally {
+    await connection.end();
+  }
+}
+
+/**
+ * Invalidate admin email cache
+ * Call this after any admin role changes
+ */
+export function invalidateAdminCache(): void {
+  adminEmailsCache = null;
+  cacheTimestamp = 0;
+  console.log('🔄 Admin cache invalidated');
+}
+
+// ========================================
 // LOCATION MANAGEMENT
 // ========================================
 
@@ -229,6 +296,9 @@ export async function grantAdminRole(params: {
       ]
     );
 
+    // Invalidate admin cache
+    invalidateAdminCache();
+
     return { success: true, message: 'Admin role granted successfully' };
   } catch (error: any) {
     console.error('Error granting admin role:', error);
@@ -291,6 +361,9 @@ export async function revokeAdminRole(params: {
         params.userAgent || null,
       ]
     );
+
+    // Invalidate admin cache
+    invalidateAdminCache();
 
     return { success: true, message: 'Admin role revoked successfully' };
   } catch (error: any) {

@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
 import { joinRequestService } from '@/lib/join-request-service';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const health = {
     status: 'healthy',

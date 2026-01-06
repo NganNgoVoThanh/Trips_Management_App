@@ -5,16 +5,7 @@ import { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import { config } from "@/lib/config";
 import { createOrUpdateUserOnLogin } from "@/lib/user-service";
-
-// ========================================
-// ADMIN CONFIGURATION
-// ========================================
-// ONLY THESE 3 EMAILS ARE ADMINS - EVERYTHING ELSE IS USER
-const ADMIN_EMAILS = [
-  'admin@intersnack.com.vn',
-  'manager@intersnack.com.vn',
-  'operations@intersnack.com.vn'
-];
+import { getActiveAdminEmails } from "@/lib/admin-service";
 
 // ========================================
 // HELPER FUNCTIONS
@@ -24,18 +15,28 @@ function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
-function determineRole(email: string): 'admin' | 'user' {
+/**
+ * Determine user role by checking database
+ * Replaces hardcoded ADMIN_EMAILS list
+ */
+async function determineRole(email: string): Promise<'admin' | 'user'> {
   const normalizedEmail = normalizeEmail(email);
 
-  for (const adminEmail of ADMIN_EMAILS) {
-    if (normalizedEmail === adminEmail.toLowerCase()) {
-      console.log(`✅ SSO: ${email} is ADMIN`);
+  try {
+    // Get admin list from database (with cache)
+    const adminEmails = await getActiveAdminEmails();
+
+    if (adminEmails.includes(normalizedEmail)) {
+      console.log(`✅ SSO: ${email} is ADMIN (from database)`);
       return 'admin';
     }
-  }
 
-  console.log(`✅ SSO: ${email} is USER`);
-  return 'user';
+    console.log(`✅ SSO: ${email} is USER`);
+    return 'user';
+  } catch (error) {
+    console.error('❌ Error checking admin status, defaulting to user:', error);
+    return 'user';
+  }
 }
 
 function getDepartmentFromEmail(email: string): string {
@@ -121,7 +122,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account, profile, trigger }) {
       if (user) {
         const normalizedEmail = normalizeEmail(user.email || '');
-        const role = determineRole(normalizedEmail);
+        const role = await determineRole(normalizedEmail);
 
         // ✅ Extract Azure AD profile fields
         const azureProfile = profile as any;
@@ -142,7 +143,46 @@ export const authOptions: NextAuthOptions = {
         console.log('Phone:', phone || 'not available');
         console.log('Job Title:', jobTitle || 'not available');
 
-        token.id = user.id;
+        // ✅ Create/update user in database and get the database user ID
+        let databaseUserId = user.id; // fallback to Azure ID
+        try {
+          await createOrUpdateUserOnLogin({
+            azureId: user.id, // Azure AD Object ID
+            email: normalizedEmail,
+            name: user.name || normalizedEmail.split('@')[0],
+            employeeId: employeeId,
+            role: role,
+            department: department,
+            officeLocation: azureProfile?.officeLocation || null,
+            jobTitle: jobTitle || null,
+          });
+
+          // Get the actual database user ID
+          const mysql = await import('mysql2/promise');
+          const connection = await mysql.default.createConnection({
+            host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+            port: parseInt(process.env.DB_PORT || '3306'),
+            user: process.env.DB_USER || 'tripsmgm-rndus2',
+            password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
+            database: process.env.DB_NAME || 'tripsmgm-mydb002',
+          });
+
+          const [userRows] = await connection.query<any[]>(
+            'SELECT id FROM users WHERE email = ? LIMIT 1',
+            [normalizedEmail]
+          );
+
+          await connection.end();
+
+          if (Array.isArray(userRows) && userRows.length > 0) {
+            databaseUserId = userRows[0].id;
+            console.log('✅ Database user ID:', databaseUserId);
+          }
+        } catch (error) {
+          console.error('❌ Error creating/updating user:', error);
+        }
+
+        token.id = databaseUserId; // Use database user ID, not Azure ID
         token.email = normalizedEmail;
         token.name = user.name || normalizedEmail.split('@')[0];
         token.role = role;
@@ -209,7 +249,7 @@ export const authOptions: NextAuthOptions = {
 
       if (trigger === "update") {
         if (token.email) {
-          token.role = determineRole(token.email);
+          token.role = await determineRole(token.email);
         }
       }
 
@@ -286,7 +326,7 @@ export const authOptions: NextAuthOptions = {
         try {
           const azureProfile = profile as any;
           const normalizedEmail = normalizeEmail(user.email);
-          const role = determineRole(normalizedEmail);
+          const role = await determineRole(normalizedEmail);
           const azureId = azureProfile?.oid || azureProfile?.sub || user.id;
           const employeeId = azureProfile?.oid ? `EMP${azureProfile.oid.slice(0, 6).toUpperCase()}` : stableEmployeeIdFromEmail(normalizedEmail);
           const department = azureProfile?.department || getDepartmentFromEmail(normalizedEmail);

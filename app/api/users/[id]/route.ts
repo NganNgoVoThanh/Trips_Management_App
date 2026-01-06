@@ -45,6 +45,7 @@ export async function GET(
     const [rows] = await connection.query(
       `SELECT
         id, email, name, role, department, employee_id,
+        office_location, pickup_address, pickup_notes,
         phone, emergency_contact, emergency_phone,
         preferred_vehicle, preferred_departure_time,
         profile_visibility, share_statistics, location_tracking,
@@ -104,6 +105,10 @@ export async function PUT(
     const body = await request.json()
 
     const {
+      department,
+      office_location,
+      pickup_address,
+      pickup_notes,
       phone,
       emergency_contact,
       emergency_phone,
@@ -120,6 +125,22 @@ export async function PUT(
     const updates: string[] = []
     const values: any[] = []
 
+    if (department !== undefined) {
+      updates.push('department = ?')
+      values.push(department)
+    }
+    if (office_location !== undefined) {
+      updates.push('office_location = ?')
+      values.push(office_location)
+    }
+    if (pickup_address !== undefined) {
+      updates.push('pickup_address = ?')
+      values.push(pickup_address)
+    }
+    if (pickup_notes !== undefined) {
+      updates.push('pickup_notes = ?')
+      values.push(pickup_notes)
+    }
     if (phone !== undefined) {
       updates.push('phone = ?')
       values.push(phone)
@@ -171,6 +192,7 @@ export async function PUT(
     const [rows] = await connection.query(
       `SELECT
         id, email, name, role, department, employee_id,
+        office_location, pickup_address, pickup_notes,
         phone, emergency_contact, emergency_phone,
         preferred_vehicle, preferred_departure_time,
         profile_visibility, share_statistics, location_tracking,

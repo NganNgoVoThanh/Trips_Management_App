@@ -20,6 +20,7 @@ interface ProfileData {
   office_location: string;
   employee_id?: string;
   manager_email: string;
+  manager_name?: string;
   phone: string;
   pickup_address: string;
   pickup_notes?: string;

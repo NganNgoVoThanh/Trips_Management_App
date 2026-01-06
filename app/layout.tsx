@@ -4,6 +4,10 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider-nextauth";
 import { AppFooter } from "@/components/ui/app-footer";
 
+// Force dynamic rendering - disable static optimization
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Trips Management System | Intersnack",
   description: "Business trip management and optimization system for Intersnack Vietnam",

@@ -7,6 +7,9 @@ import { authOptions } from '@/lib/auth-options';
 import mysql from 'mysql2/promise';
 import * as XLSX from 'xlsx';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 async function getConnection() {
   return await mysql.createConnection({
     host: process.env.DB_HOST,

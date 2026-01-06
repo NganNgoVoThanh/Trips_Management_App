@@ -90,12 +90,12 @@ export async function POST(request: NextRequest) {
         `INSERT INTO manager_changes
          (user_id, old_manager_email, new_manager_email, reason, status, requested_at)
          VALUES (?, ?, ?, ?, 'pending', NOW())`,
-        [Number(user.id), oldManagerEmail, newManagerEmailLower, reason || null]
+        [user.id, oldManagerEmail, newManagerEmailLower, reason || null]
       );
 
       // Send confirmation email to new manager
       await sendManagerConfirmationEmail({
-        userId: Number(user.id),
+        userId: user.id, // user.id is string (VARCHAR), no need to convert
         userEmail: userEmail,
         userName: userName,
         managerEmail: newManagerEmailLower,

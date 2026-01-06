@@ -27,7 +27,7 @@ import {
   Download
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { formatCurrency, getLocationName } from "@/lib/config"
+import { formatCurrency, getLocationName, config } from "@/lib/config"
 import { exportToCsv } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -77,19 +77,22 @@ export default function ProfilePage() {
     optimizationRate: 0,
     carbonSaved: 0
   })
-  
+
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: true,
     shareStatistics: true,
     locationTracking: false
   })
-  
+
   const [profileData, setProfileData] = useState({
     name: '',
     email: '',
     phone: '',
     department: '',
     employeeId: '',
+    officeLocation: '',
+    pickupAddress: '',
+    pickupNotes: '',
     preferredVehicle: 'car-4',
     preferredDepartureTime: '08:00',
     emergencyContact: '',
@@ -120,15 +123,24 @@ export default function ProfilePage() {
 
       // Load profile data from MySQL
       try {
-        const userResponse = await fetch(`/api/users/${currentUser.id}`)
+        const userResponse = await fetch(`/api/users/${currentUser.id}`, {
+          cache: 'no-store', // Disable cache to always get fresh data
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        })
         if (userResponse.ok) {
           const userData = await userResponse.json()
+          console.log('📊 Profile data from API:', userData)
           setProfileData({
             name: userData.name || currentUser.name,
             email: userData.email || currentUser.email,
             phone: userData.phone || currentUser.phone || '',
             department: userData.department || currentUser.department || 'General',
             employeeId: userData.employee_id || currentUser.employeeId || '',
+            officeLocation: userData.office_location || '',
+            pickupAddress: userData.pickup_address || '',
+            pickupNotes: userData.pickup_notes || '',
             preferredVehicle: userData.preferred_vehicle || 'car-4',
             preferredDepartureTime: userData.preferred_departure_time || '08:00',
             emergencyContact: userData.emergency_contact || '',
@@ -148,6 +160,9 @@ export default function ProfilePage() {
             phone: currentUser.phone || '',
             department: currentUser.department || 'General',
             employeeId: currentUser.employeeId || '',
+            officeLocation: '',
+            pickupAddress: '',
+            pickupNotes: '',
             preferredVehicle: 'car-4',
             preferredDepartureTime: '08:00',
             emergencyContact: '',
@@ -163,13 +178,16 @@ export default function ProfilePage() {
           phone: currentUser.phone || '',
           department: currentUser.department || 'General',
           employeeId: currentUser.employeeId || '',
+          officeLocation: '',
+          pickupAddress: '',
+          pickupNotes: '',
           preferredVehicle: 'car-4',
           preferredDepartureTime: '08:00',
           emergencyContact: '',
           emergencyPhone: ''
         })
       }
-      
+
       const userTrips = await fabricService.getTrips({ userId: currentUser.id })
       setTrips(userTrips)
       calculateStats(userTrips)
@@ -199,7 +217,7 @@ export default function ProfilePage() {
       }
       return sum
     }, 0)
-    
+
     // Calculate favorite route
     const routeCounts = new Map<string, number>()
     trips.forEach(t => {
@@ -214,10 +232,10 @@ export default function ProfilePage() {
         favoriteRoute = route
       }
     })
-    
+
     const optimizationRate = totalTrips > 0 ? (optimizedTrips / totalTrips) * 100 : 0
     const carbonSaved = totalSavings / 10000 * 2.3 // Estimate CO2 savings
-    
+
     setStats({
       totalTrips,
       totalSavings,
@@ -241,6 +259,10 @@ export default function ProfilePage() {
         },
         body: JSON.stringify({
           phone: profileData.phone,
+          department: profileData.department,
+          office_location: profileData.officeLocation,
+          pickup_address: profileData.pickupAddress,
+          pickup_notes: profileData.pickupNotes,
           emergency_contact: profileData.emergencyContact,
           emergency_phone: profileData.emergencyPhone,
           preferred_vehicle: profileData.preferredVehicle,
@@ -421,7 +443,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-            <Button 
+            <Button
               onClick={() => setIsEditing(!isEditing)}
               className="bg-white text-red-600 hover:bg-gray-100"
             >
@@ -441,7 +463,7 @@ export default function ProfilePage() {
               <p className="text-2xl font-bold">{stats.totalTrips}</p>
             </CardContent>
           </Card>
-          
+
           <Card className="border-t-4 border-t-green-600">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-gray-600">Money Saved</CardTitle>
@@ -452,7 +474,7 @@ export default function ProfilePage() {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card className="border-t-4 border-t-blue-600">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-gray-600">Optimization Rate</CardTitle>
@@ -461,7 +483,7 @@ export default function ProfilePage() {
               <p className="text-2xl font-bold">{stats.optimizationRate.toFixed(0)}%</p>
             </CardContent>
           </Card>
-          
+
           <Card className="border-t-4 border-t-purple-600">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-gray-600">Distance Traveled</CardTitle>
@@ -470,21 +492,21 @@ export default function ProfilePage() {
               <p className="text-2xl font-bold">{stats.totalDistance} km</p>
             </CardContent>
           </Card>
-          
+
           <Card className="border-t-4 border-t-orange-600">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-gray-600">Favorite Route</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm font-medium">
-                {stats.favoriteRoute ? 
-                  stats.favoriteRoute.split('-').map(l => getLocationName(l)).join(' → ') : 
+                {stats.favoriteRoute ?
+                  stats.favoriteRoute.split('-').map(l => getLocationName(l)).join(' → ') :
                   'No trips yet'
                 }
               </p>
             </CardContent>
           </Card>
-          
+
           <Card className="border-t-4 border-t-teal-600">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-gray-600">CO₂ Saved</CardTitle>
@@ -523,7 +545,7 @@ export default function ProfilePage() {
                     <Input
                       id="name"
                       value={profileData.name}
-                      onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                       disabled={!isEditing}
                     />
                   </div>
@@ -542,32 +564,28 @@ export default function ProfilePage() {
                     <Input
                       id="phone"
                       value={profileData.phone}
-                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
                       disabled={!isEditing}
                       placeholder="+84 xxx xxx xxx"
+                      className={!isEditing ? "bg-gray-50 text-gray-900" : ""}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Department</Label>
                     <Select
                       value={profileData.department}
-                      onValueChange={(value) => setProfileData({...profileData, department: value})}
+                      onValueChange={(value) => setProfileData({ ...profileData, department: value })}
                       disabled={!isEditing}
                     >
                       <SelectTrigger id="department">
-                        <SelectValue />
+                        <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Management">Management</SelectItem>
-                        <SelectItem value="Operations">Operations</SelectItem>
-                        <SelectItem value="Production">Production</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="HR">Human Resources</SelectItem>
-                        <SelectItem value="IT">Information Technology</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                        <SelectItem value="Marketing">Marketing</SelectItem>
-                        <SelectItem value="Process RD & Optimization">Process RD & Optimization</SelectItem>
-                        <SelectItem value="General">General</SelectItem>
+                        {config.departments.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -581,13 +599,55 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Office Location / Work Location</Label>
+                    <Select
+                      value={profileData.officeLocation}
+                      onValueChange={(value) => setProfileData({ ...profileData, officeLocation: value })}
+                      disabled={!isEditing}
+                    >
+                      <SelectTrigger id="officeLocation">
+                        <SelectValue placeholder="Select office/factory location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(config.locations).map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pickupAddress">Pickup Address</Label>
+                    <Input
+                      id="pickupAddress"
+                      value={profileData.pickupAddress}
+                      onChange={(e) => setProfileData({ ...profileData, pickupAddress: e.target.value })}
+                      disabled={!isEditing}
+                      placeholder="Full pickup address for trips"
+                      className={!isEditing ? "bg-gray-50 text-gray-900" : ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pickupNotes">Pickup Notes</Label>
+                    <Input
+                      id="pickupNotes"
+                      value={profileData.pickupNotes}
+                      onChange={(e) => setProfileData({ ...profileData, pickupNotes: e.target.value })}
+                      disabled={!isEditing}
+                      placeholder="Landmarks, special instructions"
+                      className={!isEditing ? "bg-gray-50 text-gray-900" : ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="emergencyContact">Emergency Contact</Label>
                     <Input
                       id="emergencyContact"
                       value={profileData.emergencyContact}
-                      onChange={(e) => setProfileData({...profileData, emergencyContact: e.target.value})}
+                      onChange={(e) => setProfileData({ ...profileData, emergencyContact: e.target.value })}
                       disabled={!isEditing}
                       placeholder="Contact name"
+                      className={!isEditing ? "bg-gray-50 text-gray-900" : ""}
                     />
                   </div>
                   <div className="space-y-2">
@@ -595,15 +655,16 @@ export default function ProfilePage() {
                     <Input
                       id="emergencyPhone"
                       value={profileData.emergencyPhone}
-                      onChange={(e) => setProfileData({...profileData, emergencyPhone: e.target.value})}
+                      onChange={(e) => setProfileData({ ...profileData, emergencyPhone: e.target.value })}
                       disabled={!isEditing}
                       placeholder="Contact phone"
+                      className={!isEditing ? "bg-gray-50 text-gray-900" : ""}
                     />
                   </div>
                 </div>
                 {isEditing && (
                   <div className="flex justify-end">
-                    <Button 
+                    <Button
                       onClick={handleSaveProfile}
                       className="bg-red-600 hover:bg-red-700"
                       disabled={isSaving}
@@ -637,9 +698,9 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Preferred Vehicle Type</Label>
-                    <Select 
+                    <Select
                       value={profileData.preferredVehicle}
-                      onValueChange={(value) => setProfileData({...profileData, preferredVehicle: value})}
+                      onValueChange={(value) => setProfileData({ ...profileData, preferredVehicle: value })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -656,7 +717,7 @@ export default function ProfilePage() {
                     <Input
                       type="time"
                       value={profileData.preferredDepartureTime}
-                      onChange={(e) => setProfileData({...profileData, preferredDepartureTime: e.target.value})}
+                      onChange={(e) => setProfileData({ ...profileData, preferredDepartureTime: e.target.value })}
                     />
                   </div>
                 </div>
@@ -718,12 +779,11 @@ export default function ProfilePage() {
                     {trips.map((trip) => (
                       <div key={trip.id} className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className={`h-3 w-3 rounded-full ${
-                            trip.status === 'optimized' ? 'bg-green-500' :
+                          <div className={`h-3 w-3 rounded-full ${trip.status === 'optimized' ? 'bg-green-500' :
                             trip.status === 'confirmed' ? 'bg-blue-500' :
-                            trip.status === 'cancelled' ? 'bg-red-500' :
-                            'bg-yellow-500'
-                          }`} />
+                              trip.status === 'cancelled' ? 'bg-red-500' :
+                                'bg-yellow-500'
+                            }`} />
                           <div>
                             <p className="font-medium">
                               {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
@@ -731,8 +791,8 @@ export default function ProfilePage() {
                             <div className="flex items-center gap-4 text-sm text-gray-500">
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(trip.departureDate).toLocaleDateString('en-US', { 
-                                  month: 'short', 
+                                {new Date(trip.departureDate).toLocaleDateString('en-US', {
+                                  month: 'short',
                                   day: 'numeric',
                                   year: 'numeric'
                                 })}
@@ -744,8 +804,8 @@ export default function ProfilePage() {
                               {trip.vehicleType && (
                                 <span className="flex items-center gap-1">
                                   <Car className="h-3 w-3" />
-                                  {trip.vehicleType === 'car-4' ? '4-Seater' : 
-                                   trip.vehicleType === 'car-7' ? '7-Seater' : '16-Seater'}
+                                  {trip.vehicleType === 'car-4' ? '4-Seater' :
+                                    trip.vehicleType === 'car-7' ? '7-Seater' : '16-Seater'}
                                 </span>
                               )}
                             </div>
@@ -754,9 +814,9 @@ export default function ProfilePage() {
                         <div className="text-right">
                           <Badge variant="outline" className={
                             trip.status === 'optimized' ? 'bg-green-50 text-green-700 border-green-200' :
-                            trip.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            trip.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
-                            'bg-yellow-50 text-yellow-700 border-yellow-200'
+                              trip.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                trip.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                                  'bg-yellow-50 text-yellow-700 border-yellow-200'
                           }>
                             {trip.status}
                           </Badge>
@@ -819,15 +879,15 @@ export default function ProfilePage() {
                               <Badge
                                 variant={
                                   request.status === 'approved' ? 'default' :
-                                  request.status === 'pending' ? 'outline' :
-                                  request.status === 'rejected' ? 'destructive' :
-                                  'secondary'
+                                    request.status === 'pending' ? 'outline' :
+                                      request.status === 'rejected' ? 'destructive' :
+                                        'secondary'
                                 }
                                 className={
                                   request.status === 'approved' ? 'bg-green-600' :
-                                  request.status === 'rejected' ? 'bg-red-600' :
-                                  request.status === 'cancelled' ? 'bg-gray-500' :
-                                  ''
+                                    request.status === 'rejected' ? 'bg-red-600' :
+                                      request.status === 'cancelled' ? 'bg-gray-500' :
+                                        ''
                                 }
                               >
                                 {request.status === 'approved' && <CheckCircle2 className="mr-1 h-3 w-3" />}
@@ -859,19 +919,16 @@ export default function ProfilePage() {
                             )}
 
                             {request.adminNotes && (
-                              <div className={`mt-2 p-3 rounded border ${
-                                request.status === 'approved'
-                                  ? 'bg-green-50 border-green-200'
-                                  : 'bg-red-50 border-red-200'
-                              }`}>
-                                <p className={`text-sm font-medium mb-1 ${
-                                  request.status === 'approved' ? 'text-green-800' : 'text-red-800'
+                              <div className={`mt-2 p-3 rounded border ${request.status === 'approved'
+                                ? 'bg-green-50 border-green-200'
+                                : 'bg-red-50 border-red-200'
                                 }`}>
+                                <p className={`text-sm font-medium mb-1 ${request.status === 'approved' ? 'text-green-800' : 'text-red-800'
+                                  }`}>
                                   Admin Note:
                                 </p>
-                                <p className={`text-sm ${
-                                  request.status === 'approved' ? 'text-green-700' : 'text-red-700'
-                                }`}>
+                                <p className={`text-sm ${request.status === 'approved' ? 'text-green-700' : 'text-red-700'
+                                  }`}>
                                   {request.adminNotes}
                                 </p>
                               </div>
@@ -911,7 +968,7 @@ export default function ProfilePage() {
                       {trips.filter(t => parseInt(t.departureTime) < 8).length}/10
                     </p>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg text-center hover:shadow-md transition-shadow">
                     <TrendingDown className="h-12 w-12 text-green-500 mx-auto mb-2" />
                     <h3 className="font-medium">Cost Saver</h3>
@@ -921,7 +978,7 @@ export default function ProfilePage() {
                       {formatCurrency(stats.totalSavings)} / 1,000,000 VND
                     </p>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg text-center hover:shadow-md transition-shadow">
                     <Users className="h-12 w-12 text-blue-500 mx-auto mb-2" />
                     <h3 className="font-medium">Team Player</h3>
@@ -931,7 +988,7 @@ export default function ProfilePage() {
                       {trips.filter(t => t.status === 'optimized').length}/5
                     </p>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg text-center hover:shadow-md transition-shadow">
                     <Car className="h-12 w-12 text-purple-500 mx-auto mb-2" />
                     <h3 className="font-medium">Frequent Traveler</h3>
@@ -941,7 +998,7 @@ export default function ProfilePage() {
                       {trips.length}/50
                     </p>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg text-center hover:shadow-md transition-shadow">
                     <Target className="h-12 w-12 text-red-500 mx-auto mb-2" />
                     <h3 className="font-medium">Perfect Planner</h3>
@@ -951,7 +1008,7 @@ export default function ProfilePage() {
                       {trips.filter(t => t.status === 'cancelled').length === 0 ? '✓ Achieved' : `${trips.filter(t => t.status === 'cancelled').length} cancellations`}
                     </p>
                   </div>
-                  
+
                   <div className="p-4 border rounded-lg text-center hover:shadow-md transition-shadow opacity-50">
                     <Shield className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                     <h3 className="font-medium">Elite Traveler</h3>
@@ -962,7 +1019,7 @@ export default function ProfilePage() {
                     </p>
                   </div>
                 </div>
-                
+
                 {/* Achievement Stats */}
                 <div className="mt-8 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-medium mb-4">Your Stats</h3>

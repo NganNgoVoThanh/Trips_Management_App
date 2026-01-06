@@ -1,14 +1,16 @@
 // lib/email-service.ts
 import { Trip } from './mysql-service';
 import { config, getLocationName, formatCurrency } from './config';
+import { graphEmailService } from './microsoft-graph-email';
 
-interface EmailNotification {
+export interface EmailNotification {
   to: string | string[];
   cc?: string[];
   subject: string;
   body?: string;
   text?: string;
   html?: string;
+  category?: 'notification' | 'approval' | 'alert';
 }
 
 class EmailService {
@@ -16,8 +18,9 @@ class EmailService {
   private pendingEmails: EmailNotification[] = [];
 
   constructor() {
-    // In production, check for email service configuration
-    this.isConfigured = !!process.env.EMAIL_SERVICE_URL || 
+    // Check if Microsoft Graph API is configured
+    this.isConfigured = graphEmailService.isConfigured() ||
+                       !!process.env.EMAIL_SERVICE_URL ||
                        !!process.env.SMTP_HOST ||
                        typeof window === 'undefined'; // Allow on server
   }
@@ -392,6 +395,7 @@ Intersnack Trips Management Team
 
   /**
    * Core email sending function
+   * Priority: Microsoft Graph API > Custom API > SMTP > Dev Mode
    */
   async sendEmail(notification: EmailNotification): Promise<void> {
     // Store email for later processing if not configured
@@ -406,11 +410,28 @@ Intersnack Trips Management Team
       const toArray = Array.isArray(notification.to) ? notification.to : [notification.to];
       const bodyText = notification.text || notification.body || '';
 
-      // In production, integrate with actual email service
-      // Options: SendGrid, AWS SES, Mailgun, SMTP, etc.
+      // Priority 1: Microsoft Graph API (Production)
+      if (graphEmailService.isConfigured()) {
+        // Determine sender based on category
+        // - 'approval' -> 'approvals' uses trip-approvals@intersnack.com.vn (official approval emails)
+        // - 'notification' | 'alert' -> 'no-reply' uses no-reply.trips@intersnack.com.vn (general notifications)
+        const senderType = notification.category === 'approval' ? 'approvals' : 'no-reply';
 
+        await graphEmailService.sendEmail({
+          to: toArray,
+          cc: notification.cc,
+          subject: notification.subject,
+          html: notification.html || `<pre>${bodyText}</pre>`,
+          text: bodyText,
+          from: senderType
+        });
+
+        console.log(`✅ Email sent via Microsoft Graph API (from: ${senderType})`);
+        return;
+      }
+
+      // Priority 2: Custom Email API
       if (process.env.EMAIL_SERVICE_URL) {
-        // Example: External email API
         const response = await fetch(process.env.EMAIL_SERVICE_URL, {
           method: 'POST',
           headers: {
@@ -429,24 +450,25 @@ Intersnack Trips Management Team
         if (!response.ok) {
           throw new Error(`Email API error: ${response.status}`);
         }
-      } else {
-        // Development: Log emails to console
-        console.log('📧 Email sent (dev mode):');
-        console.log('To:', toArray.join(', '));
-        if (notification.cc && notification.cc.length > 0) {
-          console.log('CC:', notification.cc.join(', '));
-        }
-        console.log('Subject:', notification.subject);
-        console.log('Body:', bodyText.substring(0, 200) + '...');
+
+        console.log('✅ Email sent via custom API');
+        return;
       }
 
-      // Mark trips as notified in database
-      // This would be handled by the backend service
+      // Priority 3: Development mode - Log to console
+      console.log('📧 Email sent (dev mode):');
+      console.log('To:', toArray.join(', '));
+      if (notification.cc && notification.cc.length > 0) {
+        console.log('CC:', notification.cc.join(', '));
+      }
+      console.log('Subject:', notification.subject);
+      console.log('Body:', bodyText.substring(0, 200) + '...');
 
     } catch (error) {
       console.error('Failed to send email:', error);
       // In production, implement retry logic or queue for later
       this.pendingEmails.push(notification);
+      throw error; // Re-throw to let caller handle
     }
   }
 
@@ -482,16 +504,6 @@ export const emailService = new EmailService();
 /**
  * Helper function to send generic email
  */
-export async function sendEmail(params: {
-  to: string | string[];
-  subject: string;
-  html: string;
-  cc?: string[];
-}): Promise<void> {
-  return emailService.sendEmail({
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-    cc: params.cc,
-  });
+export async function sendEmail(params: EmailNotification): Promise<void> {
+  return emailService.sendEmail(params);
 }

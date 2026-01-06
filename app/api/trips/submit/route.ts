@@ -159,6 +159,16 @@ export async function POST(request: NextRequest) {
           returnDate: tripData.returnDate,
           returnTime: tripData.returnTime,
           purpose: tripData.purpose,
+          vehicleType: tripData.vehicleType,
+          estimatedCost: tripData.estimatedCost,
+          passengerCount: tripData.vehicleType === 'car-4' ? 4 : tripData.vehicleType === 'car-7' ? 7 : tripData.vehicleType === 'van-16' ? 16 : undefined,
+        },
+        userDetails: {
+          department: user.department || undefined,
+          employeeId: user.employee_id || undefined,
+          phone: user.phone || undefined,
+          pickupAddress: user.pickup_address || undefined,
+          pickupNotes: user.pickup_notes || undefined,
         },
         isUrgent,
       };

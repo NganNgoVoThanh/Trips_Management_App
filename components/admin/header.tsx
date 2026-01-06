@@ -147,6 +147,24 @@ export function AdminHeader() {
               </Button>
             </Link>
 
+            {user?.adminType === 'super_admin' && (
+              <Link href="/admin/manage-admins">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "transition-all",
+                    isActive('/admin/manage-admins')
+                      ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                      : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+                  )}
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Manage Admins
+                </Button>
+              </Link>
+            )}
+
             <Link href="/dashboard">
               <Button
                 variant="ghost"

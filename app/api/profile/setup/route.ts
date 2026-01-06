@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
         // Send confirmation email to manager
         await sendManagerConfirmationEmail({
-          userId: Number(user.id),
+          userId: user.id,
           userEmail: userEmail,
           userName: userName,
           managerEmail: managerEmailLower,

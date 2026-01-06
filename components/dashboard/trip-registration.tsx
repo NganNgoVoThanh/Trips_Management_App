@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,6 +16,7 @@ import { config, getLocationName, calculateDistance, formatCurrency } from "@/li
 export function TripRegistration() {
   const { toast } = useToast()
   const { data: session } = useSession()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [availableTrips, setAvailableTrips] = useState<Trip[]>([])
   
@@ -186,8 +188,13 @@ export function TripRegistration() {
         ccEmailInput: "",
         notes: ""
       })
-      
+
       setAvailableTrips([])
+
+      // Redirect to My Trips to see the newly submitted trip
+      setTimeout(() => {
+        router.push('/dashboard/trips')
+      }, 1500)
       
     } catch (error: any) {
       console.error('=== TRIP SUBMISSION ERROR ===', error)
