@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
     let tripStatus: 'pending' | 'approved' = 'pending';
 
     // Exception Case 1: No manager (CEO/Founder) → Auto-approve
-    if (!user.manager_email || !user.manager_name) {
+    // Only auto-approve if manager_email is explicitly NULL or empty
+    if (!user.manager_email) {
       console.log(`🔓 Auto-approving trip for user without manager: ${userEmail}`);
       autoApproved = true;
       approvalStatus = 'approved';
@@ -143,13 +144,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Send approval email if has manager
-    if (!autoApproved && user.manager_email && user.manager_name) {
+    if (!autoApproved && user.manager_email) {
+      // Use manager_name if available, otherwise use email as fallback
+      const managerDisplayName = user.manager_name || user.manager_email.split('@')[0];
+
       const emailData: ApprovalEmailData = {
         tripId: trip.id,
         userName: user.name || userEmail.split('@')[0],
         userEmail: userEmail,
         managerEmail: user.manager_email,
-        managerName: user.manager_name,
+        managerName: managerDisplayName,
         ccEmails: tripData.ccEmails || [],
         tripDetails: {
           departureLocation: tripData.departureLocation,

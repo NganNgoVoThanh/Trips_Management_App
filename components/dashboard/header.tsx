@@ -77,79 +77,24 @@ export function DashboardHeader() {
             )}
           </Link>
           
-          {/* Navigation Links */}
+          {/* Navigation Links - User View Only */}
           <nav className="hidden md:flex items-center gap-2">
-            {user?.role === 'admin' ? (
-              // Admin navigation - consistent with AdminHeader
-              <>
-                <Link href="/admin/dashboard">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "transition-all",
-                      isActive('/admin/dashboard')
-                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                    )}
-                  >
-                    <Home className="mr-2 h-4 w-4" />
-                    Dashboard
-                  </Button>
-                </Link>
-
-                <Link href="/management">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "transition-all",
-                      isActive('/management')
-                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                    )}
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Management
-                  </Button>
-                </Link>
-
-                <Link href="/dashboard">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "transition-all",
-                      isActive('/dashboard') && !pathname?.startsWith('/admin') && !pathname?.startsWith('/management')
-                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                    )}
-                  >
-                    <Car className="mr-2 h-4 w-4" />
-                    User View
-                  </Button>
-                </Link>
-              </>
-            ) : (
-              // Regular user navigation
-              <>
-                <Link href="/dashboard">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "transition-all",
-                      isActive('/dashboard') && !pathname?.startsWith('/management')
-                        ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                        : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                    )}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Trips
-                  </Button>
-                </Link>
-              </>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/dashboard')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/dashboard">
+                <Calendar className="mr-2 h-4 w-4" />
+                My Trips
+              </Link>
+            </Button>
           </nav>
         </div>
         
@@ -197,17 +142,7 @@ export function DashboardHeader() {
                 Profile
               </Link>
             </DropdownMenuItem>
-            
-            {/* Management Link in Dropdown for Admin */}
-            {user?.role === 'admin' && (
-              <DropdownMenuItem asChild>
-                <Link href="/management" className="cursor-pointer">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Management Dashboard
-                </Link>
-              </DropdownMenuItem>
-            )}
-            
+
             <DropdownMenuSeparator />
             
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">

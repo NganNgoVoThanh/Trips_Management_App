@@ -20,7 +20,7 @@ import {
   Mail,
   TrendingUp
 } from "lucide-react"
-import { authService } from "@/lib/auth-service"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -64,6 +64,7 @@ interface Statistics {
 export default function ManualOverridePage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [trips, setTrips] = useState<ExpiredTrip[]>([])
   const [statistics, setStatistics] = useState<Statistics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -82,12 +83,15 @@ export default function ManualOverridePage() {
   const loadData = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
-      if (!user || user.role !== 'admin') {
+
+      // Check NextAuth session
+      if (!session?.user || session.user.role !== 'admin') {
+        console.log('❌ Not admin, redirecting');
         router.push('/dashboard')
         return
       }
 
+      console.log('✅ Admin verified for Override page');
       const response = await fetch('/api/admin/manual-override')
       const data = await response.json()
 

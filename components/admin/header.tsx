@@ -3,6 +3,7 @@
 
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
+import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -16,7 +17,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle } from "lucide-react"
-import { authService } from "@/lib/auth-service"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -25,24 +25,21 @@ export function AdminHeader() {
   const router = useRouter()
   const pathname = usePathname()
   const { toast } = useToast()
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    const currentUser = authService.getCurrentUser()
-    setUser(currentUser)
-  }, [])
+  const { data: session } = useSession()
+  const user = session?.user
 
   const handleLogout = async () => {
     try {
-      await authService.logout()
       toast({
-        title: "Logged out successfully",
-        description: "Redirecting to home page...",
+        title: "Signing out...",
+        description: "Please wait",
       })
-      // Use hard reload to ensure cookies are fully cleared
-      setTimeout(() => {
-        window.location.href = "/"
-      }, 500)
+
+      // Use NextAuth signOut
+      await signOut({
+        callbackUrl: '/',
+        redirect: true
+      })
     } catch (error) {
       console.error('Logout error:', error)
       toast({
@@ -83,103 +80,109 @@ export function AdminHeader() {
           
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-2">
-            <Link href="/admin/dashboard">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={cn(
-                  "transition-all",
-                  isActive('/admin/dashboard')
-                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                )}
-              >
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/admin/dashboard')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/admin/dashboard">
                 <Home className="mr-2 h-4 w-4" />
                 Dashboard
-              </Button>
-            </Link>
-            
-            <Link href="/management">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "transition-all",
-                  isActive('/management')
-                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                )}
-              >
+              </Link>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/management')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/management">
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Management
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
-            <Link href="/admin/vehicles">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "transition-all",
-                  isActive('/admin/vehicles')
-                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                )}
-              >
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/admin/vehicles')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/admin/vehicles">
                 <Car className="mr-2 h-4 w-4" />
                 Providers
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
-            <Link href="/admin/manual-override">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "transition-all",
-                  isActive('/admin/manual-override')
-                    ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                    : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                )}
-              >
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/admin/manual-override')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/admin/manual-override">
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Override
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
             {user?.adminType === 'super_admin' && (
-              <Link href="/admin/manage-admins">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "transition-all",
-                    isActive('/admin/manage-admins')
-                      ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                      : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-                  )}
-                >
-                  <Shield className="mr-2 h-4 w-4" />
-                  Manage Admins
-                </Button>
-              </Link>
-            )}
-
-            <Link href="/dashboard">
               <Button
                 variant="ghost"
                 size="sm"
+                asChild
                 className={cn(
-                  "transition-all",
-                  isActive('/dashboard') && !pathname?.startsWith('/admin')
+                  "transition-all cursor-pointer",
+                  isActive('/admin/manage-admins')
                     ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
                     : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
                 )}
               >
+                <Link href="/admin/manage-admins">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Manage Admins
+                </Link>
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className={cn(
+                "transition-all cursor-pointer",
+                isActive('/dashboard') && !pathname?.startsWith('/admin')
+                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
+                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
+              )}
+            >
+              <Link href="/dashboard">
                 <Home className="mr-2 h-4 w-4" />
                 User View
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </nav>
         </div>
         

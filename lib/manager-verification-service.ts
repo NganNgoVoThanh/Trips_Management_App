@@ -1318,7 +1318,7 @@ export async function processManagerConfirmation(token: string, action: 'confirm
     const [rows] = await connection.query(
       `SELECT mc.*, u.email as user_email, u.name as user_name
        FROM manager_confirmations mc
-       JOIN users u ON mc.user_id = u.id
+       JOIN users u ON CAST(mc.user_id AS CHAR) = CAST(u.id AS CHAR)
        WHERE mc.token = ? AND mc.confirmed = FALSE`,
       [token]
     );

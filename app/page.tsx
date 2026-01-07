@@ -20,15 +20,23 @@ export default function Page() {
   useEffect(() => {
     if (status === "authenticated" && session?.user && !redirectInitiated.current) {
       redirectInitiated.current = true;
+
+      // Debug: Log session data
+      console.log('=== SESSION DEBUG ===');
+      console.log('User email:', session.user.email);
+      console.log('User role:', session.user.role);
+      console.log('Admin type:', session.user.adminType);
+      console.log('Full session user:', session.user);
+
       const targetPath = session.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
-      console.log(`🔄 Redirecting to ${targetPath}`);
+      console.log(`🔄 Redirecting to ${targetPath} (role: ${session.user.role})`);
 
       // Small delay to ensure session is fully loaded
       setTimeout(() => {
         router.replace(targetPath);
       }, 100);
     }
-  }, [status, router]);
+  }, [status, router, session]);
 
   // Show loading spinner while checking session OR redirecting
   if (status === "loading" || status === "authenticated") {

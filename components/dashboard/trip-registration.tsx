@@ -163,16 +163,53 @@ export function TripRegistration() {
         throw new Error(result.error || 'Failed to submit trip')
       }
 
-      // Success notification with approval status
-      toast({
-        title: result.trip.autoApproved ? "✅ Trip Auto-Approved!" : "✅ Trip Submitted!",
-        description: result.trip.autoApproved
-          ? `Your trip has been auto-approved (no manager assigned). Departure: ${formData.departureDate}`
-          : result.trip.isUrgent
-          ? `⚠️ URGENT trip submitted! Approval email sent to your manager and admin. Departure: ${formData.departureDate}`
-          : `Approval email sent to your manager. You will be notified once approved. Departure: ${formData.departureDate}`,
-        duration: 6000,
-      })
+      // Success notification with detailed approval status
+      if (result.trip.autoApproved) {
+        toast({
+          title: "✅ Trip Auto-Approved Successfully!",
+          description: (
+            <div className="space-y-2">
+              <p className="font-semibold">Your trip has been automatically approved (no manager approval required).</p>
+              <div className="text-sm">
+                <p>📅 Departure: <strong>{formData.departureDate}</strong> at <strong>{formData.departureTime}</strong></p>
+                <p>📍 Route: <strong>{formData.departureLocation}</strong> → <strong>{formData.destination}</strong></p>
+              </div>
+              <p className="text-sm text-green-600 font-medium mt-2">✓ Ready to view in My Trips</p>
+            </div>
+          ),
+          duration: 8000,
+        })
+      } else if (result.trip.isUrgent) {
+        toast({
+          title: "⚠️ URGENT Trip Submitted!",
+          description: (
+            <div className="space-y-2">
+              <p className="font-semibold text-orange-600">Urgent approval request sent to your manager and admin.</p>
+              <div className="text-sm">
+                <p>📅 Departure: <strong>{formData.departureDate}</strong> at <strong>{formData.departureTime}</strong></p>
+                <p>📍 Route: <strong>{formData.departureLocation}</strong> → <strong>{formData.destination}</strong></p>
+              </div>
+              <p className="text-sm text-amber-700 font-medium mt-2">⏰ Departure in less than 24 hours - priority processing</p>
+            </div>
+          ),
+          duration: 8000,
+        })
+      } else {
+        toast({
+          title: "✅ Trip Submitted Successfully!",
+          description: (
+            <div className="space-y-2">
+              <p className="font-semibold">Approval email sent to your manager.</p>
+              <div className="text-sm">
+                <p>📅 Departure: <strong>{formData.departureDate}</strong> at <strong>{formData.departureTime}</strong></p>
+                <p>📍 Route: <strong>{formData.departureLocation}</strong> → <strong>{formData.destination}</strong></p>
+              </div>
+              <p className="text-sm text-blue-600 font-medium mt-2">📧 You will be notified once your manager approves</p>
+            </div>
+          ),
+          duration: 8000,
+        })
+      }
 
       // Reset form after successful submission
       setFormData({
@@ -198,10 +235,26 @@ export function TripRegistration() {
       
     } catch (error: any) {
       console.error('=== TRIP SUBMISSION ERROR ===', error)
+
+      // Detailed error notification
       toast({
-        title: "Registration Failed",
-        description: error.message || "Failed to register trip. Please try again.",
-        variant: "destructive"
+        title: "❌ Trip Submission Failed",
+        description: (
+          <div className="space-y-2">
+            <p className="font-semibold text-red-600">
+              {error.message || "Failed to submit trip request"}
+            </p>
+            <div className="text-sm">
+              <p>📅 Attempted: <strong>{formData.departureDate}</strong> at <strong>{formData.departureTime}</strong></p>
+              <p>📍 Route: <strong>{formData.departureLocation}</strong> → <strong>{formData.destination}</strong></p>
+            </div>
+            <p className="text-sm text-red-700 font-medium mt-2">
+              ⚠️ Please check your profile settings and try again, or contact support if the issue persists.
+            </p>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 8000,
       })
     } finally {
       setIsLoading(false)

@@ -87,168 +87,189 @@ function generateApprovalEmailHTML(data: ApprovalEmailData, approveToken: string
   const rejectUrl = `${appUrl}/api/trips/approve?token=${rejectToken}`;
 
   const urgentBadge = data.isUrgent
-    ? '<div style="background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; display: inline-block; margin-bottom: 20px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);">⚠️ URGENT - Approval needed within 24 hours</div>'
+    ? `<div style="background: #C00000; color: white; padding: 12px 20px; border-radius: 6px; display: inline-block; margin-bottom: 24px; font-weight: 700; font-size: 14px; border-left: 4px solid #8B0000;">
+      ⚠️ URGENT - Approval needed within 24 hours
+    </div>`
     : '';
 
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Business Trip Approval Request</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background-color: #C00000; padding: 30px 40px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; }
+    .header p { color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 13px; }
+    .content { padding: 40px; }
+    @media only screen and (max-width: 600px) {
+      .content { padding: 24px !important; }
+      .btn { display: block !important; width: 100% !important; margin: 8px 0 !important; }
+    }
+  </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
-
-  <!-- Professional Header -->
-  <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">Business Trip Approval Request</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Trips Management System - Intersnack Vietnam</p>
-  </div>
-
-  <!-- Main Content -->
-  <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-
-    ${urgentBadge}
-
-    <p style="font-size: 16px; margin-bottom: 20px; color: #1f2937;">Dear <strong style="color: #dc2626;">${data.managerName}</strong>,</p>
-
-    <p style="margin-bottom: 24px; color: #4b5563; line-height: 1.6;">
-      <strong>${data.userName}</strong> (<a href="mailto:${data.userEmail}" style="color: #dc2626; text-decoration: none;">${data.userEmail}</a>) has submitted a business trip request that requires your approval.
-    </p>
-
-    <!-- Employee Info (if available) -->
-    ${data.userDetails ? `
-    <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
-      <table style="width: 100%; border-collapse: collapse;">
-        ${data.userDetails.department ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; width: 35%; font-size: 13px;">Department:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.department}</td>
-        </tr>
-        ` : ''}
-        ${data.userDetails.employeeId ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Employee ID:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.employeeId}</td>
-        </tr>
-        ` : ''}
-        ${data.userDetails.phone ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Phone:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.phone}</td>
-        </tr>
-        ` : ''}
-      </table>
-    </div>
-    ` : ''}
-
-    <!-- Trip Details Card -->
-    <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; padding: 24px; margin: 24px 0; border-radius: 6px;">
-      <h3 style="margin-top: 0; color: #991b1b; font-size: 18px; font-weight: 600; margin-bottom: 16px;">📋 Trip Details</h3>
-
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; width: 35%; font-size: 14px; font-weight: 500;">From:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureLocation}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">To:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.destination}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Departure:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureDate} at ${data.tripDetails.departureTime}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Return:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.returnDate} at ${data.tripDetails.returnTime}</td>
-        </tr>
-        ${data.tripDetails.vehicleType ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Vehicle Type:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${
-            data.tripDetails.vehicleType === 'car-4' ? '4-Seater Car' :
-            data.tripDetails.vehicleType === 'car-7' ? '7-Seater Car' :
-            data.tripDetails.vehicleType === 'van-16' ? '16-Seater Van' :
-            data.tripDetails.vehicleType
-          }</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.passengerCount ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Passengers:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.passengerCount} person(s)</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.estimatedCost ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Estimated Cost:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #dc2626; font-size: 14px;">${data.tripDetails.estimatedCost.toLocaleString('vi-VN')} VND</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.purpose ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Purpose:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.purpose}</td>
-        </tr>
-        ` : ''}
-      </table>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Business Trip Approval Request</h1>
+      <p>Trips Management System • Intersnack Vietnam</p>
     </div>
 
-    <!-- Pickup Information (if available) -->
-    ${data.userDetails && (data.userDetails.pickupAddress || data.userDetails.pickupNotes) ? `
-    <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
-      <h4 style="margin: 0 0 12px 0; color: #0369a1; font-size: 14px; font-weight: 600;">📍 Pickup Information</h4>
-      ${data.userDetails.pickupAddress ? `
-      <p style="margin: 4px 0; color: #374151; font-size: 13px;">
-        <strong>Address:</strong> ${data.userDetails.pickupAddress}
+    <!-- Content -->
+    <div class="content">
+      ${urgentBadge}
+
+      <p style="font-size: 16px; margin-bottom: 12px; color: #111827; font-weight: 600;">
+        Dear ${data.managerName},
       </p>
+
+      <p style="margin-bottom: 24px; color: #4b5563; line-height: 1.6; font-size: 14px;">
+        <strong>${data.userName}</strong> (<a href="mailto:${data.userEmail}" style="color: #C00000; text-decoration: none;">${data.userEmail}</a>) has submitted a business trip request that requires your approval.
+      </p>
+
+      <!-- Employee Info -->
+      ${data.userDetails ? `
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          ${data.userDetails.department ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; width: 35%; font-size: 13px;">Department:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.department}</td>
+          </tr>
+          ` : ''}
+          ${data.userDetails.employeeId ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Employee ID:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.employeeId}</td>
+          </tr>
+          ` : ''}
+          ${data.userDetails.phone ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Phone:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.phone}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
       ` : ''}
-      ${data.userDetails.pickupNotes ? `
-      <p style="margin: 4px 0; color: #6b7280; font-size: 13px;">
-        <strong>Notes:</strong> ${data.userDetails.pickupNotes}
-      </p>
+
+      <!-- Trip Details -->
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #C00000; padding: 24px; margin: 24px 0; border-radius: 6px;">
+        <h3 style="margin-top: 0; color: #C00000; font-size: 18px; font-weight: 600; margin-bottom: 16px;">Trip Details</h3>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; width: 35%; font-size: 14px; font-weight: 500;">From:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureLocation}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">To:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.destination}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Departure:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureDate} at ${data.tripDetails.departureTime} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Return:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.returnDate} at ${data.tripDetails.returnTime} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+          ${data.tripDetails.vehicleType ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Vehicle Type:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${
+              data.tripDetails.vehicleType === 'car-4' ? '4-Seater Car' :
+              data.tripDetails.vehicleType === 'car-7' ? '7-Seater Car' :
+              data.tripDetails.vehicleType === 'van-16' ? '16-Seater Van' :
+              data.tripDetails.vehicleType
+            }</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.passengerCount ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Passengers:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.passengerCount} person(s)</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.estimatedCost ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Estimated Cost:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #C00000; font-size: 14px;">${data.tripDetails.estimatedCost.toLocaleString('vi-VN')} VND</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.purpose ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Purpose:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.purpose}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      <!-- Pickup Information -->
+      ${data.userDetails && (data.userDetails.pickupAddress || data.userDetails.pickupNotes) ? `
+      <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
+        <h4 style="margin: 0 0 12px 0; color: #0369a1; font-size: 14px; font-weight: 600;">Pickup Information</h4>
+        ${data.userDetails.pickupAddress ? `
+        <p style="margin: 4px 0; color: #374151; font-size: 13px;">
+          <strong>Address:</strong> ${data.userDetails.pickupAddress}
+        </p>
+        ` : ''}
+        ${data.userDetails.pickupNotes ? `
+        <p style="margin: 4px 0; color: #6b7280; font-size: 13px;">
+          <strong>Notes:</strong> ${data.userDetails.pickupNotes}
+        </p>
+        ` : ''}
+      </div>
       ` : ''}
-    </div>
-    ` : ''}
 
-    <!-- Action Buttons -->
-    <div style="text-align: center; margin: 32px 0;">
-      <p style="margin-bottom: 20px; font-weight: 600; color: #374151; font-size: 15px;">Please approve or reject this request:</p>
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin: 40px 0;">
+        <p style="margin-bottom: 24px; font-weight: 600; color: #1f2937; font-size: 16px;">
+          Please approve or reject this request:
+        </p>
 
-      <table style="width: 100%; max-width: 420px; margin: 0 auto;" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding: 8px;">
-            <a href="${approveUrl}" style="display: block; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 16px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; text-align: center; box-shadow: 0 4px 6px rgba(22,163,74,0.3);">
-              ✓ Approve
-            </a>
-          </td>
-          <td style="padding: 8px;">
-            <a href="${rejectUrl}" style="display: block; background: white; color: #dc2626; padding: 16px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; border: 2px solid #dc2626; text-align: center; box-shadow: 0 2px 4px rgba(220,38,38,0.2);">
-              ✗ Reject
-            </a>
-          </td>
-        </tr>
-      </table>
-    </div>
+        <table style="width: 100%; max-width: 480px; margin: 0 auto;" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding: 10px;">
+              <a href="${approveUrl}" style="display: block; background-color: #10b981; color: white !important; padding: 16px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px; text-align: center;">
+                ✓ Approve Trip
+              </a>
+            </td>
+            <td style="padding: 10px;">
+              <a href="${rejectUrl}" style="display: block; background-color: #ffffff; color: #C00000 !important; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 15px; border: 2px solid #C00000; text-align: center;">
+                ✗ Reject Trip
+              </a>
+            </td>
+          </tr>
+        </table>
+      </div>
 
-    <!-- Important Notice -->
-    <div style="background: #fff7ed; border: 1px solid #fb923c; border-radius: 6px; padding: 16px; margin-top: 28px;">
-      <p style="margin: 0; font-size: 14px; color: #9a3412; line-height: 1.5;">
-        <strong>⏰ Important:</strong> This approval link is valid for <strong>48 hours</strong>. After this period, the request will be escalated to Admin for processing.
-      </p>
-    </div>
+      <!-- Important Notice -->
+      <div style="background: #fffbeb; border: 1px solid #fbbf24; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 16px; margin-top: 32px;">
+        <p style="margin: 0; font-size: 14px; color: #92400e; line-height: 1.6;">
+          <strong>Important:</strong> This approval link is valid for 48 hours. After this period, the request will be escalated to Admin for processing.
+        </p>
+      </div>
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
 
-    <!-- Footer -->
-    <div style="text-align: center;">
-      <p style="font-size: 13px; color: #9ca3af; margin: 0; line-height: 1.6;">
-        This email was sent automatically from <strong style="color: #6b7280;">Trips Management System</strong><br>
-        <span style="font-size: 12px;">Intersnack Vietnam • trip.intersnack.com.vn</span><br>
-        <span style="font-size: 12px;">Please do not reply to this email.</span>
-      </p>
+      <!-- Footer -->
+      <div style="text-align: center;">
+        <p style="font-size: 13px; color: #6b7280; margin: 0; line-height: 1.6;">
+          This email was sent automatically from<br>
+          <strong style="color: #374151;">Trips Management System</strong><br>
+          <span style="font-size: 12px; color: #9ca3af;">Intersnack Vietnam • trip.intersnack.com.vn</span>
+        </p>
+        <p style="font-size: 12px; color: #9ca3af; margin: 12px 0 0 0;">
+          Please do not reply to this email.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -262,155 +283,162 @@ function generateApprovalEmailHTML(data: ApprovalEmailData, approveToken: string
  */
 function generateCCNotificationHTML(data: ApprovalEmailData): string {
   const urgentBadge = data.isUrgent
-    ? '<div style="background: #dc3545; color: white; padding: 12px 20px; border-radius: 6px; display: inline-block; margin-bottom: 20px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);">⚠️ URGENT - Approval needed within 24 hours</div>'
+    ? '<div style="background: #C00000; color: white; padding: 12px 20px; border-radius: 6px; display: inline-block; margin-bottom: 20px; font-weight: 600; font-size: 14px; border-left: 4px solid #8B0000;">⚠️ URGENT - Approval needed within 24 hours</div>'
     : '';
 
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Business Trip Request - For Information</title>
+  <title>Business Trip Request - FYI</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+  </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div style="background-color: #C00000; padding: 30px 40px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Business Trip Request - FYI</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 13px;">Trips Management System • Intersnack Vietnam</p>
+    </div>
 
-  <!-- Professional Header -->
-  <div style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">Business Trip Request - FYI</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Trips Management System - Intersnack Vietnam</p>
-  </div>
+    <!-- Content -->
+    <div style="padding: 40px;">
+      ${urgentBadge}
 
-  <!-- Main Content -->
-  <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <!-- Info Badge -->
+      <div style="background: #e8f4f8; border: 1px solid #0369a1; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
+        <p style="margin: 0; color: #0369a1; font-size: 14px; font-weight: 600;">
+          ℹ️ You are receiving this for information only
+        </p>
+      </div>
 
-    ${urgentBadge}
+      <p style="font-size: 16px; margin-bottom: 12px; color: #111827; font-weight: 600;">Dear Team,</p>
 
-    <!-- Info Badge -->
-    <div style="background: #dbeafe; border: 1px solid #3b82f6; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
-      <p style="margin: 0; color: #1e40af; font-size: 14px; font-weight: 600;">
-        ℹ️ You are receiving this for information only
+      <p style="margin-bottom: 24px; color: #4b5563; line-height: 1.6; font-size: 14px;">
+        <strong>${data.userName}</strong> (<a href="mailto:${data.userEmail}" style="color: #C00000; text-decoration: none;">${data.userEmail}</a>) has submitted a business trip request to <strong>${data.managerName}</strong> for approval.
       </p>
-    </div>
 
-    <p style="font-size: 16px; margin-bottom: 20px; color: #1f2937;">Dear Team,</p>
-
-    <p style="margin-bottom: 24px; color: #4b5563; line-height: 1.6;">
-      <strong>${data.userName}</strong> (<a href="mailto:${data.userEmail}" style="color: #3b82f6; text-decoration: none;">${data.userEmail}</a>) has submitted a business trip request to <strong>${data.managerName}</strong> for approval.
-    </p>
-
-    <!-- Employee Info (if available) -->
-    ${data.userDetails ? `
-    <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
-      <table style="width: 100%; border-collapse: collapse;">
-        ${data.userDetails.department ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; width: 35%; font-size: 13px;">Department:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.department}</td>
-        </tr>
-        ` : ''}
-        ${data.userDetails.employeeId ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Employee ID:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.employeeId}</td>
-        </tr>
-        ` : ''}
-        ${data.userDetails.phone ? `
-        <tr>
-          <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Phone:</td>
-          <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.phone}</td>
-        </tr>
-        ` : ''}
-      </table>
-    </div>
-    ` : ''}
-
-    <!-- Trip Details Card -->
-    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #3b82f6; padding: 24px; margin: 24px 0; border-radius: 6px;">
-      <h3 style="margin-top: 0; color: #1e40af; font-size: 18px; font-weight: 600; margin-bottom: 16px;">📋 Trip Details</h3>
-
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; width: 35%; font-size: 14px; font-weight: 500;">From:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureLocation}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">To:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.destination}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Departure:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureDate} at ${data.tripDetails.departureTime}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Return:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.returnDate} at ${data.tripDetails.returnTime}</td>
-        </tr>
-        ${data.tripDetails.vehicleType ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Vehicle Type:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${
-            data.tripDetails.vehicleType === 'car-4' ? '4-Seater Car' :
-            data.tripDetails.vehicleType === 'car-7' ? '7-Seater Car' :
-            data.tripDetails.vehicleType === 'van-16' ? '16-Seater Van' :
-            data.tripDetails.vehicleType
-          }</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.passengerCount ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Passengers:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.passengerCount} person(s)</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.estimatedCost ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Estimated Cost:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #3b82f6; font-size: 14px;">${data.tripDetails.estimatedCost.toLocaleString('vi-VN')} VND</td>
-        </tr>
-        ` : ''}
-        ${data.tripDetails.purpose ? `
-        <tr>
-          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Purpose:</td>
-          <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.purpose}</td>
-        </tr>
-        ` : ''}
-      </table>
-    </div>
-
-    <!-- Pickup Information (if available) -->
-    ${data.userDetails && (data.userDetails.pickupAddress || data.userDetails.pickupNotes) ? `
-    <div style="background: #fef3c7; border: 1px solid #fcd34d; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
-      <h4 style="margin: 0 0 12px 0; color: #92400e; font-size: 14px; font-weight: 600;">📍 Pickup Information</h4>
-      ${data.userDetails.pickupAddress ? `
-      <p style="margin: 4px 0; color: #374151; font-size: 13px;">
-        <strong>Address:</strong> ${data.userDetails.pickupAddress}
-      </p>
+      <!-- Employee Info -->
+      ${data.userDetails ? `
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          ${data.userDetails.department ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; width: 35%; font-size: 13px;">Department:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.department}</td>
+          </tr>
+          ` : ''}
+          ${data.userDetails.employeeId ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Employee ID:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.employeeId}</td>
+          </tr>
+          ` : ''}
+          ${data.userDetails.phone ? `
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280; font-size: 13px;">Phone:</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #1f2937; font-size: 13px;">${data.userDetails.phone}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
       ` : ''}
-      ${data.userDetails.pickupNotes ? `
-      <p style="margin: 4px 0; color: #6b7280; font-size: 13px;">
-        <strong>Notes:</strong> ${data.userDetails.pickupNotes}
-      </p>
+
+      <!-- Trip Details -->
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #C00000; padding: 24px; margin: 24px 0; border-radius: 6px;">
+        <h3 style="margin-top: 0; color: #C00000; font-size: 18px; font-weight: 600; margin-bottom: 16px;">Trip Details</h3>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; width: 35%; font-size: 14px; font-weight: 500;">From:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureLocation}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">To:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.destination}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Departure:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.departureDate} at ${data.tripDetails.departureTime} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Return:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.returnDate} at ${data.tripDetails.returnTime} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+          ${data.tripDetails.vehicleType ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Vehicle Type:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${
+              data.tripDetails.vehicleType === 'car-4' ? '4-Seater Car' :
+              data.tripDetails.vehicleType === 'car-7' ? '7-Seater Car' :
+              data.tripDetails.vehicleType === 'van-16' ? '16-Seater Van' :
+              data.tripDetails.vehicleType
+            }</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.passengerCount ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Passengers:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.passengerCount} person(s)</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.estimatedCost ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Estimated Cost:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #C00000; font-size: 14px;">${data.tripDetails.estimatedCost.toLocaleString('vi-VN')} VND</td>
+          </tr>
+          ` : ''}
+          ${data.tripDetails.purpose ? `
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Purpose:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${data.tripDetails.purpose}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      <!-- Pickup Information -->
+      ${data.userDetails && (data.userDetails.pickupAddress || data.userDetails.pickupNotes) ? `
+      <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 16px; margin-bottom: 20px; border-radius: 6px;">
+        <h4 style="margin: 0 0 12px 0; color: #0369a1; font-size: 14px; font-weight: 600;">Pickup Information</h4>
+        ${data.userDetails.pickupAddress ? `
+        <p style="margin: 4px 0; color: #374151; font-size: 13px;">
+          <strong>Address:</strong> ${data.userDetails.pickupAddress}
+        </p>
+        ` : ''}
+        ${data.userDetails.pickupNotes ? `
+        <p style="margin: 4px 0; color: #6b7280; font-size: 13px;">
+          <strong>Notes:</strong> ${data.userDetails.pickupNotes}
+        </p>
+        ` : ''}
+      </div>
       ` : ''}
-    </div>
-    ` : ''}
 
-    <!-- Approval Status Notice -->
-    <div style="background: #fffbeb; border: 1px solid #fbbf24; border-radius: 6px; padding: 16px; margin-top: 28px;">
-      <p style="margin: 0; font-size: 14px; color: #92400e; line-height: 1.5;">
-        <strong>📧 Approval request sent to:</strong> ${data.managerName} (${data.managerEmail})
-      </p>
-    </div>
+      <!-- Approval Status Notice -->
+      <div style="background: #fffbeb; border: 1px solid #fbbf24; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 16px; margin-top: 28px;">
+        <p style="margin: 0; font-size: 14px; color: #92400e; line-height: 1.5;">
+          <strong>Approval request sent to:</strong> ${data.managerName} (${data.managerEmail})
+        </p>
+      </div>
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
 
-    <!-- Footer -->
-    <div style="text-align: center;">
-      <p style="font-size: 13px; color: #9ca3af; margin: 0; line-height: 1.6;">
-        This email was sent automatically from <strong style="color: #6b7280;">Trips Management System</strong><br>
-        <span style="font-size: 12px;">Intersnack Vietnam • trip.intersnack.com.vn</span><br>
-        <span style="font-size: 12px;">Please do not reply to this email.</span>
-      </p>
+      <!-- Footer -->
+      <div style="text-align: center;">
+        <p style="font-size: 13px; color: #6b7280; margin: 0; line-height: 1.6;">
+          This email was sent automatically from<br>
+          <strong style="color: #374151;">Trips Management System</strong><br>
+          <span style="font-size: 12px; color: #9ca3af;">Intersnack Vietnam • trip.intersnack.com.vn</span>
+        </p>
+        <p style="font-size: 12px; color: #9ca3af; margin: 12px 0 0 0;">
+          Please do not reply to this email.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -559,65 +587,101 @@ export async function sendConfirmationEmail(params: {
     const emailNotification: EmailNotification = {
       to: [params.userEmail],
       subject: isApproved
-        ? `✅ Yêu cầu đi công tác đã được phê duyệt`
-        : `❌ Yêu cầu đi công tác bị từ chối`,
+        ? `✅ Business Trip Request Approved`
+        : `❌ Business Trip Request Rejected`,
       html: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>${isApproved ? 'Yêu cầu được phê duyệt' : 'Yêu cầu bị từ chối'}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${isApproved ? 'Trip Request Approved' : 'Trip Request Rejected'}</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+  </style>
 </head>
-<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
-  <!-- Header -->
-  <div style="background: ${isApproved ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'}; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-    <h2 style="color: white; margin: 0; font-size: 24px;">
-      ${isApproved ? '✅ Yêu cầu đã được phê duyệt' : '❌ Yêu cầu bị từ chối'}
-    </h2>
-  </div>
-
-  <!-- Content -->
-  <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <p style="font-size: 16px; color: #1f2937;">Xin chào <strong>${params.userName}</strong>,</p>
-
-    <p style="color: #4b5563; line-height: 1.6;">
-      Yêu cầu đi công tác của bạn đã được <strong>${params.managerName}</strong>
-      <strong style="color: ${isApproved ? '#16a34a' : '#dc2626'};">${isApproved ? 'phê duyệt' : 'từ chối'}</strong>.
-    </p>
-
-    ${params.rejectionReason ? `
-      <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #991b1b;"><strong>Lý do từ chối:</strong></p>
-        <p style="margin: 8px 0 0 0; color: #7f1d1d;">${params.rejectionReason}</p>
-      </div>
-    ` : ''}
-
-    <!-- Trip Details -->
-    <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0 0 12px 0; font-weight: 600; color: #374151;">Chi tiết chuyến đi:</p>
-      <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
-        <li>Từ: <strong>${params.tripDetails.departureLocation}</strong></li>
-        <li>Đến: <strong>${params.tripDetails.destination}</strong></li>
-        <li>Khởi hành: <strong>${params.tripDetails.departureDate}</strong></li>
-      </ul>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div style="background-color: ${isApproved ? '#10b981' : '#C00000'}; padding: 30px 40px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+        ${isApproved ? '✅ Trip Request Approved' : '❌ Trip Request Rejected'}
+      </h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 13px;">Trips Management System • Intersnack Vietnam</p>
     </div>
 
-    ${isApproved ? `
+    <!-- Content -->
+    <div style="padding: 40px;">
+      <p style="font-size: 16px; margin-bottom: 12px; color: #111827; font-weight: 600;">
+        Dear ${params.userName},
+      </p>
+
+      <p style="margin-bottom: 24px; color: #4b5563; line-height: 1.6; font-size: 14px;">
+        Your business trip request has been <strong style="color: ${isApproved ? '#10b981' : '#C00000'};">${isApproved ? 'approved' : 'rejected'}</strong> by <strong>${params.managerName}</strong>.
+      </p>
+
+      ${params.rejectionReason ? `
+      <div style="background: #fef2f2; border: 1px solid #fca5a5; border-left: 4px solid #C00000; padding: 16px; margin: 20px 0; border-radius: 6px;">
+        <p style="margin: 0 0 8px 0; color: #991b1b; font-weight: 600;">Rejection Reason:</p>
+        <p style="margin: 0; color: #7f1d1d; font-size: 14px; line-height: 1.5;">${params.rejectionReason}</p>
+      </div>
+      ` : ''}
+
+      <!-- Trip Details -->
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid ${isApproved ? '#10b981' : '#C00000'}; padding: 24px; margin: 24px 0; border-radius: 6px;">
+        <h3 style="margin-top: 0; color: ${isApproved ? '#10b981' : '#C00000'}; font-size: 18px; font-weight: 600; margin-bottom: 16px;">Trip Details</h3>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; width: 35%; font-size: 14px; font-weight: 500;">From:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${params.tripDetails.departureLocation}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">To:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${params.tripDetails.destination}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Departure:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${params.tripDetails.departureDate} at ${params.tripDetails.departureTime || 'N/A'} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; font-weight: 500;">Return:</td>
+            <td style="padding: 10px 0; font-weight: 600; color: #1f2937; font-size: 14px;">${params.tripDetails.returnDate} at ${params.tripDetails.returnTime || 'N/A'} <span style="color: #6b7280; font-size: 12px; font-weight: 400;">(GMT+7)</span></td>
+          </tr>
+        </table>
+      </div>
+
+      ${isApproved ? `
       <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 16px; margin-top: 20px;">
-        <p style="margin: 0; color: #065f46; font-size: 14px;">
-          ✓ Bạn có thể xem chi tiết và theo dõi chuyến đi trong <strong>My Trips</strong> trên hệ thống.
+        <p style="margin: 0; color: #065f46; font-size: 14px; line-height: 1.5;">
+          ✓ You can view details and track your trip in <strong>My Trips</strong> section of the system.
         </p>
       </div>
-    ` : ''}
+      ` : `
+      <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 16px; margin-top: 20px;">
+        <p style="margin: 0; color: #7f1d1d; font-size: 14px; line-height: 1.5;">
+          If you have questions about this decision, please contact your manager directly.
+        </p>
+      </div>
+      `}
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 28px 0;">
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
 
-    <!-- Footer -->
-    <p style="font-size: 13px; color: #9ca3af; text-align: center; margin: 0; line-height: 1.6;">
-      Email này được gửi tự động từ <strong style="color: #6b7280;">Trips Management System</strong><br>
-      <span style="font-size: 12px;">Intersnack Vietnam • trip.intersnack.com.vn</span>
-    </p>
+      <!-- Footer -->
+      <div style="text-align: center;">
+        <p style="font-size: 13px; color: #6b7280; margin: 0; line-height: 1.6;">
+          This email was sent automatically from<br>
+          <strong style="color: #374151;">Trips Management System</strong><br>
+          <span style="font-size: 12px; color: #9ca3af;">Intersnack Vietnam • trip.intersnack.com.vn</span>
+        </p>
+        <p style="font-size: 12px; color: #9ca3af; margin: 12px 0 0 0;">
+          Please do not reply to this email.
+        </p>
+      </div>
+    </div>
   </div>
+
 </body>
 </html>
       `,

@@ -16,6 +16,7 @@ const publicPaths = [
 // Admin-only paths
 const adminPaths = [
   '/admin',
+  '/management', // Management dashboard for admins
   '/api/optimize/approve',
   '/api/optimize/reject',
   '/api/join-requests/stats',

@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getUserByEmail } from '@/lib/user-service';
 import { validateEmailDomain, sendManagerConfirmationEmail } from '@/lib/manager-verification-service';
+import { getAdminConfig, getLocationId } from '@/lib/admin-config';
+import { invalidateAdminCache } from '@/lib/admin-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,6 +42,16 @@ export async function POST(request: NextRequest) {
     const userName = session.user.name || userEmail;
 
     console.log(`📝 Saving profile setup for ${userEmail}`);
+
+    // Check if user should be auto-assigned as admin
+    const adminConfig = getAdminConfig(userEmail);
+    const isAdmin = !!adminConfig;
+    const adminType = adminConfig?.adminType || 'none';
+    const adminLocationId = adminConfig ? getLocationId(userEmail) : null;
+
+    if (isAdmin) {
+      console.log(`👑 Auto-assigning ${userEmail} as ${adminType}${adminLocationId ? ` for ${adminLocationId}` : ''}`);
+    }
 
     // Get user from database
     const mysql = await import('mysql2/promise');
@@ -80,7 +92,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Update user profile with pending manager
+        // Update user profile with pending manager AND admin fields
         await connection.query(
           `UPDATE users
            SET department = ?,
@@ -92,9 +104,26 @@ export async function POST(request: NextRequest) {
                pending_manager_email = ?,
                manager_confirmed = FALSE,
                profile_completed = TRUE,
+               role = ?,
+               admin_type = ?,
+               admin_location_id = ?,
+               admin_assigned_at = ${isAdmin ? 'NOW()' : 'NULL'},
+               admin_assigned_by = ${isAdmin ? "'system-auto'" : 'NULL'},
                updated_at = NOW()
            WHERE email = ?`,
-          [department, office_location, employee_id || null, phone, pickup_address, pickup_notes || null, managerEmailLower, userEmail]
+          [
+            department,
+            office_location,
+            employee_id || null,
+            phone,
+            pickup_address,
+            pickup_notes || null,
+            managerEmailLower,
+            isAdmin ? 'admin' : 'user',
+            adminType,
+            adminLocationId,
+            userEmail
+          ]
         );
 
         // Send confirmation email to manager
@@ -109,7 +138,7 @@ export async function POST(request: NextRequest) {
         pendingManagerConfirmation = true;
         console.log(`✅ Profile saved, confirmation email sent to ${managerEmailLower}`);
       } else {
-        // No manager (CEO/C-Level) - auto-approve
+        // No manager (CEO/C-Level) - auto-approve AND admin fields
         await connection.query(
           `UPDATE users
            SET department = ?,
@@ -122,18 +151,41 @@ export async function POST(request: NextRequest) {
                manager_confirmed = TRUE,
                manager_confirmed_at = NOW(),
                profile_completed = TRUE,
+               role = ?,
+               admin_type = ?,
+               admin_location_id = ?,
+               admin_assigned_at = ${isAdmin ? 'NOW()' : 'NULL'},
+               admin_assigned_by = ${isAdmin ? "'system-auto'" : 'NULL'},
                updated_at = NOW()
            WHERE email = ?`,
-          [department, office_location, employee_id || null, phone, pickup_address, pickup_notes || null, userEmail]
+          [
+            department,
+            office_location,
+            employee_id || null,
+            phone,
+            pickup_address,
+            pickup_notes || null,
+            isAdmin ? 'admin' : 'user',
+            adminType,
+            adminLocationId,
+            userEmail
+          ]
         );
 
-        console.log(`✅ Profile completed for ${userEmail} (no manager)`);
+        console.log(`✅ Profile completed for ${userEmail} (no manager)${isAdmin ? ` - Auto-assigned as ${adminType}` : ''}`);
+      }
+
+      // Invalidate admin cache if user was assigned as admin
+      if (isAdmin) {
+        console.log(`🔄 Invalidating admin cache for ${userEmail}`);
+        invalidateAdminCache();
       }
 
       return NextResponse.json({
         success: true,
         message: 'Profile setup completed successfully',
         pendingManagerConfirmation,
+        isAdmin, // Return this so client knows if user became admin
       });
     } finally {
       await connection.end();

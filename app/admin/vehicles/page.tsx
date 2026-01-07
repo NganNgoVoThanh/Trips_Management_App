@@ -37,6 +37,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Car, Plus, Edit, Trash2, Power, PowerOff, Loader2, Truck } from "lucide-react";
+import { AdminHeader } from "@/components/admin/header";
 
 interface Vehicle {
   id: string;
@@ -253,13 +254,15 @@ export default function VehiclesPage() {
   const inactiveVehicles = vehicles.filter((v) => v.status === "inactive").length;
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Transportation Service Providers</h1>
-        <p className="text-muted-foreground">
-          Manage external vendors and transportation service providers for business trips
-        </p>
-      </div>
+    <div className="flex min-h-dvh flex-col bg-gray-50">
+      <AdminHeader />
+      <div className="container mx-auto py-8 px-4 flex-1">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Transportation Service Providers</h1>
+          <p className="text-muted-foreground">
+            Manage external vendors and transportation service providers for business trips
+          </p>
+        </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3 mb-8">
@@ -655,6 +658,7 @@ export default function VehiclesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

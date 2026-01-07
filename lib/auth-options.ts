@@ -247,9 +247,40 @@ export const authOptions: NextAuthOptions = {
       delete token.image; // Remove duplicate field
       delete token.sub; // Remove duplicate ID field
 
+      // Handle session update (e.g., after profile setup)
       if (trigger === "update") {
         if (token.email) {
-          token.role = await determineRole(token.email);
+          const normalizedEmail = normalizeEmail(token.email as string);
+
+          // Reload role from database
+          token.role = await determineRole(normalizedEmail);
+
+          // Reload admin_type and admin_location_id from database
+          try {
+            const mysql = await import('mysql2/promise');
+            const connection = await mysql.default.createConnection({
+              host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+              port: parseInt(process.env.DB_PORT || '3306'),
+              user: process.env.DB_USER || 'tripsmgm-rndus2',
+              password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
+              database: process.env.DB_NAME || 'tripsmgm-mydb002',
+            });
+
+            const [rows] = await connection.query<any[]>(
+              'SELECT admin_type, admin_location_id FROM users WHERE email = ? LIMIT 1',
+              [normalizedEmail]
+            );
+
+            await connection.end();
+
+            if (Array.isArray(rows) && rows.length > 0) {
+              token.adminType = rows[0].admin_type || 'none';
+              token.adminLocationId = rows[0].admin_location_id || undefined;
+              console.log(`🔄 Session updated for ${normalizedEmail}: role=${token.role}, adminType=${token.adminType}`);
+            }
+          } catch (error) {
+            console.error('❌ Failed to reload admin fields on session update:', error);
+          }
         }
       }
 

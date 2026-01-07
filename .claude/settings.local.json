@@ -107,7 +107,9 @@
       "Bash(if exist appadminmanage-admins rmdir /s /q appadminmanage-admins)",
       "Bash(ping:*)",
       "Bash(pm2 flush:*)",
-      "Bash(node scripts/test-user-creation.js:*)"
+      "Bash(node scripts/test-user-creation.js:*)",
+      "Bash(tasklist:*)",
+      "Bash(timeout /t 5 /nobreak)"
     ],
     "deny": [],
     "ask": []

@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, MapPin, UserPlus, UserMinus, Search, RefreshCw, Activity, Users } from 'lucide-react';
+import { AdminHeader } from '@/components/admin/header';
 
 interface Location {
   id: string;
@@ -197,19 +198,24 @@ export default function ManageAdminsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex min-h-screen flex-col bg-gray-50">
+        <AdminHeader />
+        <div className="flex items-center justify-center flex-1">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Management</h1>
-        <p className="text-gray-600">Manage Super Admins and Location Admins</p>
-      </div>
+    <div className="flex min-h-dvh flex-col bg-gray-50">
+      <AdminHeader />
+      <div className="container mx-auto p-6 max-w-7xl flex-1">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Management</h1>
+          <p className="text-gray-600">Manage Super Admins and Location Admins</p>
+        </div>
 
       {/* Statistics Cards */}
       {statistics && (
@@ -475,6 +481,7 @@ export default function ManageAdminsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

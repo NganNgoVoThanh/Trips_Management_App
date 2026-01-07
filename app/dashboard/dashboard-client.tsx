@@ -8,6 +8,7 @@ import { TripRegistration } from "@/components/dashboard/trip-registration"
 import { UpcomingTrips } from "@/components/dashboard/upcoming-trips"
 import { AvailableTrips } from "@/components/dashboard/available-trips"
 import { DashboardHeader } from "@/components/dashboard/header"
+import { AdminHeader } from "@/components/admin/header"
 import { DashboardShell } from "@/components/dashboard/shell"
 import { SessionMonitor } from "@/components/session-monitor"
 import { fabricService, Trip } from "@/lib/fabric-client"
@@ -308,9 +309,10 @@ export function DashboardClient({
 
   // ✅ Show loading while checking authentication or loading initial data
   if (status === "loading" || (status === "authenticated" && isLoading)) {
+    const isAdmin = session?.user?.role === 'admin';
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
-        <DashboardHeader />
+        {isAdmin ? <AdminHeader /> : <DashboardHeader />}
         <div className="flex items-center justify-center flex-1">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-red-600 mx-auto mb-4" />
@@ -329,11 +331,14 @@ export function DashboardClient({
     return null
   }
 
+  // Check if user is admin
+  const isAdmin = session?.user?.role === 'admin';
+
   return (
     <>
       <SessionMonitor />
       <div className="flex min-h-dvh flex-col bg-gray-50">
-        <DashboardHeader />
+        {isAdmin ? <AdminHeader /> : <DashboardHeader />}
 
         <div className="container flex-1 space-y-4 p-8 pt-6">
         {/* Database Warning Alert */}

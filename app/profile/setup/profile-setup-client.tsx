@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { ProfileSetupWizardEmail } from '@/components/profile-setup-wizard-email';
 
 interface ProfileSetupClientProps {
@@ -15,6 +16,7 @@ interface ProfileSetupClientProps {
 
 export default function ProfileSetupClient({ currentUser }: ProfileSetupClientProps) {
   const router = useRouter();
+  const { update } = useSession();
 
   const handleComplete = async (data: {
     department: string;
@@ -38,6 +40,23 @@ export default function ProfileSetupClient({ currentUser }: ProfileSetupClientPr
 
     const result = await response.json();
 
+    // Force session update to get new role from database
+    console.log('🔄 Updating session...');
+    await update();
+
+    // Wait a bit for JWT callback to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Get fresh session after update
+    const response2 = await fetch('/api/auth/session');
+    const freshSession = await response2.json();
+
+    console.log('📋 Fresh session:', {
+      role: freshSession?.user?.role,
+      adminType: freshSession?.user?.adminType,
+      email: freshSession?.user?.email,
+    });
+
     // Show success message
     if (result.pendingManagerConfirmation) {
       alert(
@@ -45,12 +64,17 @@ export default function ProfileSetupClient({ currentUser }: ProfileSetupClientPr
         'A confirmation email has been sent to your manager.\n' +
         'You can browse the system, but trip submission will be enabled after manager confirms.'
       );
+    } else if (result.isAdmin) {
+      alert('✅ Profile setup completed!\n\nYou have been assigned as an admin.');
     } else {
       alert('✅ Profile setup completed!');
     }
 
-    // Redirect to dashboard
-    router.push('/dashboard');
+    // Redirect to appropriate dashboard based on NEW role
+    const targetPath = freshSession?.user?.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+    console.log(`🔄 Redirecting to ${targetPath} with role: ${freshSession?.user?.role}`);
+
+    router.push(targetPath);
     router.refresh();
   };
 

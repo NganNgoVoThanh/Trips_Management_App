@@ -40,8 +40,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { AdminHeader } from "@/components/admin/header"
-import { DashboardHeader } from "@/components/dashboard/header"
-import { authService } from "@/lib/auth-service"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { emailService } from "@/lib/email-service"
@@ -58,10 +57,10 @@ import {
 export default function ManagementDashboard() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
   const [trips, setTrips] = useState<Trip[]>([])
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [locationFilter, setLocationFilter] = useState("all")
@@ -99,13 +98,12 @@ export default function ManagementDashboard() {
   }, [trips, searchTerm, statusFilter, locationFilter, dateFilter])
 
   const checkUserRole = () => {
-    const user = authService.getCurrentUser()
-    if (!user) {
+    // Check NextAuth session
+    if (status === 'unauthenticated') {
       router.push('/')
       return
     }
-    setIsAdmin(user?.role === 'admin')
-    
+
     // Load saved settings
     const savedSettings = localStorage.getItem('management_settings')
     if (savedSettings) {
@@ -283,7 +281,7 @@ export default function ManagementDashboard() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-gray-50">
-      {isAdmin ? <AdminHeader /> : <DashboardHeader />}
+      <AdminHeader />
 
       <div className="container mx-auto p-6 space-y-4 flex-1">
         {/* Header Actions */}
@@ -810,8 +808,8 @@ export default function ManagementDashboard() {
               <Button variant="outline" onClick={() => setShowTripDetails(false)}>
                 Close
               </Button>
-              {selectedTrip?.status === 'pending' && isAdmin && (
-                <Button 
+              {selectedTrip?.status === 'pending' && (
+                <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={() => {
                     handleApproveTrip(selectedTrip.id)

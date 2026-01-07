@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminHeader } from "@/components/admin/header"
@@ -9,7 +10,6 @@ import { TripOptimization } from "@/components/admin/trip-optimization"
 import { TripManagement } from "@/components/admin/trip-management"
 import { JoinRequestsManagement } from "@/components/admin/join-requests-management"
 import { SessionMonitor } from "@/components/session-monitor"
-import { authService } from "@/lib/auth-service"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
 import { aiOptimizer } from "@/lib/ai-optimizer"
@@ -66,7 +66,8 @@ import { Textarea } from "@/components/ui/textarea"
 export function AdminDashboardClient() {
   const router = useRouter()
   const { toast } = useToast()
-  const [user, setUser] = useState<any>(null)
+  const { data: session, status } = useSession()
+  const user = session?.user
   const [stats, setStats] = useState({
     totalTrips: 0,
     pendingApprovals: 0,
@@ -139,15 +140,16 @@ export function AdminDashboardClient() {
       if (!isMountedRef.current) return
 
       setIsLoading(true)
-      const currentUser = authService.getCurrentUser()
 
-      if (!currentUser || currentUser.role !== 'admin') {
+      // Check session from NextAuth
+      if (!user || user.role !== 'admin') {
+        console.log('❌ Not admin or no session, redirecting to /dashboard');
         router.push('/dashboard')
         return
       }
 
+      console.log('✅ Admin verified:', user.email, user.role);
       if (!isMountedRef.current) return
-      setUser(currentUser)
 
       // Load all trips from database with error handling
       let allTrips: Trip[] = []
