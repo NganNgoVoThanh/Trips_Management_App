@@ -86,8 +86,8 @@ export default function ThisMonthPage() {
 
       // Status breakdown
       const optimized = thisMonthTrips.filter((t: Trip) => t.status === 'optimized')
-      const pending = thisMonthTrips.filter((t: Trip) => t.status === 'pending')
-      const confirmed = thisMonthTrips.filter((t: Trip) => t.status === 'confirmed')
+      const pending = thisMonthTrips.filter((t: Trip) => t.status === 'pending_approval' || t.status === 'pending_urgent')
+      const confirmed = thisMonthTrips.filter((t: Trip) => t.status === 'approved_solo' || t.status === 'approved' || t.status === 'auto_approved')
       const cancelled = thisMonthTrips.filter((t: Trip) => t.status === 'cancelled')
 
       // Calculate costs

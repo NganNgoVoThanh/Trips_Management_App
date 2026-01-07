@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { emailService } from "@/lib/email-service"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
+import { getStatusBadge, getStatusLabel, getStatusIcon } from "@/lib/trip-status-config"
 import {
   Dialog,
   DialogContent,
@@ -42,15 +43,15 @@ export function TripManagement() {
   const loadTrips = async () => {
     try {
       setIsLoading(true)
-      
+
       // Load all trips from Fabric/localStorage
       const allTrips = await fabricService.getTrips()
-      
+
       // Sort by creation date (newest first)
-      allTrips.sort((a, b) => 
+      allTrips.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
-      
+
       setTrips(allTrips)
     } catch (error) {
       console.error('Error loading trips:', error)
@@ -82,22 +83,11 @@ export function TripManagement() {
 
     // Status filter
     if (statusFilter !== "all") {
-      switch (statusFilter) {
-        case "confirmed":
-          filtered = filtered.filter(t => t.status === "confirmed")
-          break
-        case "pending":
-          filtered = filtered.filter(t => t.status === "pending")
-          break
-        case "optimized":
-          filtered = filtered.filter(t => t.status === "optimized")
-          break
-        case "cancelled":
-          filtered = filtered.filter(t => t.status === "cancelled")
-          break
-        case "not-notified":
-          filtered = filtered.filter(t => !t.notified && t.status !== "cancelled")
-          break
+      if (statusFilter === "not-notified") {
+        filtered = filtered.filter(t => !t.notified && t.status !== "cancelled")
+      } else {
+        // Filter by exact status match
+        filtered = filtered.filter(t => t.status === statusFilter)
       }
     }
 
@@ -115,19 +105,19 @@ export function TripManagement() {
 
   const handleSendNotification = async (tripId: string) => {
     setSendingNotification(tripId)
-    
+
     try {
       const trip = trips.find(t => t.id === tripId)
       if (!trip) return
 
       // Send appropriate notification based on status
-      if (trip.status === 'confirmed') {
+      if (trip.status === 'approved') {
         await emailService.sendApprovalNotification(trip)
       } else if (trip.status === 'optimized') {
         // For optimized trips, need to get the group info
         const groups = await fabricService.getOptimizationGroups()
         const group = groups.find(g => g.trips.includes(tripId))
-        
+
         if (group) {
           const groupTrips = trips.filter(t => group.trips.includes(t.id))
           await emailService.sendOptimizationNotification(
@@ -143,12 +133,12 @@ export function TripManagement() {
 
       // Update trip as notified
       await fabricService.updateTrip(tripId, { notified: true })
-      
+
       toast({
         title: "Notification Sent",
         description: "Email has been sent to the employee",
       })
-      
+
       // Reload trips
       await loadTrips()
     } catch (error: any) {
@@ -164,18 +154,18 @@ export function TripManagement() {
 
   const handleUpdateStatus = async (tripId: string, newStatus: string) => {
     setUpdatingStatus(tripId)
-    
+
     try {
-      await fabricService.updateTrip(tripId, { 
+      await fabricService.updateTrip(tripId, {
         status: newStatus as Trip['status'],
         notified: false // Reset notification status when status changes
       })
-      
+
       toast({
         title: "Status Updated",
         description: `Trip status has been updated to ${newStatus}`,
       })
-      
+
       // Reload trips
       await loadTrips()
     } catch (error: any) {
@@ -189,20 +179,7 @@ export function TripManagement() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-50 text-green-700 border-green-200'
-      case 'optimized':
-        return 'bg-blue-50 text-blue-700 border-blue-200'
-      case 'pending':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200'
-      case 'cancelled':
-        return 'bg-red-50 text-red-700 border-red-200'
-      default:
-        return 'bg-gray-50 text-gray-700 border-gray-200'
-    }
-  }
+  // Removed getStatusColor - now using helper functions from trip-status-config
 
   if (isLoading) {
     return (
@@ -239,17 +216,38 @@ export function TripManagement() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Trips ({trips.length})</SelectItem>
-              <SelectItem value="confirmed">
-                Confirmed ({trips.filter(t => t.status === 'confirmed').length})
+              <SelectItem value="pending_approval">
+                Pending Approval ({trips.filter(t => t.status === 'pending_approval').length})
               </SelectItem>
-              <SelectItem value="pending">
-                Pending ({trips.filter(t => t.status === 'pending').length})
+              <SelectItem value="pending_urgent">
+                Pending (Urgent) ({trips.filter(t => t.status === 'pending_urgent').length})
+              </SelectItem>
+              <SelectItem value="auto_approved">
+                Auto-Approved ({trips.filter(t => t.status === 'auto_approved').length})
+              </SelectItem>
+              <SelectItem value="approved">
+                Approved ({trips.filter(t => t.status === 'approved').length})
+              </SelectItem>
+              <SelectItem value="approved_solo">
+                Approved (Solo) ({trips.filter(t => t.status === 'approved_solo').length})
+              </SelectItem>
+              <SelectItem value="pending_optimization">
+                Pending Optimization ({trips.filter(t => t.status === 'pending_optimization').length})
+              </SelectItem>
+              <SelectItem value="proposed">
+                Proposed ({trips.filter(t => t.status === 'proposed').length})
               </SelectItem>
               <SelectItem value="optimized">
                 Optimized ({trips.filter(t => t.status === 'optimized').length})
               </SelectItem>
+              <SelectItem value="rejected">
+                Rejected ({trips.filter(t => t.status === 'rejected').length})
+              </SelectItem>
               <SelectItem value="cancelled">
                 Cancelled ({trips.filter(t => t.status === 'cancelled').length})
+              </SelectItem>
+              <SelectItem value="expired">
+                Expired ({trips.filter(t => t.status === 'expired').length})
               </SelectItem>
               <SelectItem value="not-notified">
                 Not Notified ({trips.filter(t => !t.notified && t.status !== 'cancelled').length})
@@ -263,7 +261,7 @@ export function TripManagement() {
             <Calendar className="mb-2 h-10 w-10 text-gray-400" />
             <h3 className="mb-1 text-lg font-medium">No Trips Found</h3>
             <p className="text-sm text-gray-500">
-              {searchTerm || statusFilter !== "all" 
+              {searchTerm || statusFilter !== "all"
                 ? "Try changing your filters or search term"
                 : "No trips have been registered yet"}
             </p>
@@ -279,8 +277,8 @@ export function TripManagement() {
                         <User className="h-4 w-4" />
                         {trip.userName}
                       </h3>
-                      <Badge variant="outline" className={getStatusColor(trip.status)}>
-                        {trip.status}
+                      <Badge variant="outline" className={getStatusBadge(trip.status)}>
+                        {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
                       </Badge>
                       {trip.optimizedGroupId && (
                         <Badge variant="outline" className="bg-purple-50 text-purple-700">
@@ -293,18 +291,18 @@ export function TripManagement() {
                         </Badge>
                       )}
                     </div>
-                    
+
                     <div className="text-sm text-gray-500">
                       {trip.userEmail}
                     </div>
-                    
+
                     <div className="flex flex-col gap-1 text-sm text-gray-500 md:flex-row md:gap-4">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
                         <span>{getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-1 text-sm text-gray-500 md:flex-row md:gap-4">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
@@ -318,21 +316,21 @@ export function TripManagement() {
                         )}
                       </div>
                     </div>
-                    
+
                     {trip.vehicleType && (
                       <div className="flex items-center gap-1 text-sm text-gray-500">
                         <Car className="h-4 w-4" />
                         <span>{config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</span>
                       </div>
                     )}
-                    
+
                     {trip.estimatedCost && (
                       <div className="text-sm font-medium">
                         Cost: {formatCurrency(trip.estimatedCost)}
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-2">
                     <Dialog>
                       <DialogTrigger asChild>
@@ -366,14 +364,14 @@ export function TripManagement() {
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div>
                               <h4 className="mb-2 font-medium">Status Information</h4>
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-gray-500">Status:</span>
-                                  <Badge variant="outline" className={getStatusColor(trip.status)}>
-                                    {trip.status}
+                                  <Badge variant="outline" className={getStatusBadge(trip.status)}>
+                                    {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
                                   </Badge>
                                 </div>
                                 <div className="flex justify-between">
@@ -389,7 +387,7 @@ export function TripManagement() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div>
                             <h4 className="mb-2 font-medium">Trip Details</h4>
                             <div className="space-y-2 text-sm">
@@ -423,7 +421,7 @@ export function TripManagement() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div>
                             <h4 className="mb-2 font-medium">Timestamps</h4>
                             <div className="space-y-2 text-sm">
@@ -440,33 +438,33 @@ export function TripManagement() {
                         </div>
                       </DialogContent>
                     </Dialog>
-                    
-                    {trip.status === 'pending' && (
+
+                    {(trip.status === 'pending_approval' || trip.status === 'pending_urgent') && (
                       <>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleUpdateStatus(trip.id, 'confirmed')}
+                          onClick={() => handleUpdateStatus(trip.id, 'approved_solo')}
                           disabled={updatingStatus === trip.id}
                         >
                           {updatingStatus === trip.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            'Confirm'
+                            'Approve'
                           )}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleUpdateStatus(trip.id, 'cancelled')}
+                          onClick={() => handleUpdateStatus(trip.id, 'rejected')}
                           disabled={updatingStatus === trip.id}
                         >
-                          Cancel
+                          Reject
                         </Button>
                       </>
                     )}
-                    
-                    {!trip.notified && trip.status !== 'pending' && trip.status !== 'cancelled' && (
+
+                    {!trip.notified && trip.status !== 'pending_approval' && trip.status !== 'pending_urgent' && trip.status !== 'cancelled' && (
                       <Button
                         size="sm"
                         variant="outline"

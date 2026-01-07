@@ -131,7 +131,7 @@ export default function ManagementDashboard() {
 
   const calculateStats = (trips: Trip[]) => {
     const totalTrips = trips.length
-    const pendingTrips = trips.filter(t => t.status === 'pending').length
+    const pendingTrips = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent').length
     const optimizedTrips = trips.filter(t => t.status === 'optimized').length
     
     const totalSavings = trips.reduce((sum, t) => {
@@ -223,8 +223,12 @@ export default function ManagementDashboard() {
 
   const handleApproveTrip = async (tripId: string) => {
     try {
+      // Check if trip can be optimized
+      const { checkOptimizationPotential } = await import('@/lib/optimization-helper');
+      const canOptimize = await checkOptimizationPotential(tripId);
+
       await fabricService.updateTrip(tripId, {
-        status: 'confirmed'
+        status: canOptimize ? 'approved' : 'approved_solo'
       })
       
       await loadDashboardData()
@@ -401,8 +405,8 @@ export default function ManagementDashboard() {
                         <div className="flex items-center gap-3">
                           <div className={`h-2 w-2 rounded-full ${
                             trip.status === 'optimized' ? 'bg-blue-400' :
-                            trip.status === 'confirmed' ? 'bg-green-400' :
-                            trip.status === 'pending' ? 'bg-yellow-400' :
+                            trip.status === 'approved' || trip.status === 'approved_solo' || trip.status === 'auto_approved' ? 'bg-green-400' :
+                            trip.status === 'pending_approval' || trip.status === 'pending_urgent' ? 'bg-yellow-400' :
                             'bg-red-400'
                           }`} />
                           <div>
@@ -448,7 +452,7 @@ export default function ManagementDashboard() {
                         <span className="text-sm">Trips ready for optimization</span>
                       </div>
                       <Badge className="bg-blue-600">
-                        {trips.filter(t => t.status === 'confirmed' && !t.optimizedGroupId).length}
+                        {trips.filter(t => t.status === 'approved' && !t.optimizedGroupId).length}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
@@ -509,8 +513,8 @@ export default function ManagementDashboard() {
                       <div className="flex items-center gap-4">
                         <div className={`h-3 w-3 rounded-full ${
                           trip.status === 'optimized' ? 'bg-blue-500' :
-                          trip.status === 'confirmed' ? 'bg-green-500' :
-                          trip.status === 'pending' ? 'bg-yellow-500' :
+                          trip.status === 'approved' || trip.status === 'approved_solo' || trip.status === 'auto_approved' ? 'bg-green-500' :
+                          trip.status === 'pending_approval' || trip.status === 'pending_urgent' ? 'bg-yellow-500' :
                           'bg-red-500'
                         }`} />
                         <div>
@@ -742,8 +746,8 @@ export default function ManagementDashboard() {
                     <Label className="text-xs text-gray-500">Status</Label>
                     <Badge className={
                       selectedTrip.status === 'optimized' ? 'bg-blue-100 text-blue-700' :
-                      selectedTrip.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                      selectedTrip.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                      selectedTrip.status === 'approved' || selectedTrip.status === 'approved_solo' || selectedTrip.status === 'auto_approved' ? 'bg-green-100 text-green-700' :
+                      selectedTrip.status === 'pending_approval' || selectedTrip.status === 'pending_urgent' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-red-100 text-red-700'
                     }>
                       {selectedTrip.status}
@@ -808,7 +812,7 @@ export default function ManagementDashboard() {
               <Button variant="outline" onClick={() => setShowTripDetails(false)}>
                 Close
               </Button>
-              {selectedTrip?.status === 'pending' && (
+              {(selectedTrip?.status === 'pending_approval' || selectedTrip?.status === 'pending_urgent') && (
                 <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={() => {

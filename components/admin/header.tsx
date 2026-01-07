@@ -197,6 +197,18 @@ export function AdminHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full relative">
                 <Avatar className="h-8 w-8">
+                  {user?.image && (
+                    <img
+                      src={user.image}
+                      alt={user?.name || 'Admin'}
+                      className="h-full w-full object-cover rounded-full"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  )}
                   <AvatarFallback className="bg-red-600 text-white">
                     {getInitials(user?.name || 'Admin')}
                   </AvatarFallback>

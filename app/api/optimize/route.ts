@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
 import { aiOptimizer } from '@/lib/ai-optimizer';
+import { TripStatus } from '@/lib/trip-status-config';
 
 // THÊM GET handler này
 export async function GET(request: NextRequest) {
@@ -20,23 +21,119 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// GIỮ NGUYÊN POST handler có sẵn
+// POST handler - Run AI Optimization
 export async function POST(request: NextRequest) {
   try {
-    const trips = await fabricService.getTrips({ status: 'pending' });
-    
-    if (trips.length === 0) {
-      return NextResponse.json(
-        { message: 'No trips to optimize' },
-        { status: 200 }
-      );
+    console.log('🔄 Admin triggered AI optimization...');
+
+    // Step 1: Get trips that can be optimized (status = 'approved')
+    const tripsToOptimize = await fabricService.getTrips({
+      status: 'approved',
+      dataType: 'raw'
+    });
+
+    if (tripsToOptimize.length === 0) {
+      console.log('⚠️ No trips available for optimization');
+      return NextResponse.json({
+        message: 'No trips available for optimization',
+        availableTrips: 0
+      });
     }
-    
-    const proposals = await aiOptimizer.optimizeTrips(trips);
-    
-    return NextResponse.json(proposals);
+
+    console.log(`📊 Found ${tripsToOptimize.length} trips eligible for optimization`);
+
+    // Step 2: Update status to 'pending_optimization'
+    for (const trip of tripsToOptimize) {
+      await fabricService.updateTrip(trip.id, {
+        status: 'pending_optimization' as TripStatus
+      });
+    }
+    console.log(`✓ Updated ${tripsToOptimize.length} trips to 'pending_optimization'`);
+
+    // Step 3: Run AI optimizer
+    const proposals = await aiOptimizer.optimizeTrips(tripsToOptimize);
+
+    if (proposals.length === 0) {
+      console.log('⚠️ AI found no optimization opportunities');
+
+      // Mark trips as solo (cannot be optimized)
+      for (const trip of tripsToOptimize) {
+        await fabricService.updateTrip(trip.id, {
+          status: 'approved_solo' as TripStatus
+        });
+      }
+
+      return NextResponse.json({
+        message: 'No optimization opportunities found',
+        tripsProcessed: tripsToOptimize.length,
+        note: 'Trips have been marked as individual trips'
+      });
+    }
+
+    console.log(`💡 AI generated ${proposals.length} optimization proposals`);
+
+    // Step 4: Create optimization groups & TEMP trips
+    let totalTripsAffected = 0;
+
+    for (const proposal of proposals) {
+      // Create optimization group
+      const group = await fabricService.createOptimizationGroup({
+        trips: proposal.trips.map(t => t.id),
+        proposedDepartureTime: proposal.proposedDepartureTime,
+        vehicleType: proposal.vehicleType,
+        estimatedSavings: proposal.estimatedSavings,
+        status: 'proposed',
+        createdBy: 'system'
+      });
+      const groupId = group.id;
+
+      console.log(`📦 Created optimization group: ${groupId}`);
+
+      // Create TEMP trips for this group
+      for (const trip of proposal.trips) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id, createdAt, updatedAt, ...tripData } = trip;
+        await fabricService.createTrip({
+          ...tripData,
+          status: 'draft' as TripStatus,
+          dataType: 'temp',
+          optimizedGroupId: groupId,
+          departureTime: proposal.proposedDepartureTime,
+          vehicleType: proposal.vehicleType,
+          parentTripId: trip.id
+        });
+      }
+
+      // Update original RAW trips to 'proposed' status
+      for (const trip of proposal.trips) {
+        await fabricService.updateTrip(trip.id, {
+          status: 'proposed' as TripStatus,
+          optimizedGroupId: groupId
+        });
+        totalTripsAffected++;
+      }
+
+      console.log(`✓ Created TEMP trips and updated ${proposal.trips.length} RAW trips to 'proposed'`);
+    }
+
+    console.log(`✅ Optimization complete: ${proposals.length} proposals created, ${totalTripsAffected} trips affected`);
+
+    return NextResponse.json({
+      success: true,
+      proposalsCreated: proposals.length,
+      tripsAffected: totalTripsAffected,
+      message: `Successfully created ${proposals.length} optimization proposals affecting ${totalTripsAffected} trips`,
+      proposals: proposals.map(p => ({
+        id: p.id,
+        tripCount: p.trips.length,
+        vehicleType: p.vehicleType,
+        estimatedSavings: p.estimatedSavings,
+        savingsPercentage: p.savingsPercentage
+      }))
+    });
+
   } catch (error: any) {
-    console.error('Optimize error:', error);
+    console.error('❌ Optimization error:', error);
     return NextResponse.json(
       { error: error.message || 'Optimization failed' },
       { status: 500 }

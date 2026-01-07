@@ -780,7 +780,7 @@ export default function ProfilePage() {
                       <div key={trip.id} className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className={`h-3 w-3 rounded-full ${trip.status === 'optimized' ? 'bg-green-500' :
-                            trip.status === 'confirmed' ? 'bg-blue-500' :
+                            trip.status === 'approved' || trip.status === 'approved_solo' || trip.status === 'auto_approved' ? 'bg-blue-500' :
                               trip.status === 'cancelled' ? 'bg-red-500' :
                                 'bg-yellow-500'
                             }`} />
@@ -814,7 +814,7 @@ export default function ProfilePage() {
                         <div className="text-right">
                           <Badge variant="outline" className={
                             trip.status === 'optimized' ? 'bg-green-50 text-green-700 border-green-200' :
-                              trip.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              trip.status === 'approved' || trip.status === 'approved_solo' || trip.status === 'auto_approved' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                 trip.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
                                   'bg-yellow-50 text-yellow-700 border-yellow-200'
                           }>

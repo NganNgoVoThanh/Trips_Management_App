@@ -12,6 +12,7 @@ import {
   ApprovalEmailData,
 } from '@/lib/email-approval-service';
 import { logApprovalAction } from '@/lib/audit-log-service';
+import { TripStatus } from '@/lib/trip-status-config';
 
 interface TripSubmissionData {
   departureLocation: string;
@@ -86,18 +87,27 @@ export async function POST(request: NextRequest) {
     const hoursUntilDeparture = (departureDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     const isUrgent = hoursUntilDeparture < 24;
 
-    // Check for auto-approve scenarios
+    // Determine trip status based on conditions
     let autoApproved = false;
     let approvalStatus: 'pending' | 'approved' = 'pending';
-    let tripStatus: 'pending' | 'approved' = 'pending';
+    let tripStatus: TripStatus;
 
     // Exception Case 1: No manager (CEO/Founder) → Auto-approve
-    // Only auto-approve if manager_email is explicitly NULL or empty
     if (!user.manager_email) {
-      console.log(`🔓 Auto-approving trip for user without manager: ${userEmail}`);
+      console.log(`✅ Auto-approving trip for user without manager: ${userEmail}`);
       autoApproved = true;
       approvalStatus = 'approved';
-      tripStatus = 'approved';
+      tripStatus = 'auto_approved';
+    }
+    // Exception Case 2: Urgent trip (< 24h)
+    else if (isUrgent) {
+      console.log(`⚡ Urgent trip: Departure in ${hoursUntilDeparture.toFixed(1)} hours`);
+      tripStatus = 'pending_urgent';
+    }
+    // Normal case: Pending approval
+    else {
+      console.log(`⏳ Normal trip: Awaiting manager approval`);
+      tripStatus = 'pending_approval';
     }
 
     // Create trip in database
@@ -135,7 +145,7 @@ export async function POST(request: NextRequest) {
       actorEmail: userEmail,
       actorName: user.name || userEmail.split('@')[0],
       actorRole: 'user',
-      newStatus: autoApproved ? 'approved' : 'pending',
+      newStatus: tripStatus,
       notes: autoApproved
         ? 'Trip auto-approved (no manager assigned)'
         : isUrgent

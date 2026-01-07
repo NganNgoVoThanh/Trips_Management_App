@@ -54,8 +54,8 @@ export default function OptimizationRatePage() {
 
       const allTrips = await fabricService.getTrips()
       const optimizedTrips = allTrips.filter(t => t.status === 'optimized')
-      const pendingTrips = allTrips.filter(t => t.status === 'pending')
-      const confirmedTrips = allTrips.filter(t => t.status === 'confirmed')
+      const pendingTrips = allTrips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent')
+      const confirmedTrips = allTrips.filter(t => t.status === 'approved_solo' || t.status === 'approved' || t.status === 'auto_approved')
       const cancelledTrips = allTrips.filter(t => t.status === 'cancelled')
 
       const overallRate = allTrips.length > 0 
@@ -114,13 +114,13 @@ export default function OptimizationRatePage() {
           color: 'bg-blue-800'
         },
         {
-          status: 'Confirmed',
+          status: 'Approved',
           count: confirmedTrips.length,
           percentage: safePercentage(confirmedTrips.length, allTrips.length),
           color: 'bg-green-500'
         },
         {
-          status: 'Pending',
+          status: 'Pending Approval',
           count: pendingTrips.length,
           percentage: safePercentage(pendingTrips.length, allTrips.length),
           color: 'bg-yellow-500'

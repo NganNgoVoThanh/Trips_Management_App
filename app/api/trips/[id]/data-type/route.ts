@@ -37,11 +37,11 @@ export async function GET(
       hasRelatedData: !!relatedData,
       relatedData,
       metadata: {
-        isRaw: trip.dataType === 'raw' || (!trip.dataType && trip.status === 'pending'),
+        isRaw: trip.dataType === 'raw' || (!trip.dataType && (trip.status === 'pending_approval' || trip.status === 'pending_urgent')),
         isTemp: trip.dataType === 'temp',
         isFinal: trip.dataType === 'final' || trip.status === 'optimized',
-        canOptimize: trip.status === 'pending' && trip.dataType !== 'temp',
-        canDelete: trip.status === 'pending' || trip.dataType === 'temp'
+        canOptimize: (trip.status === 'approved' || trip.status === 'approved_solo') && trip.dataType !== 'temp',
+        canDelete: (trip.status === 'pending_approval' || trip.status === 'pending_urgent') || trip.dataType === 'temp'
       }
     });
     

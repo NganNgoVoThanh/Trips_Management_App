@@ -39,11 +39,9 @@ export function TripOptimization() {
     try {
       setIsLoading(true)
       
-      // Load pending trips (backend handles RAW data)
-      const trips = await fabricService.getTrips({ 
-        status: 'pending',
-        includeTemp: false
-      })
+      // Load approved trips ready for optimization
+      const allTrips = await fabricService.getTrips({ includeTemp: false })
+      const trips = allTrips.filter(t => t.status === 'approved')
       setPendingTrips(trips)
       
       // Load existing proposals

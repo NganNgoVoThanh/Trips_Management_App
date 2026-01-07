@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fabricService } from '@/lib/mysql-service';
 import { getServerUser } from '@/lib/server-auth';
+import { TripStatus } from '@/lib/trip-status-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,18 +60,35 @@ export async function POST(request: NextRequest) {
     // Get temp trips count before deletion
     const tempTrips = await fabricService.getTempTripsByGroupId(groupId);
     const tempCount = tempTrips.length;
-    
-    console.log(`Rejecting group ${groupId} with ${tempCount} temp trips`);
+
+    console.log(`⛔ Admin rejecting optimization group ${groupId} with ${tempCount} temp trips`);
 
     // Reject the optimization (backend handles TEMP deletion, RAW preservation)
     await fabricService.rejectOptimization(groupId);
-    
+
+    // Update RAW trips back to 'approved_solo' status
+    // (fabricService.rejectOptimization should handle this, but let's be explicit)
+    const rawTrips = await fabricService.getTrips({
+      optimizedGroupId: groupId,
+      dataType: 'raw'
+    });
+
+    for (const trip of rawTrips) {
+      await fabricService.updateTrip(trip.id, {
+        status: 'approved_solo' as TripStatus,
+        optimizedGroupId: undefined
+      });
+    }
+
+    console.log(`✓ Reverted ${rawTrips.length} trips to 'approved_solo' status`);
+
     return NextResponse.json({
       success: true,
       groupId,
-      message: `Optimization rejected. ${tempCount} temporary records deleted, original trips preserved`,
+      message: `Optimization rejected. ${tempCount} temporary records deleted, ${rawTrips.length} original trips reverted to individual status`,
       tempDataDeleted: tempCount,
-      rawDataPreserved: true,
+      rawTripsReverted: rawTrips.length,
+      newStatus: 'approved_solo',
       rejectedBy: user.email,
       rejectedAt: new Date().toISOString()
     });

@@ -283,7 +283,7 @@ export default function ActivityPage() {
                       <h3 className="font-medium">{activity.type}</h3>
                       <Badge variant="outline" className={
                         activity.status === 'optimized' ? 'border-blue-400 text-blue-700' :
-                        activity.status === 'confirmed' ? 'border-green-400 text-green-700' :
+                        activity.status === 'approved' || activity.status === 'approved_solo' || activity.status === 'auto_approved' ? 'border-green-400 text-green-700' :
                         activity.status === 'cancelled' ? 'border-red-400 text-red-700' :
                         'border-yellow-400 text-yellow-700'
                       }>

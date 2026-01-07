@@ -10,6 +10,7 @@ import { AlertCircle, Calendar, Clock, MapPin, Car, Users, Loader2 } from "lucid
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { config, getLocationName, formatCurrency } from "@/lib/config"
 import { emailService } from "@/lib/email-service"
+import { getStatusBadge, getStatusLabel, getStatusIcon } from "@/lib/trip-status-config"
 import {
   Dialog,
   DialogContent,
@@ -143,18 +144,7 @@ export function UpcomingTrips() {
     return `In ${diffDays} days`
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400'
-      case 'optimized':
-        return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400'
-      case 'pending':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400'
-      default:
-        return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400'
-    }
-  }
+  // Removed getStatusColor - now using helper functions from trip-status-config
 
   if (isLoading) {
     return (
@@ -194,10 +184,9 @@ export function UpcomingTrips() {
                         </h3>
                         <Badge
                           variant="outline"
-                          className={getStatusColor(trip.status)}
+                          className={getStatusBadge(trip.status)}
                         >
-                          {trip.status === 'optimized' ? 'Optimized' :
-                           trip.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+                          {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
                         </Badge>
                         {trip.parentTripId && (
                           <Badge
@@ -306,8 +295,8 @@ export function UpcomingTrips() {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-gray-500">Status:</span>
-                                  <Badge variant="outline" className={getStatusColor(trip.status)}>
-                                    {trip.status}
+                                  <Badge variant="outline" className={getStatusBadge(trip.status)}>
+                                    {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
                                   </Badge>
                                 </div>
                                 {trip.estimatedCost && (
@@ -327,7 +316,7 @@ export function UpcomingTrips() {
                         </DialogContent>
                       </Dialog>
                       
-                      {trip.status === 'pending' && (
+                      {(trip.status === 'pending_approval' || trip.status === 'pending_urgent') && (
                         <Button
                           variant="outline"
                           size="sm"

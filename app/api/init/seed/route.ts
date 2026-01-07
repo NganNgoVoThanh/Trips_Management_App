@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     
     // Get summary
     const trips = await fabricService.getTrips();
-    const pendingTrips = trips.filter(t => t.status === 'pending');
-    const confirmedTrips = trips.filter(t => t.status === 'confirmed');
+    const pendingTrips = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent');
+    const confirmedTrips = trips.filter(t => t.status === 'approved_solo' || t.status === 'approved' || t.status === 'auto_approved');
     const optimizedTrips = trips.filter(t => t.status === 'optimized');
     const groups = await fabricService.getOptimizationGroups();
     

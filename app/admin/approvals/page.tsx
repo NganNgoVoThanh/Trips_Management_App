@@ -34,8 +34,12 @@ export default function ApprovalsPage() {
         return
       }
 
-      const trips = await fabricService.getTrips({ status: 'pending' })
-      setPendingTrips(trips)
+      // Get trips pending manager approval
+      const allTrips = await fabricService.getTrips()
+      const pendingTrips = allTrips.filter(t =>
+        t.status === 'pending_approval' || t.status === 'pending_urgent'
+      )
+      setPendingTrips(pendingTrips)
     } catch (error) {
       console.error('Error loading pending trips:', error)
       toast({
@@ -51,17 +55,17 @@ export default function ApprovalsPage() {
   const handleApprove = async (trip: Trip) => {
     setProcessingId(trip.id)
     try {
-      await fabricService.updateTrip(trip.id, { 
-        status: 'confirmed',
-        notified: true 
+      await fabricService.updateTrip(trip.id, {
+        status: 'approved',
+        notified: true
       })
       await emailService.sendApprovalNotification(trip)
-      
+
       toast({
         title: "Trip Approved",
         description: `Trip for ${trip.userName} has been approved`,
       })
-      
+
       await loadPendingTrips()
     } catch (error) {
       toast({
@@ -77,17 +81,17 @@ export default function ApprovalsPage() {
   const handleReject = async (trip: Trip) => {
     setProcessingId(trip.id)
     try {
-      await fabricService.updateTrip(trip.id, { 
+      await fabricService.updateTrip(trip.id, {
         status: 'cancelled',
-        notified: true 
+        notified: true
       })
       await emailService.sendCancellationNotification(trip)
-      
+
       toast({
         title: "Trip Rejected",
         description: `Trip for ${trip.userName} has been rejected`,
       })
-      
+
       await loadPendingTrips()
     } catch (error) {
       toast({
@@ -114,12 +118,12 @@ export default function ApprovalsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <AdminHeader />
-      
+
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => router.push('/admin/dashboard')}
             >
@@ -158,12 +162,12 @@ export default function ApprovalsPage() {
                         <h3 className="font-medium text-lg">{trip.userName}</h3>
                         <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>
                       </div>
-                      
+
                       <div className="text-sm text-gray-600">
                         <p className="mb-1">{trip.userEmail}</p>
                         <p className="font-mono text-xs">ID: {trip.id.slice(0, 12)}</p>
                       </div>
-                      
+
                       <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
@@ -172,12 +176,12 @@ export default function ApprovalsPage() {
                           </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-6 text-sm text-gray-600">
                         <span>Departure: {formatDate(trip.departureDate)} at {trip.departureTime}</span>
                         <span>Return: {formatDate(trip.returnDate)} at {trip.returnTime}</span>
                       </div>
-                      
+
                       {trip.estimatedCost && (
                         <div className="text-sm">
                           <span className="text-gray-600">Estimated Cost: </span>
@@ -187,7 +191,7 @@ export default function ApprovalsPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"

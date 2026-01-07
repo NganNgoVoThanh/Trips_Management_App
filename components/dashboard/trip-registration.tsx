@@ -55,7 +55,7 @@ export function TripRegistration() {
 
     try {
       const trips = await fabricService.getTrips({
-        status: 'confirmed'
+        status: 'approved_solo'
       })
       
       const filtered = trips.filter(trip => 

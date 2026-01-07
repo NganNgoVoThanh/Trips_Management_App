@@ -79,8 +79,8 @@ export default function TotalSavingsPage() {
         return sum
       }, 0)
 
-      // Calculate potential savings from pending trips
-      const pendingTrips = allTrips.filter(t => t.status === 'confirmed' && !t.optimizedGroupId)
+      // Calculate potential savings from approved trips not yet optimized
+      const pendingTrips = allTrips.filter(t => t.status === 'approved' && !t.optimizedGroupId)
       const potentialSavings = pendingTrips.reduce((sum, trip) => {
         if (trip.estimatedCost) {
           return sum + (trip.estimatedCost * 0.25) // Potential 25% savings

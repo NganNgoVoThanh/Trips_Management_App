@@ -68,7 +68,7 @@ export function ManagementDashboard() {
       const groups = await fabricService.getOptimizationGroups()
       
       // Calculate stats
-      const pendingTrips = trips.filter(t => t.status === 'pending').length
+      const pendingTrips = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent').length
       const optimizedTrips = trips.filter(t => t.status === 'optimized').length
       const totalSavings = groups
         .filter(g => g.status === 'approved')

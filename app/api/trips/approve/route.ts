@@ -11,6 +11,8 @@ import {
   sendExpiredLinkNotificationToAdmin,
   calculateExpiredHours,
 } from '@/lib/expired-approval-notification';
+import { TripStatus } from '@/lib/trip-status-config';
+import { checkOptimizationPotential } from '@/lib/optimization-helper';
 
 // Database connection
 async function getConnection() {
@@ -232,18 +234,41 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Update trip status
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    // Determine new status based on action
+    let tripStatus: TripStatus;
+    const approvalStatus = action === 'approve' ? 'approved' : 'rejected';
     const approvedAt = action === 'approve' ? new Date() : null;
 
+    if (action === 'approve') {
+      // Check if trip can be optimized with other similar trips
+      // First update manager approval status
+      await connection.query(
+        `UPDATE trips
+         SET manager_approval_status = ?,
+             manager_approval_at = ?,
+             manager_approved_by = ?
+         WHERE id = ?`,
+        [approvalStatus, approvedAt, managerEmail, tripId]
+      );
+
+      // Check optimization potential
+      const canOptimize = await checkOptimizationPotential(tripId);
+
+      // Set appropriate status
+      tripStatus = canOptimize ? 'approved' : 'approved_solo';
+
+      console.log(`✓ Trip ${tripId} can optimize: ${canOptimize} → status: ${tripStatus}`);
+    } else {
+      // Rejected by manager
+      tripStatus = 'rejected';
+    }
+
+    // Update trip status
     await connection.query(
       `UPDATE trips
-       SET manager_approval_status = ?,
-           manager_approval_at = ?,
-           manager_approved_by = ?,
-           status = ?
+       SET status = ?
        WHERE id = ?`,
-      [newStatus, approvedAt, managerEmail, newStatus, tripId]
+      [tripStatus, tripId]
     );
 
     // Log to audit trail
@@ -252,9 +277,11 @@ export async function GET(request: NextRequest) {
       action: action === 'approve' ? 'approve' : 'reject',
       actorEmail: managerEmail,
       actorRole: 'manager',
-      oldStatus: 'pending',
-      newStatus,
-      notes: `Manager ${action === 'approve' ? 'approved' : 'rejected'} via email link`,
+      oldStatus: 'pending_approval',
+      newStatus: tripStatus,
+      notes: action === 'approve'
+        ? `Manager approved via email link. Status: ${tripStatus} (${tripStatus === 'approved' ? 'can be optimized' : 'solo trip'})`
+        : 'Manager rejected via email link',
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
     });
@@ -271,11 +298,11 @@ export async function GET(request: NextRequest) {
         returnDate: trip.return_date,
         returnTime: trip.return_time,
       },
-      status: newStatus,
+      status: action === 'approve' ? 'approved' : 'rejected',
       managerName: managerEmail.split('@')[0],
     });
 
-    console.log(`✅ Trip ${tripId} ${newStatus} by ${managerEmail}`);
+    console.log(`✅ Trip ${tripId} status: ${tripStatus} by ${managerEmail}`);
 
     // 🔥 AUTO-TRIGGER OPTIMIZATION: If trip approved, trigger AI optimization
     if (action === 'approve') {

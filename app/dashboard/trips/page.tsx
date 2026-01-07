@@ -6,11 +6,11 @@ import { DashboardHeader } from "@/components/dashboard/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { 
-  ChevronLeft, 
-  Download, 
-  Car, 
-  MapPin, 
+import {
+  ChevronLeft,
+  Download,
+  Car,
+  MapPin,
   Calendar,
   Clock,
   Filter,
@@ -21,6 +21,7 @@ import {
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
+import { getStatusBadge, getStatusLabel, getStatusIcon } from "@/lib/trip-status-config"
 import { useRouter } from "next/navigation"
 import {
   Select,
@@ -77,8 +78,8 @@ export default function AllTripsPage() {
   }
 
   const calculateStats = () => {
-    const pending = trips.filter(t => t.status === 'pending').length
-    const confirmed = trips.filter(t => t.status === 'confirmed').length
+    const pending = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent').length
+    const confirmed = trips.filter(t => t.status === 'approved_solo' || t.status === 'approved' || t.status === 'auto_approved').length
     const optimized = trips.filter(t => t.status === 'optimized').length
     const cancelled = trips.filter(t => t.status === 'cancelled').length
 
@@ -135,15 +136,7 @@ export default function AllTripsPage() {
     setFilteredTrips(filtered)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'bg-blue-100 text-blue-800'
-      case 'optimized': return 'bg-green-100 text-green-800'
-      case 'cancelled': return 'bg-red-100 text-red-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  // Removed getStatusColor - now using helper functions from trip-status-config
 
   const exportTrips = () => {
     const csv = [
@@ -332,10 +325,17 @@ export default function AllTripsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                  <SelectItem value="pending_urgent">Pending (Urgent)</SelectItem>
+                  <SelectItem value="auto_approved">Auto-Approved</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="approved_solo">Approved (Solo)</SelectItem>
+                  <SelectItem value="pending_optimization">Pending Optimization</SelectItem>
+                  <SelectItem value="proposed">Proposed</SelectItem>
                   <SelectItem value="optimized">Optimized</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={locationFilter} onValueChange={setLocationFilter}>
@@ -382,8 +382,8 @@ export default function AllTripsPage() {
                         <span className="font-medium">
                           {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                         </span>
-                        <Badge className={getStatusColor(trip.status)}>
-                          {trip.status}
+                        <Badge className={getStatusBadge(trip.status)}>
+                          {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-500 ml-7">

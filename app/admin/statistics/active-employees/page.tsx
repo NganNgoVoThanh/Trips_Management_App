@@ -93,7 +93,7 @@ export default function ActiveEmployeesPage() {
           }
         }
         
-        if (trip.status === 'pending') {
+        if (trip.status === 'pending_approval' || trip.status === 'pending_urgent') {
           userStats.pendingTrips += 1
         }
         

@@ -223,7 +223,7 @@ class JoinRequestService {
         if (tripDetails.optimizedGroupId) {
           const isAlreadyParticipant = userTrips.some((trip: any) =>
             trip.optimizedGroupId === tripDetails.optimizedGroupId &&
-            (trip.status === 'confirmed' || trip.status === 'optimized')
+            (trip.status === 'approved_solo' || trip.status === 'approved' || trip.status === 'optimized')
           );
 
           if (isAlreadyParticipant) {

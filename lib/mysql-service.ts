@@ -1,5 +1,6 @@
 // lib/mysql-service.ts
 import { config } from './config';
+import { TripStatus } from './trip-status-config';
 
 // Lazy import mysql2 only on server side
 let pool: any = null;
@@ -49,7 +50,7 @@ export interface Trip {
   departureTime: string;
   returnDate: string;
   returnTime: string;
-  status: 'pending' | 'confirmed' | 'optimized' | 'cancelled' | 'draft' | 'approved' | 'rejected';
+  status: TripStatus;
   vehicleType?: string;
   estimatedCost?: number;
   actualCost?: number;
@@ -339,7 +340,13 @@ class MySQLService {
 
 
   // Get all trips
-  async getTrips(filters?: { userId?: string; status?: string; includeTemp?: boolean }): Promise<Trip[]> {
+  async getTrips(filters?: { 
+    userId?: string; 
+    status?: string; 
+    includeTemp?: boolean;
+    optimizedGroupId?: string;
+    dataType?: string;
+  }): Promise<Trip[]> {
     if (!this.ensureServerSide('getTrips')) return [];
 
     try {
@@ -356,6 +363,14 @@ class MySQLService {
       if (filters?.status) {
         conditions.push('status = ?');
         params.push(filters.status);
+      }
+      if (filters?.optimizedGroupId) {
+        conditions.push('optimized_group_id = ?');
+        params.push(filters.optimizedGroupId);
+      }
+      if (filters?.dataType) {
+        conditions.push('data_type = ?');
+        params.push(filters.dataType);
       }
       
       if (conditions.length > 0) {

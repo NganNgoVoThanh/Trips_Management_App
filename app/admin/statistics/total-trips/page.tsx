@@ -276,8 +276,8 @@ export default function TotalTripsPage() {
                 <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
                   <Badge variant="outline" className={
                     status === 'optimized' ? 'border-green-400 text-green-700' :
-                    status === 'confirmed' ? 'border-blue-400 text-blue-700' :
-                    status === 'pending' ? 'border-yellow-400 text-yellow-700' :
+                    status === 'approved' || status === 'approved_solo' || status === 'auto_approved' ? 'border-blue-400 text-blue-700' :
+                    status === 'pending_approval' || status === 'pending_urgent' ? 'border-yellow-400 text-yellow-700' :
                     'border-red-400 text-red-700'
                   }>
                     {status}
@@ -397,8 +397,8 @@ export default function TotalTripsPage() {
                         <span className="font-semibold">{trip.userName}</span>
                         <Badge variant="outline" className={
                           trip.status === 'optimized' ? 'border-green-400 text-green-700' :
-                          trip.status === 'confirmed' ? 'border-blue-400 text-blue-700' :
-                          trip.status === 'pending' ? 'border-yellow-400 text-yellow-700' :
+                          trip.status === 'approved' || trip.status === 'approved_solo' || trip.status === 'auto_approved' ? 'border-blue-400 text-blue-700' :
+                          trip.status === 'pending_approval' || trip.status === 'pending_urgent' ? 'border-yellow-400 text-yellow-700' :
                           'border-red-400 text-red-700'
                         }>
                           {trip.status}

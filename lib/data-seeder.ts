@@ -31,7 +31,7 @@ export class DataSeeder {
         departureTime: '08:00',
         returnDate: this.getDateString(7),
         returnTime: '17:00',
-        status: 'pending',
+        status: 'pending_approval',
         vehicleType: 'car-4',
         estimatedCost: 1200000,
         notified: false
@@ -46,7 +46,7 @@ export class DataSeeder {
         departureTime: '08:30',
         returnDate: this.getDateString(7),
         returnTime: '17:00',
-        status: 'pending',
+        status: 'pending_approval',
         vehicleType: 'car-4',
         estimatedCost: 1200000,
         notified: false
@@ -61,7 +61,7 @@ export class DataSeeder {
         departureTime: '09:00',
         returnDate: this.getDateString(3),
         returnTime: '18:00',
-        status: 'confirmed',
+        status: 'approved_solo',
         vehicleType: 'car-4',
         estimatedCost: 400000,
         notified: true
@@ -76,7 +76,7 @@ export class DataSeeder {
         departureTime: '07:30',
         returnDate: this.getDateString(10),
         returnTime: '17:30',
-        status: 'pending',
+        status: 'pending_approval',
         vehicleType: 'car-7',
         estimatedCost: 600000,
         notified: false
@@ -91,7 +91,7 @@ export class DataSeeder {
         departureTime: '08:00',
         returnDate: this.getDateString(9),
         returnTime: '17:00',
-        status: 'pending',
+        status: 'pending_approval',
         vehicleType: 'car-4',
         estimatedCost: 900000,
         notified: false

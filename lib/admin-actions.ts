@@ -13,7 +13,7 @@ export async function getAdminStats() {
     const allTrips = await fabricService.getTrips();
     const joinRequestStats = await joinRequestService.getJoinRequestStats();
     
-    const pending = allTrips.filter(t => t.status === 'pending');
+    const pending = allTrips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent');
     const optimized = allTrips.filter(t => t.status === 'optimized');
     
     const currentMonth = new Date().getMonth();
@@ -71,7 +71,7 @@ export async function getAdminStats() {
 export async function getPendingActions() {
   try {
     const allTrips = await fabricService.getTrips();
-    const pending = allTrips.filter(t => t.status === 'pending');
+    const pending = allTrips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent');
     
     return pending.slice(0, 5).map(t => ({
       id: t.id,
@@ -117,8 +117,8 @@ export async function getRecentOptimizations() {
 export async function runOptimization(userId: string) {
   try {
     const trips = await fabricService.getTrips();
-    const tripsToOptimize = trips.filter(t => 
-      t.status === 'confirmed' && !t.optimizedGroupId
+    const tripsToOptimize = trips.filter(t =>
+      t.status === 'approved' && !t.optimizedGroupId
     );
     
     if (tripsToOptimize.length === 0) {
@@ -238,8 +238,12 @@ export async function approveTrip(tripId: string) {
       };
     }
     
+    // Check if trip can be optimized with others
+    const { checkOptimizationPotential } = await import('./optimization-helper');
+    const canOptimize = await checkOptimizationPotential(tripId);
+
     await fabricService.updateTrip(tripId, {
-      status: 'confirmed',
+      status: canOptimize ? 'approved' : 'approved_solo',
       notified: true
     });
     
