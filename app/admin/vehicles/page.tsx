@@ -266,38 +266,38 @@ export default function VehiclesPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3 mb-8">
-        <Card>
+        <Card className="border-l-4 border-l-red-600 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Providers</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-700">Total Providers</CardTitle>
+            <Truck className="h-5 w-5 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{vehicles.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="text-3xl font-bold text-gray-900">{vehicles.length}</div>
+            <p className="text-xs text-gray-500 mt-1">
               Registered service providers
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <Power className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-gray-700">Active</CardTitle>
+            <Power className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeVehicles}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="text-3xl font-bold text-green-600">{activeVehicles}</div>
+            <p className="text-xs text-gray-500 mt-1">
               Available for booking
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-gray-400 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
-            <PowerOff className="h-4 w-4 text-gray-600" />
+            <CardTitle className="text-sm font-medium text-gray-700">Inactive</CardTitle>
+            <PowerOff className="h-5 w-5 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{inactiveVehicles}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="text-3xl font-bold text-gray-600">{inactiveVehicles}</div>
+            <p className="text-xs text-gray-500 mt-1">
               Temporarily unavailable
             </p>
           </CardContent>
@@ -306,10 +306,10 @@ export default function VehiclesPage() {
 
       {/* Actions */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Service Providers</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Service Providers</h2>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-red-600 hover:bg-red-700">
               <Plus className="mr-2 h-4 w-4" />
               Add Provider
             </Button>
@@ -413,7 +413,7 @@ export default function VehiclesPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting} className="flex-1">
+                <Button type="submit" disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700">
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -430,11 +430,11 @@ export default function VehiclesPage() {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin text-red-600" />
             </div>
           ) : vehicles.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
@@ -472,7 +472,7 @@ export default function VehiclesPage() {
                     <TableCell>{vehicle.driver_phone || "-"}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={vehicle.status === "active" ? "default" : "secondary"}
+                        className={vehicle.status === "active" ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-gray-100 text-gray-800 hover:bg-gray-100"}
                       >
                         {vehicle.status === "active" ? "Active" : "Inactive"}
                       </Badge>
@@ -609,7 +609,7 @@ export default function VehiclesPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting} className="flex-1">
+              <Button type="submit" disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700">
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

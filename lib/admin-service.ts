@@ -491,8 +491,8 @@ export async function searchUsersForAdminAssignment(params: {
     const [rows] = await connection.query<any[]>(
       `SELECT
         id, email, name, employee_id, department, office_location,
-        role as current_role,
-        admin_type as current_admin_type
+        role as user_role,
+        admin_type as user_admin_type
        FROM users
        WHERE (email LIKE ? OR name LIKE ? OR employee_id LIKE ?)
        ${excludeClause}
@@ -503,7 +503,17 @@ export async function searchUsersForAdminAssignment(params: {
       [searchTerm, searchTerm, searchTerm, params.query, limit]
     );
 
-    return rows as any[];
+    // Map to expected interface
+    return rows.map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      employee_id: row.employee_id,
+      department: row.department,
+      office_location: row.office_location,
+      current_role: row.user_role,
+      current_admin_type: row.user_admin_type
+    }));
   } finally {
     await connection.end();
   }

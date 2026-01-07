@@ -201,7 +201,7 @@ export default function ManageAdminsPage() {
       <div className="flex min-h-screen flex-col bg-gray-50">
         <AdminHeader />
         <div className="flex items-center justify-center flex-1">
-          <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+          <RefreshCw className="h-8 w-8 animate-spin text-red-600" />
         </div>
       </div>
     );
@@ -220,40 +220,40 @@ export default function ManageAdminsPage() {
       {/* Statistics Cards */}
       {statistics && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="p-6 border-l-4 border-l-blue-500">
+          <Card className="p-6 border-l-4 border-l-red-600 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Admins</p>
                 <p className="text-3xl font-bold text-gray-900">{statistics.total_admins}</p>
               </div>
-              <Users className="h-10 w-10 text-blue-500" />
+              <Users className="h-10 w-10 text-red-600" />
             </div>
           </Card>
-          <Card className="p-6 border-l-4 border-l-purple-500">
+          <Card className="p-6 border-l-4 border-l-purple-600 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Super Admins</p>
                 <p className="text-3xl font-bold text-gray-900">{statistics.super_admins}</p>
               </div>
-              <Shield className="h-10 w-10 text-purple-500" />
+              <Shield className="h-10 w-10 text-purple-600" />
             </div>
           </Card>
-          <Card className="p-6 border-l-4 border-l-green-500">
+          <Card className="p-6 border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Location Admins</p>
                 <p className="text-3xl font-bold text-gray-900">{statistics.location_admins}</p>
               </div>
-              <MapPin className="h-10 w-10 text-green-500" />
+              <MapPin className="h-10 w-10 text-blue-600" />
             </div>
           </Card>
-          <Card className="p-6 border-l-4 border-l-orange-500">
+          <Card className="p-6 border-l-4 border-l-green-600 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Locations</p>
                 <p className="text-3xl font-bold text-gray-900">{statistics.locations_with_admins}</p>
               </div>
-              <Activity className="h-10 w-10 text-orange-500" />
+              <Activity className="h-10 w-10 text-green-600" />
             </div>
           </Card>
         </div>
@@ -261,19 +261,19 @@ export default function ManageAdminsPage() {
 
       {/* Actions */}
       <div className="mb-6 flex gap-4">
-        <Button onClick={() => setGrantDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => setGrantDialogOpen(true)} className="bg-red-600 hover:bg-red-700">
           <UserPlus className="h-4 w-4 mr-2" />
           Grant Admin Role
         </Button>
-        <Button onClick={fetchData} variant="outline">
+        <Button onClick={fetchData} variant="outline" className="border-red-200 text-red-700 hover:bg-red-50">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
       {/* Admins List */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4">Current Admins</h2>
+      <Card className="p-6 shadow-sm">
+        <h2 className="text-xl font-bold mb-4 text-gray-900">Current Admins</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -293,9 +293,9 @@ export default function ManageAdminsPage() {
                   <td className="px-4 py-3 text-sm text-gray-600">{admin.email}</td>
                   <td className="px-4 py-3">
                     {admin.admin_type === 'super_admin' ? (
-                      <Badge className="bg-purple-100 text-purple-800">Super Admin</Badge>
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Super Admin</Badge>
                     ) : (
-                      <Badge className="bg-green-100 text-green-800">Location Admin</Badge>
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Location Admin</Badge>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
@@ -314,7 +314,7 @@ export default function ManageAdminsPage() {
                   <td className="px-4 py-3">
                     <Button
                       size="sm"
-                      variant="destructive"
+                      className="bg-red-600 hover:bg-red-700"
                       onClick={() => {
                         setSelectedUser(admin);
                         setRevokeDialogOpen(true);
@@ -433,6 +433,7 @@ export default function ManageAdminsPage() {
               Cancel
             </Button>
             <Button
+              className="bg-red-600 hover:bg-red-700"
               onClick={handleGrantAdmin}
               disabled={!selectedUser || (grantAdminType === 'location_admin' && !grantLocationId) || actionLoading}
             >
@@ -475,7 +476,7 @@ export default function ManageAdminsPage() {
             <Button variant="outline" onClick={() => { setRevokeDialogOpen(false); setRevokeReason(''); setSelectedUser(null); }}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleRevokeAdmin} disabled={actionLoading}>
+            <Button className="bg-red-600 hover:bg-red-700" onClick={handleRevokeAdmin} disabled={actionLoading}>
               {actionLoading ? 'Processing...' : 'Revoke Admin Role'}
             </Button>
           </DialogFooter>
