@@ -439,32 +439,24 @@ export function TripManagement() {
                       </DialogContent>
                     </Dialog>
 
-                    {(trip.status === 'pending_approval' || trip.status === 'pending_urgent') && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(trip.id, 'approved_solo')}
-                          disabled={updatingStatus === trip.id}
-                        >
-                          {updatingStatus === trip.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Approve'
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUpdateStatus(trip.id, 'rejected')}
-                          disabled={updatingStatus === trip.id}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    )}
+                    {/* REMOVED: Admin direct approval for normal trips
+                        Reason: Prevent workflow conflicts with manager approval
+                        Admin can only approve exception cases via Manual Override page
+                    */}
 
-                    {!trip.notified && trip.status !== 'pending_approval' && trip.status !== 'pending_urgent' && trip.status !== 'cancelled' && (
+                    {/* Notify button - ONLY for exception cases that need manual notification
+                        Normal workflow: Manager approve → Auto email sent
+                        This button is for:
+                        - Optimization proposals (status: optimized)
+                        - Admin manual overrides (status: approved_solo via Manual Override page)
+                        - Auto-approved trips (status: auto_approved)
+                    */}
+                    {!trip.notified &&
+                     trip.status !== 'pending_approval' &&
+                     trip.status !== 'pending_urgent' &&
+                     trip.status !== 'approved' &&  // Normal approved trips already notified by manager
+                     trip.status !== 'rejected' &&  // Rejected trips already notified by manager
+                     trip.status !== 'cancelled' && (
                       <Button
                         size="sm"
                         variant="outline"

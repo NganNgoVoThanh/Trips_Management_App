@@ -104,7 +104,7 @@ export function CreateTripForUser() {
       });
     } catch (error: any) {
       console.error("Error creating trip:", error);
-      toast.error(error.message || "Không thể tạo chuyến đi");
+      toast.error(error.message || "Failed to create trip");
     } finally {
       setLoading(false);
     }
@@ -112,41 +112,45 @@ export function CreateTripForUser() {
 
   if (session?.user?.role !== "admin") {
     return (
-      <Card>
+      <Card className="border-red-200 bg-red-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-red-600">
             <AlertCircle className="h-5 w-5" />
-            Không có quyền truy cập
+            Access Denied
           </CardTitle>
-          <CardDescription>Chỉ admin mới có thể tạo chuyến đi cho nhân viên khác</CardDescription>
+          <CardDescription className="text-red-700">
+            Only administrators can create trips for other employees
+          </CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5" />
-          Tạo chuyến đi cho nhân viên
+    <Card className="border-gray-200 bg-white shadow-sm">
+      <CardHeader className="border-b border-gray-100">
+        <CardTitle className="flex items-center gap-2 text-gray-900">
+          <UserPlus className="h-5 w-5 text-red-600" />
+          Create Trip for Employee
         </CardTitle>
         <CardDescription>
-          Admin có thể tạo chuyến đi thay mặt cho bất kỳ nhân viên nào
+          Create a business trip on behalf of any employee in the system
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* User Selection */}
           <div className="space-y-2">
-            <Label htmlFor="userEmail">Chọn nhân viên *</Label>
+            <Label htmlFor="userEmail" className="text-gray-900">
+              Select Employee <span className="text-red-600">*</span>
+            </Label>
             <Select
               value={formData.userEmail}
               onValueChange={(value) => setFormData({ ...formData, userEmail: value })}
               disabled={loadingUsers}
             >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingUsers ? "Đang tải..." : "Chọn nhân viên"} />
+              <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
+                <SelectValue placeholder={loadingUsers ? "Loading employees..." : "Choose an employee"} />
               </SelectTrigger>
               <SelectContent>
                 {users.map((user) => (
@@ -161,23 +165,29 @@ export function CreateTripForUser() {
           {/* Trip Details */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="departureLocation">Điểm đi *</Label>
+              <Label htmlFor="departureLocation" className="text-gray-900">
+                Departure Location <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="departureLocation"
                 value={formData.departureLocation}
                 onChange={(e) => setFormData({ ...formData, departureLocation: e.target.value })}
-                placeholder="Vd: Hà Nội"
+                placeholder="e.g. Hanoi"
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="destination">Điểm đến *</Label>
+              <Label htmlFor="destination" className="text-gray-900">
+                Destination <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="destination"
                 value={formData.destination}
                 onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                placeholder="Vd: TP HCM"
+                placeholder="e.g. Ho Chi Minh City"
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -186,23 +196,29 @@ export function CreateTripForUser() {
           {/* Departure Date/Time */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="departureDate">Ngày đi *</Label>
+              <Label htmlFor="departureDate" className="text-gray-900">
+                Departure Date <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="departureDate"
                 type="date"
                 value={formData.departureDate}
                 onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="departureTime">Giờ đi *</Label>
+              <Label htmlFor="departureTime" className="text-gray-900">
+                Departure Time <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="departureTime"
                 type="time"
                 value={formData.departureTime}
                 onChange={(e) => setFormData({ ...formData, departureTime: e.target.value })}
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -211,23 +227,29 @@ export function CreateTripForUser() {
           {/* Return Date/Time */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="returnDate">Ngày về *</Label>
+              <Label htmlFor="returnDate" className="text-gray-900">
+                Return Date <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="returnDate"
                 type="date"
                 value={formData.returnDate}
                 onChange={(e) => setFormData({ ...formData, returnDate: e.target.value })}
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="returnTime">Giờ về *</Label>
+              <Label htmlFor="returnTime" className="text-gray-900">
+                Return Time <span className="text-red-600">*</span>
+              </Label>
               <Input
                 id="returnTime"
                 type="time"
                 value={formData.returnTime}
                 onChange={(e) => setFormData({ ...formData, returnTime: e.target.value })}
+                className="border-gray-300 focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -235,45 +257,47 @@ export function CreateTripForUser() {
 
           {/* Purpose */}
           <div className="space-y-2">
-            <Label htmlFor="purpose">Mục đích chuyến đi</Label>
+            <Label htmlFor="purpose" className="text-gray-900">Trip Purpose</Label>
             <Textarea
               id="purpose"
               value={formData.purpose}
               onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-              placeholder="Mô tả mục đích chuyến đi..."
+              placeholder="Describe the purpose of this business trip..."
+              className="border-gray-300 focus:border-red-500 focus:ring-red-500"
               rows={3}
             />
           </div>
 
           {/* Vehicle Type */}
           <div className="space-y-2">
-            <Label htmlFor="vehicleType">Loại phương tiện</Label>
+            <Label htmlFor="vehicleType" className="text-gray-900">Vehicle Type</Label>
             <Select
               value={formData.vehicleType}
               onValueChange={(value) => setFormData({ ...formData, vehicleType: value })}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Chọn phương tiện" />
+              <SelectTrigger className="border-gray-300 focus:border-red-500 focus:ring-red-500">
+                <SelectValue placeholder="Select vehicle type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="car">Ô tô</SelectItem>
-                <SelectItem value="plane">Máy bay</SelectItem>
-                <SelectItem value="train">Tàu hỏa</SelectItem>
-                <SelectItem value="bus">Xe khách</SelectItem>
-                <SelectItem value="other">Khác</SelectItem>
+                <SelectItem value="car">Car</SelectItem>
+                <SelectItem value="plane">Airplane</SelectItem>
+                <SelectItem value="train">Train</SelectItem>
+                <SelectItem value="bus">Bus</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Estimated Cost */}
           <div className="space-y-2">
-            <Label htmlFor="estimatedCost">Chi phí dự kiến (VNĐ)</Label>
+            <Label htmlFor="estimatedCost" className="text-gray-900">Estimated Cost (VND)</Label>
             <Input
               id="estimatedCost"
               type="number"
               value={formData.estimatedCost}
               onChange={(e) => setFormData({ ...formData, estimatedCost: e.target.value })}
               placeholder="0"
+              className="border-gray-300 focus:border-red-500 focus:ring-red-500"
               min="0"
               step="1000"
             />
@@ -281,26 +305,32 @@ export function CreateTripForUser() {
 
           {/* CC Emails */}
           <div className="space-y-2">
-            <Label htmlFor="ccEmails">CC Email (phân cách bằng dấu phẩy)</Label>
+            <Label htmlFor="ccEmails" className="text-gray-900">CC Emails (comma-separated)</Label>
             <Input
               id="ccEmails"
               type="text"
               value={formData.ccEmails}
               onChange={(e) => setFormData({ ...formData, ccEmails: e.target.value })}
               placeholder="email1@example.com, email2@example.com"
+              className="border-gray-300 focus:border-red-500 focus:ring-red-500"
             />
+            <p className="text-xs text-gray-500">Additional email addresses to notify about this trip</p>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5"
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang tạo chuyến đi...
+                Creating trip...
               </>
             ) : (
               <>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Tạo chuyến đi
+                Create Trip
               </>
             )}
           </Button>

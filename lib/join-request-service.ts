@@ -3,6 +3,7 @@ import { fabricService } from './mysql-service';
 import { authService } from './auth-service';
 import { emailService } from './email-service';
 import { toMySQLDateTime, getCurrentVietnamTime } from './utils'; // ✅ Import từ utils
+import { TripStatus } from './trip-status-config';
 
 // Check if we're on server side
 const isServer = typeof window === 'undefined';
@@ -206,8 +207,9 @@ class JoinRequestService {
           // Check if it's on the same date
           if (trip.departureDate !== tripDetails.departureDate) return false;
 
-          // Check if status is confirmed or optimized (not cancelled/draft)
-          if (trip.status !== 'confirmed' && trip.status !== 'optimized') return false;
+          // Check if status is approved or optimized (not cancelled/draft/pending)
+          const validStatuses = ['approved_solo', 'approved', 'auto_approved', 'optimized'];
+          if (!validStatuses.includes(trip.status)) return false;
 
           return true;
         });
@@ -811,8 +813,8 @@ You will receive another email once your request has been reviewed.`;
 
   private async sendApprovalNotification(request: JoinRequest): Promise<void> {
     try {
-      const subject = '✅ Trip Join Request Approved';
-      const body = `Great news! Your request to join the trip has been approved.
+      const subject = '✅ Trip Join Request Approved - Manager Approval Required';
+      const body = `Great news! Your join request has been approved by admin.
 
 Trip Details:
 • From: ${request.tripDetails.departureLocation}
@@ -821,12 +823,13 @@ Trip Details:
 • Time: ${request.tripDetails.departureTime}
 ${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
 
-See you on the trip!`;
+⚠️ NEXT STEP: Your trip is now pending your manager's approval.
+${request.requesterManagerEmail ? `Your manager (${request.requesterManagerEmail}) will receive an email to approve this trip.` : 'You will be notified once your trip is fully confirmed.'}`;
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #4caf50;">✅ Trip Join Request Approved</h2>
-          <p>Great news! Your request to join the trip has been <strong style="color: #4caf50;">approved</strong>.</p>
+          <p>Great news! Your request to join the trip has been <strong style="color: #4caf50;">approved by admin</strong>.</p>
 
           <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4caf50;">
             <h3 style="margin-top: 0; color: #2e7d32;">Trip Details</h3>
@@ -842,7 +845,13 @@ See you on the trip!`;
             </div>
           ` : ''}
 
-          <p style="color: #2e7d32; font-weight: bold;">See you on the trip! 🚗</p>
+          <div style="background: #fff9e6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff9800;">
+            <h3 style="margin-top: 0; color: #e65100;">⚠️ Next Step: Manager Approval Required</h3>
+            <p style="margin: 0;">Your trip is now <strong>pending your manager's approval</strong>.</p>
+            ${request.requesterManagerEmail ? `<p style="margin: 10px 0 0 0;">Your manager (<strong>${request.requesterManagerEmail}</strong>) will receive an email to approve this trip.</p>` : ''}
+          </div>
+
+          <p style="color: #666;">You will be notified once your manager approves the trip. 📧</p>
         </div>
       `;
 
@@ -957,6 +966,42 @@ Trip Details:
       console.log('📋 Creating new trip for user:', request.requesterName);
       console.log('📋 Based on trip:', originalTrip.id);
 
+      // 🔥 Get user's manager info
+      let managerEmail: string | null = null;
+      let managerName: string | null = null;
+
+      if (this.ensureServerSide('addUserToTrip - get manager info')) {
+        try {
+          const poolInstance = await getPool();
+          const connection = await poolInstance.getConnection();
+          const [userRows] = await connection.query(
+            'SELECT manager_email, manager_name FROM users WHERE id = ? LIMIT 1',
+            [request.requesterId]
+          ) as any[];
+          connection.release();
+
+          if (Array.isArray(userRows) && userRows.length > 0) {
+            managerEmail = userRows[0].manager_email;
+            managerName = userRows[0].manager_name;
+            console.log(`📧 Manager info for ${request.requesterEmail}: ${managerName} (${managerEmail})`);
+          } else {
+            console.log(`⚠️ No manager found for user ${request.requesterEmail}`);
+          }
+        } catch (dbError) {
+          console.warn('⚠️ Could not fetch manager info:', dbError);
+        }
+      }
+
+      // 🔥 Determine trip status: pending_approval or pending_urgent (for joined trips, always need manager approval)
+      // Check if trip is urgent (< 24 hours)
+      const departureDateTime = new Date(`${originalTrip.departureDate}T${originalTrip.departureTime}`);
+      const now = new Date();
+      const hoursUntilDeparture = (departureDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const isUrgent = hoursUntilDeparture < 24;
+
+      // 🔥 NEW LOGIC: Joined trips ALWAYS need manager approval (even if original trip is already optimized)
+      const tripStatus: TripStatus = managerEmail ? (isUrgent ? 'pending_urgent' : 'pending_approval') : 'auto_approved';
+
       // Create a new trip for the user with the same details as the original trip
       const newTrip = {
         userId: request.requesterId,
@@ -971,26 +1016,37 @@ Trip Details:
         vehicleType: originalTrip.vehicleType,
         estimatedCost: originalTrip.estimatedCost,
         actualCost: originalTrip.actualCost,
-        status: originalTrip.status, // Keep same status (optimized or confirmed)
-        optimizedGroupId: originalTrip.optimizedGroupId, // Join the same optimized group
+        status: tripStatus, // 🔥 NEW: Requires manager approval
+        optimizedGroupId: originalTrip.optimizedGroupId, // Will join the same group AFTER manager approval
         originalDepartureTime: originalTrip.originalDepartureTime,
-        notified: false, // New user hasn't been notified yet
+        notified: false,
         dataType: 'final' as const,
         parentTripId: originalTrip.id, // Track which trip this was joined from
+        managerApprovalStatus: 'pending', // 🔥 NEW: Track manager approval
+        managerEmail: managerEmail || undefined,
+        managerName: managerName || undefined,
       };
 
       // Create the trip
       const createdTrip = await fabricService.createTrip(newTrip);
 
-      console.log('✅ User', request.requesterName, 'added to trip group', originalTrip.optimizedGroupId || originalTrip.id);
+      console.log('✅ Trip created for', request.requesterName, 'with status:', tripStatus);
+      console.log('✅ Manager approval required:', managerEmail ? `Yes (${managerEmail})` : 'No (auto-approved)');
+
+      // 🔥 Send manager approval email if needed
+      if (managerEmail && emailService.isServiceConfigured()) {
+        await emailService.sendManagerApprovalEmail(createdTrip, managerEmail, managerName || '');
+        console.log(`✅ Manager approval email sent to ${managerEmail}`);
+      }
+
       console.log('✅ New trip created with details:', {
         id: createdTrip.id,
         userId: createdTrip.userId,
         userName: createdTrip.userName,
-        userEmail: createdTrip.userEmail,
         status: createdTrip.status,
+        managerApprovalStatus: 'pending',
         optimizedGroupId: createdTrip.optimizedGroupId,
-        departureDate: createdTrip.departureDate
+        parentTripId: createdTrip.parentTripId
       });
     } catch (error) {
       console.error('Error adding user to trip:', error);

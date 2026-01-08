@@ -35,17 +35,32 @@ export interface User {
 }
 
 // ========================================
-// DATABASE CONNECTION
+// DATABASE CONNECTION POOL
 // ========================================
 
-async function getDbConnection() {
-  return await mysql.createConnection({
-    host: process.env.DB_HOST,
+let pool: any = null;
+
+async function getDbPool() {
+  if (pool) return pool;
+
+  pool = mysql.createPool({
+    host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
     port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    user: process.env.DB_USER || 'tripsmgm-rndus2',
+    password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
+    database: process.env.DB_NAME || 'tripsmgm-mydb002',
+    waitForConnections: true,
+    connectionLimit: 20,
+    queueLimit: 10,
+    maxIdle: 10,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    connectTimeout: 20000
   });
+
+  console.log('✓ User Service MySQL Pool initialized');
+  return pool;
 }
 
 // ========================================
@@ -66,7 +81,8 @@ export async function createOrUpdateUserOnLogin(params: {
   officeLocation?: string | null;
   jobTitle?: string | null;
 }): Promise<void> {
-  const connection = await getDbConnection();
+  const poolInstance = await getDbPool();
+  const connection = await poolInstance.getConnection();
 
   try {
     const {
@@ -81,7 +97,7 @@ export async function createOrUpdateUserOnLogin(params: {
     } = params;
 
     // Check if user exists
-    const [existing] = await connection.query<any[]>(
+    const [existing]: any = await connection.query(
       'SELECT id FROM users WHERE email = ? LIMIT 1',
       [email]
     );
@@ -121,7 +137,7 @@ export async function createOrUpdateUserOnLogin(params: {
     console.error('❌ Error creating/updating user:', error.message);
     throw error;
   } finally {
-    await connection.end();
+    connection.release();
   }
 }
 
@@ -130,10 +146,11 @@ export async function createOrUpdateUserOnLogin(params: {
 // ========================================
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const connection = await getDbConnection();
+  const poolInstance = await getDbPool();
+  const connection = await poolInstance.getConnection();
 
   try {
-    const [rows] = await connection.query<any[]>(
+    const [rows]: any = await connection.query(
       'SELECT * FROM users WHERE email = ? LIMIT 1',
       [email]
     );
@@ -147,7 +164,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     console.error('❌ Error getting user:', error.message);
     return null;
   } finally {
-    await connection.end();
+    connection.release();
   }
 }
 
@@ -173,7 +190,8 @@ export async function updateUserProfile(params: {
   pickupAddress?: string;
   pickupNotes?: string;
 }): Promise<void> {
-  const connection = await getDbConnection();
+  const poolInstance = await getDbPool();
+  const connection = await poolInstance.getConnection();
 
   try {
     const updateFields: string[] = [];
@@ -223,6 +241,6 @@ export async function updateUserProfile(params: {
     console.error('❌ Error updating profile:', error.message);
     throw error;
   } finally {
-    await connection.end();
+    connection.release();
   }
 }

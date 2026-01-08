@@ -166,7 +166,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Update trip status
-      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      // Manual override for expired trips should use 'approved_solo' (cannot be optimized)
+      const managerApprovalStatus = action === 'approve' ? 'approved' : 'rejected';
+      const tripStatus = action === 'approve' ? 'approved_solo' : 'rejected';
       const approvedAt = action === 'approve' ? new Date() : null;
 
       await connection.query(
@@ -174,9 +176,10 @@ export async function POST(request: NextRequest) {
          SET manager_approval_status = ?,
              manager_approval_at = ?,
              manager_approved_by = ?,
-             status = ?
+             status = ?,
+             notified = TRUE
          WHERE id = ?`,
-        [newStatus, approvedAt, session.user.email, newStatus, tripId]
+        [managerApprovalStatus, approvedAt, session.user.email, tripStatus, tripId]
       );
 
       // Log to admin_override_log
@@ -201,7 +204,7 @@ export async function POST(request: NextRequest) {
           session.user.name || session.user.email,
           reason,
           'pending',
-          newStatus,
+          tripStatus,
           'EXPIRED_APPROVAL_LINK',
           trip.user_email,
           trip.user_name,
@@ -256,29 +259,9 @@ export async function POST(request: NextRequest) {
         // Don't fail the override if email fails
       }
 
-      // If approved, trigger AI optimization
-      if (action === 'approve') {
-        try {
-          const { aiOptimizer } = await import('@/lib/ai-optimizer');
-
-          const [approvedTrips] = await connection.query(
-            `SELECT * FROM trips
-             WHERE manager_approval_status = 'approved'
-               AND status = 'approved'
-               AND departure_date >= CURDATE()
-             ORDER BY departure_date ASC, departure_time ASC
-             LIMIT 100`
-          ) as any[];
-
-          if (approvedTrips.length >= 2) {
-            console.log('🤖 Triggering AI optimization after manual approval...');
-            const proposals = await aiOptimizer.optimizeTrips(approvedTrips);
-            console.log(`✅ Generated ${proposals.length} optimization proposals`);
-          }
-        } catch (optimizationError) {
-          console.error('❌ Auto-optimization failed (non-critical):', optimizationError);
-        }
-      }
+      // REMOVED: Auto-trigger AI optimization after manual approval
+      // Reason: Admin should manually control when to run optimization
+      // Admin can use "Run AI Optimization" button in Dashboard when ready
 
       await connection.end();
 
@@ -286,7 +269,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: `Trip ${action}d successfully`,
         tripId,
-        newStatus,
+        newStatus: tripStatus,
       });
     } catch (error) {
       await connection.rollback();

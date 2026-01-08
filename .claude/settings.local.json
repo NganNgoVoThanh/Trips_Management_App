@@ -110,7 +110,10 @@
       "Bash(node scripts/test-user-creation.js:*)",
       "Bash(tasklist:*)",
       "Bash(timeout /t 5 /nobreak)",
-      "Bash(node scripts/setup-location-admins.js:*)"
+      "Bash(node scripts/setup-location-admins.js:*)",
+      "Bash(pm2 status:*)",
+      "Bash(node scripts/update-trip-status-enum.js:*)",
+      "Bash(if exist STATUS-AUDIT-REPORT.md del STATUS-AUDIT-REPORT.md)"
     ],
     "deny": [],
     "ask": []

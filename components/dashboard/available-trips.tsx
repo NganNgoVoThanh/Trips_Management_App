@@ -78,8 +78,8 @@ export function AvailableTrips() {
         tripDate.setHours(0, 0, 0, 0)
         const isFutureTrip = tripDate >= today
 
-        // Show approved_solo, optimized, AND pending_approval trips (so users can see all upcoming trips)
-        const isValidStatus = trip.status === 'approved_solo' || trip.status === 'optimized' || trip.status === 'pending_approval' || trip.status === 'pending_urgent'
+        // Show only approved_solo, approved, auto_approved, and optimized trips (trips that are confirmed and have available seats)
+        const isValidStatus = trip.status === 'approved_solo' || trip.status === 'approved' || trip.status === 'auto_approved' || trip.status === 'optimized'
 
         // ✅ Exclude trips that belong to current user (to avoid showing duplicate)
         const isNotUserTrip = !user || trip.userId !== user.id
@@ -276,7 +276,7 @@ export function AvailableTrips() {
   const hasTripOnSameDate = (trip: any): boolean => {
     return userTrips.some(userTrip =>
       userTrip.departureDate === trip.departureDate &&
-      (userTrip.status === 'approved_solo' || userTrip.status === 'optimized')
+      (userTrip.status === 'approved_solo' || userTrip.status === 'approved' || userTrip.status === 'auto_approved' || userTrip.status === 'optimized')
     )
   }
 
@@ -285,7 +285,7 @@ export function AvailableTrips() {
     if (!trip.optimizedGroupId) return false
     return userTrips.some(userTrip =>
       userTrip.optimizedGroupId === trip.optimizedGroupId &&
-      (userTrip.status === 'approved_solo' || userTrip.status === 'optimized')
+      (userTrip.status === 'approved_solo' || userTrip.status === 'approved' || userTrip.status === 'auto_approved' || userTrip.status === 'optimized')
     )
   }
 

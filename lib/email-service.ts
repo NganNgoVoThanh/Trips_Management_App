@@ -492,6 +492,181 @@ Intersnack Trips Management Team
   }
 
   /**
+   * Send manager approval email for joined trips
+   */
+  async sendManagerApprovalEmail(trip: Trip, managerEmail: string, managerName: string): Promise<void> {
+    if (!managerEmail) {
+      console.warn('No manager email provided');
+      return;
+    }
+
+    // Generate approval token (will be handled by trips/approve API)
+    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:50001';
+    const approvalUrl = `${appUrl}/api/trips/approve/${trip.id}?action=approve`;
+    const rejectUrl = `${appUrl}/api/trips/approve/${trip.id}?action=reject`;
+
+    const subject = `[ACTION REQUIRED] Trip Approval Request - ${trip.userName}`;
+
+    const body = `
+Dear ${managerName},
+
+${trip.userName} (${trip.userEmail}) has joined an existing trip and requires your approval.
+
+This trip was created when ${trip.userName} joined another employee's trip through the join request system.
+
+Trip Details:
+• Employee: ${trip.userName} (${trip.userEmail})
+• From: ${getLocationName(trip.departureLocation || '')}
+• To: ${getLocationName(trip.destination || '')}
+• Departure: ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}
+• Return: ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}
+${trip.vehicleType ? `• Vehicle: ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}` : ''}
+${trip.estimatedCost ? `• Estimated Cost: ${formatCurrency(trip.estimatedCost)}` : ''}
+
+ACTION REQUIRED:
+Please review and approve or reject this trip request.
+
+Click to approve: ${approvalUrl}
+Click to reject: ${rejectUrl}
+
+This approval link will expire in 48 hours.
+
+Best regards,
+Trips Management System
+`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">Trip Approval Request</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Action Required</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Dear <strong>${managerName}</strong>,
+      </p>
+
+      <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+        <strong>${trip.userName}</strong> has joined an existing trip and requires your approval.
+      </p>
+
+      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #856404; font-size: 14px;">
+          <strong>📌 Note:</strong> This trip was created when ${trip.userName} joined another employee's trip through the join request system.
+        </p>
+      </div>
+
+      <!-- Trip Details -->
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+          Trip Details
+        </h3>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px; width: 40%;"><strong>Employee:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Email:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>From:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.departureLocation || '')}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>To:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.destination || '')}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Departure:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Return:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</td>
+          </tr>
+          ${trip.vehicleType ? `
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Vehicle:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
+          </tr>
+          ` : ''}
+          ${trip.estimatedCost ? `
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Estimated Cost:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: bold;">${formatCurrency(trip.estimatedCost)}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #333; font-size: 16px; font-weight: bold; margin: 0 0 20px 0;">
+          Please review and take action:
+        </p>
+
+        <a href="${approvalUrl}"
+           style="display: inline-block; background: #28a745; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 8px 10px 8px; font-size: 16px;">
+          ✅ Approve Trip
+        </a>
+
+        <a href="${rejectUrl}"
+           style="display: inline-block; background: #dc3545; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 8px 10px 8px; font-size: 16px;">
+          ❌ Reject Trip
+        </a>
+      </div>
+
+      <!-- Expiry Notice -->
+      <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #e65100; font-size: 13px;">
+          ⏰ <strong>Important:</strong> This approval link will expire in 48 hours.
+        </p>
+      </div>
+
+      <p style="color: #999; font-size: 12px; margin: 30px 0 0 0; line-height: 1.6;">
+        Best regards,<br>
+        <strong>Trips Management System</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+      <p style="color: #6c757d; font-size: 12px; margin: 0;">
+        This is an automated message from Trips Management System. Please do not reply to this email.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+    await this.sendEmail({
+      to: managerEmail,
+      cc: [trip.userEmail], // CC user
+      subject,
+      text: body,
+      html,
+      category: 'approval'
+    });
+
+    console.log(`✅ Manager approval email sent to ${managerEmail} for joined trip ${trip.id}`);
+  }
+
+  /**
    * Check if email service is configured
    */
   isServiceConfigured(): boolean {

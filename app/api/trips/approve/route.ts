@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
 import { verifyApprovalToken, sendConfirmationEmail } from '@/lib/email-approval-service';
 import { logApprovalAction } from '@/lib/audit-log-service';
-import { aiOptimizer } from '@/lib/ai-optimizer';
 import {
   sendExpiredLinkNotificationToUser,
   sendExpiredLinkNotificationToAdmin,
@@ -263,10 +262,11 @@ export async function GET(request: NextRequest) {
       tripStatus = 'rejected';
     }
 
-    // Update trip status
+    // Update trip status AND mark as notified (email will be sent below)
     await connection.query(
       `UPDATE trips
-       SET status = ?
+       SET status = ?,
+           notified = TRUE
        WHERE id = ?`,
       [tripStatus, tripId]
     );
@@ -303,39 +303,6 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(`✅ Trip ${tripId} status: ${tripStatus} by ${managerEmail}`);
-
-    // 🔥 AUTO-TRIGGER OPTIMIZATION: If trip approved, trigger AI optimization
-    if (action === 'approve') {
-      try {
-        console.log('🤖 Triggering automatic optimization after trip approval...');
-
-        // Get all approved trips for optimization
-        const [approvedTrips] = await connection.query<any[]>(
-          `SELECT
-            id, user_id, departure_location, destination,
-            departure_date, departure_time, return_date, return_time,
-            vehicle_type, purpose, estimated_cost,
-            manager_approval_status, status
-          FROM trips
-          WHERE manager_approval_status = 'approved'
-            AND status = 'approved'
-            AND departure_date >= CURDATE()
-          ORDER BY departure_date ASC, departure_time ASC
-          LIMIT 100`
-        );
-
-        if (approvedTrips.length >= 2) {
-          console.log(`Found ${approvedTrips.length} approved trips, running optimization...`);
-          const proposals = await aiOptimizer.optimizeTrips(approvedTrips);
-          console.log(`✅ Auto-optimization generated ${proposals.length} proposals`);
-        } else {
-          console.log('Not enough approved trips for optimization (need at least 2)');
-        }
-      } catch (optimizationError) {
-        // Don't fail the approval if optimization fails
-        console.error('❌ Auto-optimization failed (non-critical):', optimizationError);
-      }
-    }
 
     await connection.end();
 
