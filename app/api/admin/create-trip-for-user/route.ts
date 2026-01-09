@@ -210,16 +210,76 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send notification to user (if email provided)
+    // Send notification to user
     if (isManualEntry) {
       console.log(`✅ Trip created for employee via manual entry: ${user.name} (ID: ${userEmployeeId}) - auto-approved`);
       if (userEmail && !userEmail.endsWith('@temp.local')) {
-        console.log(`   📧 Notification will be sent to: ${userEmail}`);
+        console.log(`   📧 Sending notification to: ${userEmail}`);
+        try {
+          // Import email service at the top if not already imported
+          const { emailService } = await import('@/lib/email-service');
+
+          // Create trip object for email
+          const tripForEmail = {
+            id: tripId,
+            userName: user.name,
+            userEmail: userEmail,
+            departureLocation,
+            destination,
+            departureDate,
+            departureTime,
+            returnDate,
+            returnTime,
+            vehicleType,
+            estimatedCost,
+            status: finalStatus,
+          };
+
+          // Send trip confirmation email
+          await emailService.sendTripConfirmation(tripForEmail);
+
+          // Also send to CC emails if provided
+          if (ccEmails && ccEmails.length > 0) {
+            await emailService.sendEmail({
+              to: ccEmails,
+              subject: `Trip Created for ${user.name}`,
+              body: `A trip has been created for ${user.name} (${userEmail}).\n\nTrip Details:\n• From: ${departureLocation}\n• To: ${destination}\n• Departure: ${departureDate} at ${departureTime}\n• Return: ${returnDate} at ${returnTime}\n• Status: ${finalStatus}`,
+              category: 'notification'
+            });
+            console.log(`   📧 CC notification sent to: ${ccEmails.join(', ')}`);
+          }
+
+          console.log(`   ✅ Email sent successfully to ${userEmail}`);
+        } catch (emailError: any) {
+          console.error('   ❌ Failed to send notification email:', emailError.message);
+          // Don't fail the trip creation if email fails
+        }
       } else {
         console.log(`   ⚠️ No email provided - employee should be notified manually`);
       }
     } else if (autoApprove) {
       console.log(`✅ Trip auto-approved for ${user.email} (created by admin)`);
+      try {
+        const { emailService } = await import('@/lib/email-service');
+        const tripForEmail = {
+          id: tripId,
+          userName: user.name,
+          userEmail: user.email,
+          departureLocation,
+          destination,
+          departureDate,
+          departureTime,
+          returnDate,
+          returnTime,
+          vehicleType,
+          estimatedCost,
+          status: finalStatus,
+        };
+        await emailService.sendApprovalNotification(tripForEmail);
+        console.log(`   ✅ Approval notification sent to ${user.email}`);
+      } catch (emailError: any) {
+        console.error('   ❌ Failed to send approval notification:', emailError.message);
+      }
     } else {
       console.log(`✅ Trip created for ${user.email}, awaiting manager approval`);
     }
