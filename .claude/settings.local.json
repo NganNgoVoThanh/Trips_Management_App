@@ -113,7 +113,10 @@
       "Bash(node scripts/setup-location-admins.js:*)",
       "Bash(pm2 status:*)",
       "Bash(node scripts/update-trip-status-enum.js:*)",
-      "Bash(if exist STATUS-AUDIT-REPORT.md del STATUS-AUDIT-REPORT.md)"
+      "Bash(if exist STATUS-AUDIT-REPORT.md del STATUS-AUDIT-REPORT.md)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
