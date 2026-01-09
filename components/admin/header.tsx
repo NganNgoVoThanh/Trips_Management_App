@@ -16,7 +16,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle, Zap } from "lucide-react"
+import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle } from "lucide-react"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -111,23 +111,6 @@ export function AdminHeader() {
               <Link href="/management">
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Management
-              </Link>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className={cn(
-                "transition-all cursor-pointer",
-                isActive('/admin/tools')
-                  ? "bg-red-50 text-red-600 font-medium border-b-2 border-red-600 rounded-b-none hover:bg-red-100"
-                  : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
-              )}
-            >
-              <Link href="/admin/tools">
-                <Zap className="mr-2 h-4 w-4" />
-                Quick Actions
               </Link>
             </Button>
 

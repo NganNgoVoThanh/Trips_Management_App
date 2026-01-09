@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import mysql from 'mysql2/promise';
 import { v4 as uuidv4 } from 'uuid';
+import { ensureVehiclesTable } from '@/lib/database-migration';
 
 async function getConnection() {
   return await mysql.createConnection({
@@ -29,6 +30,9 @@ export async function GET(request: NextRequest) {
     if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
+
+    // Ensure vehicles table exists
+    await ensureVehiclesTable();
 
     const connection = await getConnection();
 
@@ -60,6 +64,9 @@ export async function POST(request: NextRequest) {
     if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
+
+    // Ensure vehicles table exists
+    await ensureVehiclesTable();
 
     const body = await request.json();
     const { vehicle_number, vehicle_type, capacity, driver_name, driver_phone, notes } = body;

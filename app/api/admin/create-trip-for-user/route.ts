@@ -8,6 +8,7 @@ import mysql from 'mysql2/promise';
 import { v4 as uuidv4 } from 'uuid';
 import { sendApprovalEmail } from '@/lib/email-approval-service';
 import { logAuditAction } from '@/lib/audit-log-service';
+import { ensureTripsColumns } from '@/lib/database-migration';
 
 async function getConnection() {
   return await mysql.createConnection({
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       userEmail,
+      userName, // For manual entry users
+      userEmployeeId, // For manual entry users
+      userDepartment, // For manual entry users
+      isManualEntry = false,
       departureLocation,
       destination,
       departureDate,
@@ -45,27 +50,66 @@ export async function POST(request: NextRequest) {
       vehicleType,
       estimatedCost,
       ccEmails = [],
+      notes,
     } = body;
 
     // Validate required fields
-    if (!userEmail || !departureLocation || !destination || !departureDate || !departureTime || !returnDate || !returnTime) {
+    if (!departureLocation || !destination || !departureDate || !departureTime || !returnDate || !returnTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const connection = await getConnection();
 
-    // Get user details
-    const [users] = await connection.query<any[]>(
-      'SELECT * FROM users WHERE email = ?',
-      [userEmail]
-    );
+    let user: any;
+    let autoApprove = false;
 
-    if (users.length === 0) {
-      await connection.end();
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (isManualEntry) {
+      // For manual entry - employees not in database yet
+      if (!userName || !userEmployeeId || !userDepartment) {
+        await connection.end();
+        return NextResponse.json({ error: 'Employee name, ID, and department are required for manual entry' }, { status: 400 });
+      }
+
+      // Create a temporary user object for manual entry employee
+      // Use provided email or generate temporary one based on employee ID
+      const emailToUse = userEmail || `employee-${userEmployeeId}@temp.local`;
+
+      user = {
+        id: `temp-${userEmployeeId}`, // Use employee ID for consistent identification
+        name: userName,
+        email: emailToUse,
+        employee_id: userEmployeeId,
+        department: userDepartment,
+        manager_email: null, // No manager assigned yet
+        role: 'user',
+      };
+
+      // Manual entry trips are auto-approved since there's no manager assigned yet
+      autoApprove = true;
+    } else {
+      // For existing users in database
+      if (!userEmail) {
+        await connection.end();
+        return NextResponse.json({ error: 'User email is required' }, { status: 400 });
+      }
+
+      const [users] = await connection.query<any[]>(
+        'SELECT * FROM users WHERE email = ?',
+        [userEmail]
+      );
+
+      if (users.length === 0) {
+        await connection.end();
+        return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+      }
+
+      user = users[0];
+
+      // Check if auto-approve needed (CEO/Founder or no manager)
+      autoApprove = !user.manager_email ||
+                    user.role === 'ceo' ||
+                    user.role === 'founder';
     }
-
-    const user = users[0];
 
     // Check if trip is urgent (less than 24 hours)
     const now = new Date();
@@ -73,13 +117,20 @@ export async function POST(request: NextRequest) {
     const hoursUntilTrip = (tripDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     const isUrgent = hoursUntilTrip < 24;
 
-    // Check if auto-approve needed (CEO/Founder or no manager)
-    const autoApprove = !user.manager_email ||
-                        user.role === 'ceo' ||
-                        user.role === 'founder';
-
     // Create trip
     const tripId = uuidv4();
+
+    // Determine final status based on user type and auto-approve logic
+    const finalStatus = autoApprove ? (isManualEntry ? 'auto_approved' : 'approved_solo') : 'pending_approval';
+
+    // Ensure all required columns exist (run migration if needed)
+    try {
+      await ensureTripsColumns();
+    } catch (migrationError: any) {
+      console.error('⚠️ Migration warning:', migrationError.message);
+      // Continue anyway - columns might already exist
+    }
+
     await connection.query(
       `INSERT INTO trips (
         id, user_id, user_name, user_email,
@@ -89,8 +140,9 @@ export async function POST(request: NextRequest) {
         purpose, vehicle_type, estimated_cost,
         status, manager_approval_status,
         is_urgent, auto_approved,
-        created_by_admin, admin_email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_by_admin, admin_email,
+        notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tripId,
         user.id,
@@ -105,12 +157,13 @@ export async function POST(request: NextRequest) {
         purpose || null,
         vehicleType || null,
         estimatedCost || null,
-        autoApprove ? 'approved' : 'pending',
+        finalStatus,
         autoApprove ? 'approved' : 'pending',
         isUrgent ? 1 : 0,
         autoApprove ? 1 : 0,
         1, // created_by_admin
         session.user.email, // admin_email
+        notes || null,
       ]
     );
 
@@ -122,14 +175,14 @@ export async function POST(request: NextRequest) {
       actorName: session.user.name || undefined,
       actorRole: session.user.role as 'user' | 'manager' | 'admin',
       oldStatus: null,
-      newStatus: autoApprove ? 'approved' : 'pending',
-      notes: `Trip created by admin for user ${userEmail}`,
+      newStatus: autoApprove ? (isManualEntry ? 'auto_approved' : 'approved_solo') : 'pending_approval',
+      notes: `Trip created by admin for ${isManualEntry ? 'employee (manual entry)' : 'registered user'}: ${user.name}${isManualEntry ? ` (ID: ${userEmployeeId})` : ''}`,
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     });
 
-    // Send approval email if not auto-approved
-    if (!autoApprove && user.manager_email) {
+    // Send approval email if not auto-approved (only for registered users with managers)
+    if (!autoApprove && !isManualEntry && user.manager_email) {
       try {
         await sendApprovalEmail({
           tripId,
@@ -157,11 +210,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send notification to user
-    if (autoApprove) {
-      console.log(`✅ Trip auto-approved for ${userEmail} (created by admin)`);
+    // Send notification to user (if email provided)
+    if (isManualEntry) {
+      console.log(`✅ Trip created for employee via manual entry: ${user.name} (ID: ${userEmployeeId}) - auto-approved`);
+      if (userEmail && !userEmail.endsWith('@temp.local')) {
+        console.log(`   📧 Notification will be sent to: ${userEmail}`);
+      } else {
+        console.log(`   ⚠️ No email provided - employee should be notified manually`);
+      }
+    } else if (autoApprove) {
+      console.log(`✅ Trip auto-approved for ${user.email} (created by admin)`);
     } else {
-      console.log(`✅ Trip created for ${userEmail}, awaiting manager approval`);
+      console.log(`✅ Trip created for ${user.email}, awaiting manager approval`);
     }
 
     await connection.end();
@@ -169,10 +229,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       tripId,
-      status: autoApprove ? 'approved' : 'pending',
-      message: autoApprove
-        ? 'Trip created and auto-approved successfully'
-        : 'Trip created, awaiting manager approval',
+      status: autoApprove ? (isManualEntry ? 'auto_approved' : 'approved_solo') : 'pending_approval',
+      isManualEntry,
+      employeeId: isManualEntry ? userEmployeeId : undefined,
+      message: isManualEntry
+        ? userEmail && !userEmail.endsWith('@temp.local')
+          ? `Trip created successfully for employee ${user.name} (auto-approved). Confirmation sent to ${userEmail}.`
+          : `Trip created successfully for employee ${user.name} (auto-approved). No email on file - please notify employee manually.`
+        : autoApprove
+          ? 'Trip created and auto-approved successfully'
+          : 'Trip created, awaiting manager approval',
     });
   } catch (error: any) {
     console.error('❌ Error creating trip for user:', error);

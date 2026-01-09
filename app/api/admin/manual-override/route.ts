@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import mysql from 'mysql2/promise';
+import { ensureTripsColumns, ensureAuditTables } from '@/lib/database-migration';
 
 // GET: Fetch trips pending manual override
 export async function GET(request: NextRequest) {
@@ -117,6 +118,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Ensure required tables and columns exist
+    await ensureTripsColumns();
+    await ensureAuditTables();
 
     const connection = await mysql.createConnection({
       host: process.env.DB_HOST,

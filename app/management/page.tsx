@@ -5,18 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  BarChart3, 
-  Users, 
-  Car, 
-  TrendingDown, 
+import {
+  BarChart3,
+  Users,
+  Car,
+  TrendingDown,
   Calendar,
   DollarSign,
   Activity,
   Download,
   Filter,
   RefreshCw,
-  Settings,
   ChevronRight,
   MapPin,
   Clock,
@@ -53,6 +52,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { CreateTripForUser } from "@/components/admin/create-trip-for-user"
+import { UserPlus } from "lucide-react"
 
 export default function ManagementDashboard() {
   const router = useRouter()
@@ -68,14 +69,6 @@ export default function ManagementDashboard() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null)
   const [showTripDetails, setShowTripDetails] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [isSavingSettings, setIsSavingSettings] = useState(false)
-  
-  const [settings, setSettings] = useState({
-    maxWaitTime: 30,
-    minSavings: 15,
-    maxDetour: 10,
-    defaultVehicle: 'car-4'
-  })
   
   const [stats, setStats] = useState({
     totalTrips: 0,
@@ -103,12 +96,6 @@ export default function ManagementDashboard() {
       router.push('/')
       return
     }
-
-    // Load saved settings
-    const savedSettings = localStorage.getItem('management_settings')
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings))
-    }
   }
 
   const loadDashboardData = async () => {
@@ -131,27 +118,58 @@ export default function ManagementDashboard() {
 
   const calculateStats = (trips: Trip[]) => {
     const totalTrips = trips.length
-    const pendingTrips = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent').length
+
+    // ✅ Fixed: Count all pending statuses correctly
+    const pendingTrips = trips.filter(t =>
+      t.status === 'pending_approval' ||
+      t.status === 'pending_urgent' ||
+      t.status === 'pending'
+    ).length
+
+    // Count optimized trips
     const optimizedTrips = trips.filter(t => t.status === 'optimized').length
-    
+
+    // ✅ Fixed: Only calculate savings when actualCost exists
     const totalSavings = trips.reduce((sum, t) => {
-      if (t.status === 'optimized' && t.estimatedCost) {
-        const actualCost = t.actualCost || (t.estimatedCost * 0.75)
-        return sum + (t.estimatedCost - actualCost)
+      // Only count trips with both estimated and actual costs
+      if (t.status === 'optimized' && t.estimatedCost && t.actualCost) {
+        const savings = t.estimatedCost - t.actualCost
+        // Only add positive savings (sanity check)
+        return sum + (savings > 0 ? savings : 0)
       }
       return sum
     }, 0)
-    
+
+    // Current month trips
     const currentMonth = new Date().getMonth()
     const currentYear = new Date().getFullYear()
     const monthlyTrips = trips.filter(t => {
-      const date = new Date(t.departureDate)
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+      try {
+        const date = new Date(t.departureDate)
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+      } catch {
+        return false
+      }
     }).length
-    
+
+    // Count unique employees with trips
     const uniqueEmployees = new Set(trips.map(t => t.userId)).size
-    const averageSavings = optimizedTrips > 0 ? totalSavings / optimizedTrips : 0
-    const optimizationRate = totalTrips > 0 ? (optimizedTrips / totalTrips) * 100 : 0
+
+    // ✅ Fixed: Calculate average savings only from trips with actual costs
+    const tripsWithActualSavings = trips.filter(t =>
+      t.status === 'optimized' && t.estimatedCost && t.actualCost
+    ).length
+    const averageSavings = tripsWithActualSavings > 0 ? totalSavings / tripsWithActualSavings : 0
+
+    // ✅ Fixed: Calculate optimization rate from approved/completed trips only
+    const completedTrips = trips.filter(t =>
+      t.status === 'optimized' ||
+      t.status === 'approved_solo' ||
+      t.status === 'approved' ||
+      t.status === 'auto_approved' ||
+      t.status === 'confirmed' // Legacy approved status
+    ).length
+    const optimizationRate = completedTrips > 0 ? (optimizedTrips / completedTrips) * 100 : 0
 
     setStats({
       totalTrips,
@@ -246,40 +264,42 @@ export default function ManagementDashboard() {
     }
   }
 
-  const handleSaveSettings = () => {
-    setIsSavingSettings(true)
-    localStorage.setItem('management_settings', JSON.stringify(settings))
-    
-    setTimeout(() => {
-      setIsSavingSettings(false)
-      toast({
-        title: "Settings Saved",
-        description: "System settings have been updated successfully"
-      })
-    }, 500)
-  }
+  const [exporting, setExporting] = useState(false)
 
   const handleExportData = async () => {
+    setExporting(true)
     try {
-      const dataStr = JSON.stringify(trips, null, 2)
-      const blob = new Blob([dataStr], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `trips-export-${new Date().toISOString().split('T')[0]}.json`
-      link.click()
-      URL.revokeObjectURL(url)
-      
+      const res = await fetch("/api/admin/export-trips")
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to export")
+      }
+
+      // Download the file
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `trips_export_${new Date().toISOString().split("T")[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
       toast({
         title: "Export Successful",
-        description: "Trip data has been exported"
+        description: "Trip data has been exported to Excel"
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Export error:", error)
       toast({
         title: "Export Failed",
-        description: "Failed to export data",
+        description: error.message || "Failed to export data",
         variant: "destructive"
       })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -308,12 +328,22 @@ export default function ManagementDashboard() {
               )}
               Refresh
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={handleExportData}
+              disabled={exporting}
             >
-              <Download className="mr-2 h-4 w-4" />
-              Export Data
+              {exporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Excel
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -382,8 +412,11 @@ export default function ManagementDashboard() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="trips">All Trips</TabsTrigger>
+            <TabsTrigger value="create-trip">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create Trip
+            </TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -472,6 +505,72 @@ export default function ManagementDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Create Trip Tab */}
+          <TabsContent value="create-trip" className="space-y-4">
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-6 text-white shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-3 rounded-lg">
+                  <UserPlus className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Create Trip for Employee</h2>
+                  <p className="text-red-100 mt-1">
+                    Register a business trip on behalf of any employee in the system
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-600 text-white p-2 rounded-lg">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium">Select Employee</p>
+                      <p className="text-xs text-blue-700">Choose from all users</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-600 text-white p-2 rounded-lg">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-green-600 font-medium">Trip Details</p>
+                      <p className="text-xs text-green-700">Auto-calculate costs</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-purple-600 text-white p-2 rounded-lg">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-purple-600 font-medium">Auto Approval</p>
+                      <p className="text-xs text-purple-700">Email notification sent</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Create Trip Form */}
+            <CreateTripForUser />
           </TabsContent>
 
           {/* All Trips Tab */}
@@ -625,10 +724,11 @@ export default function ManagementDashboard() {
                         const userTrips = trips.filter(t => t.userId === userId)
                         const user = userTrips[0]
                         const optimized = userTrips.filter(t => t.status === 'optimized').length
+                        // ✅ Fixed: Only calculate savings from actual costs
                         const savings = userTrips.reduce((sum, t) => {
-                          if (t.status === 'optimized' && t.estimatedCost) {
-                            const actualCost = t.actualCost || (t.estimatedCost * 0.75)
-                            return sum + (t.estimatedCost - actualCost)
+                          if (t.status === 'optimized' && t.estimatedCost && t.actualCost) {
+                            const savingsAmount = t.estimatedCost - t.actualCost
+                            return sum + (savingsAmount > 0 ? savingsAmount : 0)
                           }
                           return sum
                         }, 0)
@@ -646,79 +746,6 @@ export default function ManagementDashboard() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>Configure system parameters and preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="maxWait">Max Wait Time (minutes)</Label>
-                    <Input 
-                      id="maxWait"
-                      type="number" 
-                      value={settings.maxWaitTime}
-                      onChange={(e) => setSettings({...settings, maxWaitTime: parseInt(e.target.value)})}
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="minSavings">Min Savings Percentage</Label>
-                    <Input 
-                      id="minSavings"
-                      type="number" 
-                      value={settings.minSavings}
-                      onChange={(e) => setSettings({...settings, minSavings: parseInt(e.target.value)})}
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="maxDetour">Max Detour Distance (km)</Label>
-                    <Input 
-                      id="maxDetour"
-                      type="number" 
-                      value={settings.maxDetour}
-                      onChange={(e) => setSettings({...settings, maxDetour: parseInt(e.target.value)})}
-                      className="mt-1" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="defaultVehicle">Default Vehicle Type</Label>
-                    <Select value={settings.defaultVehicle} onValueChange={(v) => setSettings({...settings, defaultVehicle: v})}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="car-4">4-Seater Car</SelectItem>
-                        <SelectItem value="car-7">7-Seater Car</SelectItem>
-                        <SelectItem value="van-16">16-Seater Van</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button 
-                    className="bg-red-600 hover:bg-red-700"
-                    onClick={handleSaveSettings}
-                    disabled={isSavingSettings}
-                  >
-                    {isSavingSettings ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Settings'
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
