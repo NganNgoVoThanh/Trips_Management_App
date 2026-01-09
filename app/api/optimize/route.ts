@@ -26,21 +26,27 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🔄 Admin triggered AI optimization...');
 
-    // Step 1: Get trips that can be optimized (status = 'approved')
-    const tripsToOptimize = await fabricService.getTrips({
-      status: 'approved',
-      dataType: 'raw'
-    });
+    // Step 1: Get ALL trips that can be optimized
+    // Include: 'approved', 'auto_approved', 'approved_solo'
+    // These are trips that have been approved by manager or auto-approved
+    const allTrips = await fabricService.getTrips({ dataType: 'raw' });
+
+    // Filter trips that are eligible for optimization
+    const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved', 'approved_solo'];
+    const tripsToOptimize = allTrips.filter(trip =>
+      eligibleStatuses.includes(trip.status as TripStatus)
+    );
 
     if (tripsToOptimize.length === 0) {
       console.log('⚠️ No trips available for optimization');
       return NextResponse.json({
-        message: 'No trips available for optimization',
+        message: 'No approved trips available for optimization. Please approve some trips first.',
         availableTrips: 0
       });
     }
 
-    console.log(`📊 Found ${tripsToOptimize.length} trips eligible for optimization`);
+    console.log(`📊 Found ${tripsToOptimize.length} trips eligible for optimization (${allTrips.length} total trips)`);
+    console.log(`   Status breakdown: ${tripsToOptimize.map(t => t.status).join(', ')}`);
 
     // Step 2: Update status to 'pending_optimization'
     for (const trip of tripsToOptimize) {

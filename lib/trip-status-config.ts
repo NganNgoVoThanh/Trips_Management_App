@@ -246,7 +246,7 @@ export function isFinalStatus(status: TripStatus): boolean {
 
 // Check if status can be optimized
 export function canOptimize(status: TripStatus): boolean {
-  return ['approved', 'pending_optimization', 'proposed'].includes(status);
+  return ['approved', 'auto_approved', 'approved_solo', 'pending_optimization', 'proposed'].includes(status);
 }
 
 // Check if status is pending approval

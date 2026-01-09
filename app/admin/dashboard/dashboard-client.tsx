@@ -331,74 +331,49 @@ export function AdminDashboardClient() {
   const handleRunOptimization = async () => {
     setIsOptimizing(true)
     try {
-      // Get approved but not optimized trips
-      const trips = await fabricService.getTrips()
-      const tripsToOptimize = trips.filter(t =>
-        t.status === 'approved' && !t.optimizedGroupId
-      )
+      console.log('🚀 Triggering AI optimization via API...')
 
-      if (tripsToOptimize.length === 0) {
-        toast({
-          title: "No trips to optimize",
-          description: "All approved trips have been optimized",
-        })
-        return
+      // Call API to run optimization
+      const response = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to run optimization')
       }
 
-      // Run AI optimization
-      const proposals = await aiOptimizer.optimizeTrips(tripsToOptimize)
-
-      if (proposals.length === 0) {
+      // Check if there were no trips to optimize
+      if (data.availableTrips === 0 || data.proposalsCreated === 0) {
         toast({
           title: "No optimization opportunities",
-          description: "No cost-saving combinations found",
+          description: data.message || "No trips available for optimization",
         })
         return
       }
 
-      // Auto-approve first proposal for demo
-      const firstProposal = proposals[0]
+      // Get proposals from response
+      const proposals = data.proposals || []
 
-      // Create optimization group
-      const group = await fabricService.createOptimizationGroup({
-        trips: firstProposal.trips.map(t => t.id),
-        proposedDepartureTime: firstProposal.proposedDepartureTime,
-        vehicleType: firstProposal.vehicleType,
-        estimatedSavings: firstProposal.estimatedSavings,
-        status: 'approved',
-        createdBy: user?.id || 'admin',
-        approvedBy: user?.id,
-        approvedAt: new Date().toISOString()
-      })
-
-      // Update trips
-      for (const trip of firstProposal.trips) {
-        await fabricService.updateTrip(trip.id, {
-          status: 'optimized',
-          optimizedGroupId: group.id,
-          originalDepartureTime: trip.departureTime,
-          departureTime: firstProposal.proposedDepartureTime,
-          vehicleType: firstProposal.vehicleType,
-          actualCost: (trip.estimatedCost || 0) * 0.75,
-          notified: true
-        })
-      }
-
-      // Send notifications
-      await emailService.sendOptimizationNotification(
-        firstProposal.trips,
-        firstProposal.proposedDepartureTime,
-        firstProposal.vehicleType,
-        firstProposal.estimatedSavings
-      )
+      // Success! Show optimization results
+      const totalSavings = proposals.reduce((sum: number, p: any) => sum + (p.estimatedSavings || 0), 0)
 
       toast({
-        title: "Optimization Complete",
-        description: `Optimized ${firstProposal.trips.length} trips, saving ${formatCurrency(firstProposal.estimatedSavings)}`,
+        title: "✅ AI Optimization Complete",
+        description: `Created ${data.proposalsCreated} proposal(s) affecting ${data.tripsAffected} trips. Potential savings: ${formatCurrency(totalSavings)}`,
       })
 
-      // Reload dashboard
+      console.log(`✅ Optimization successful: ${data.proposalsCreated} proposals created`)
+
+      // Reload dashboard to show updated stats
       await loadAdminDashboard()
+
+      // Navigate to optimizations page to review proposals
+      router.push('/admin/optimizations')
 
     } catch (error: any) {
       console.error('Error running optimization:', error)
