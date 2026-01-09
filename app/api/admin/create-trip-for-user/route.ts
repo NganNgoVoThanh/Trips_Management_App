@@ -222,6 +222,7 @@ export async function POST(request: NextRequest) {
           // Create trip object for email
           const tripForEmail = {
             id: tripId,
+            userId: user.id,
             userName: user.name,
             userEmail: userEmail,
             departureLocation,
@@ -233,7 +234,10 @@ export async function POST(request: NextRequest) {
             vehicleType,
             estimatedCost,
             status: finalStatus,
-          };
+            notified: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any; // Cast to any to allow partial Trip object for email
 
           // Send trip confirmation email
           await emailService.sendTripConfirmation(tripForEmail);
@@ -263,6 +267,7 @@ export async function POST(request: NextRequest) {
         const { emailService } = await import('@/lib/email-service');
         const tripForEmail = {
           id: tripId,
+          userId: user.id,
           userName: user.name,
           userEmail: user.email,
           departureLocation,
@@ -274,7 +279,10 @@ export async function POST(request: NextRequest) {
           vehicleType,
           estimatedCost,
           status: finalStatus,
-        };
+          notified: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as any; // Cast to any to allow partial Trip object for email
         await emailService.sendApprovalNotification(tripForEmail);
         console.log(`   ✅ Approval notification sent to ${user.email}`);
       } catch (emailError: any) {
