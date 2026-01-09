@@ -38,10 +38,14 @@ export function TripOptimization() {
   const loadData = async () => {
     try {
       setIsLoading(true)
-      
+
       // Load approved trips ready for optimization
+      // Include: 'approved', 'auto_approved', 'approved_solo'
       const allTrips = await fabricService.getTrips({ includeTemp: false })
-      const trips = allTrips.filter(t => t.status === 'approved')
+      const eligibleStatuses = ['approved', 'auto_approved', 'approved_solo']
+      const trips = allTrips.filter(t => eligibleStatuses.includes(t.status))
+
+      console.log(`📊 Found ${trips.length} trips eligible for optimization (statuses: ${trips.map(t => t.status).join(', ')})`)
       setPendingTrips(trips)
       
       // Load existing proposals
@@ -84,40 +88,36 @@ export function TripOptimization() {
 
   const runOptimization = async () => {
     setIsOptimizing(true)
-    
+
     try {
-      // Get unoptimized trips
-      const unoptimizedTrips = pendingTrips.filter(t => !t.optimizedGroupId)
-      
-      if (unoptimizedTrips.length === 0) {
+      console.log('🚀 Running AI optimization...')
+
+      // Call backend API to run optimization
+      const response = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to run optimization')
+      }
+
+      // Check if no trips available
+      if (data.availableTrips === 0) {
         toast({
           title: "No trips to optimize",
-          description: "All pending trips have been processed",
+          description: data.message || "No approved trips available for optimization",
         })
         setIsOptimizing(false)
         return
       }
-      
-      // Validate trips
-      const validTrips = unoptimizedTrips.filter(trip => 
-        trip.departureLocation && 
-        trip.destination && 
-        trip.departureDate && 
-        trip.departureTime
-      )
-      
-      if (validTrips.length === 0) {
-        toast({
-          title: "Invalid trip data",
-          description: "No valid trips found for optimization",
-          variant: "destructive"
-        })
-        setIsOptimizing(false)
-        return
-      }
-      
-      // Run optimization
-      const newProposals = await aiOptimizer.optimizeTrips(validTrips)
+
+      // Get the created proposals
+      const newProposals = data.proposals || []
       
       if (!Array.isArray(newProposals)) {
         toast({
@@ -125,52 +125,24 @@ export function TripOptimization() {
           description: "Invalid response from optimization service",
           variant: "destructive"
         })
-      } else if (newProposals.length === 0) {
+      } else if (newProposals.length === 0 || data.proposalsCreated === 0) {
         toast({
           title: "No optimization opportunities",
-          description: "No cost-saving combinations found",
+          description: data.message || "No cost-saving combinations found",
         })
       } else {
-        // Process proposals (backend handles TEMP data creation)
-        const processedProposals: OptimizationProposal[] = []
-        
-        for (const proposal of newProposals) {
-          if (!proposal || !proposal.trips || proposal.trips.length === 0) continue
-          
-          // Create optimization group
-          const group = await fabricService.createOptimizationGroup({
-            trips: proposal.trips.map(t => t.id),
-            proposedDepartureTime: proposal.proposedDepartureTime || proposal.trips[0].departureTime,
-            vehicleType: proposal.vehicleType || 'car-4',
-            estimatedSavings: proposal.estimatedSavings || 0,
-            status: 'proposed',
-            createdBy: authService.getCurrentUser()?.id || 'system'
-          })
-          
-          // Create temp data in backend
-          const tempTrips = await fabricService.createTempOptimizedTrips(
-            proposal.trips.map(t => t.id),
-            {
-              proposedDepartureTime: proposal.proposedDepartureTime || proposal.trips[0].departureTime,
-              vehicleType: proposal.vehicleType || 'car-4',
-              groupId: group.id,
-              estimatedSavings: proposal.estimatedSavings
-            }
-          )
-          
-          processedProposals.push({
-            ...proposal,
-            id: group.id,
-            trips: tempTrips
-          })
-        }
-        
-        setProposals([...proposals, ...processedProposals])
-        
+        // Backend already created optimization groups and temp trips
+        // Just reload data to show new proposals
+        await loadData()
+
+        const totalSavings = newProposals.reduce((sum: number, p: any) => sum + (p.estimatedSavings || 0), 0)
+
         toast({
-          title: "Optimization Complete",
-          description: `Found ${processedProposals.length} cost-saving opportunities`,
+          title: "✅ Optimization Complete",
+          description: `Created ${data.proposalsCreated} proposal(s) affecting ${data.tripsAffected} trips. Potential savings: ${formatCurrency(totalSavings)}`,
         })
+
+        console.log(`✅ Optimization successful: ${data.proposalsCreated} proposals created`)
       }
     } catch (error: any) {
       console.error('Optimization error:', error)
