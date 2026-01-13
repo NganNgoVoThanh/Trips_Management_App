@@ -77,7 +77,18 @@ export function AdminDashboardClient() {
     monthlyTrips: 0,
     vehicleUtilization: 0,
     averageSavings: 0,
-    pendingJoinRequests: 0
+    pendingJoinRequests: 0,
+    statusBreakdown: {
+      pending_approval: 0,
+      pending_urgent: 0,
+      auto_approved: 0,
+      approved: 0,
+      approved_solo: 0,
+      optimized: 0,
+      rejected: 0,
+      cancelled: 0,
+      expired: 0,
+    }
   })
   const [pendingActions, setPendingActions] = useState<any[]>([])
   const [recentOptimizations, setRecentOptimizations] = useState<any[]>([])
@@ -204,10 +215,43 @@ export function AdminDashboardClient() {
         allTrips = []
       }
 
-      // Calculate real statistics
+      // Calculate real statistics with detailed status breakdown
+      // ✅ REFINED: Pending Actions should ONLY show trips that NEED admin action
+      // Exclude: auto_approved (already approved), approved (manager already approved), admin-created trips
+      const needsAdminApproval = allTrips.filter(t => {
+        // ✅ CRITICAL FIX: Exclude TEMP trips from Pending Actions
+        // TEMP trips are optimization previews and should NOT require approval
+        if (t.dataType === 'temp') {
+          return false;
+        }
+
+        // ✅ CRITICAL FIX: Exclude admin-created trips
+        if (t.created_by_admin) {
+          return false;
+        }
+
+        // Only include trips with pending status
+        const isPending = t.status === 'pending_approval' || t.status === 'pending_urgent'
+        if (!isPending) return false
+
+        // Exclude auto-approved trips
+        if (t.auto_approved) return false
+
+        // Exclude manager-approved trips
+        if (t.manager_approval_status === 'approved') return false
+
+        return true
+      })
+
       const pending = allTrips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent')
-      const optimized = allTrips.filter(t => t.status === 'optimized')
-      const confirmed = allTrips.filter(t => t.status === 'approved' || t.status === 'approved_solo' || t.status === 'auto_approved')
+      // ✅ FIX: Only count REAL optimized trips (exclude TEMP)
+      const optimized = allTrips.filter(t => t.status === 'optimized' && t.dataType !== 'temp')
+      const autoApproved = allTrips.filter(t => t.status === 'auto_approved')
+      const approved = allTrips.filter(t => t.status === 'approved')
+      const approvedSolo = allTrips.filter(t => t.status === 'approved_solo')
+      const rejected = allTrips.filter(t => t.status === 'rejected')
+      const cancelled = allTrips.filter(t => t.status === 'cancelled')
+      const expired = allTrips.filter(t => t.status === 'expired')
 
       const currentMonth = new Date().getMonth()
       const currentYear = new Date().getFullYear()
@@ -246,19 +290,31 @@ export function AdminDashboardClient() {
       if (!isMountedRef.current) return
       setStats({
         totalTrips: allTrips.length,
-        pendingApprovals: pending.length,
+        pendingApprovals: needsAdminApproval.length, // ✅ Use refined count
         totalSavings,
         optimizationRate: allTrips.length > 0 ? (optimized.length / allTrips.length) * 100 : 0,
         activeEmployees: uniqueEmployees,
         monthlyTrips: monthlyTrips.length,
         vehicleUtilization: Math.min(vehicleUtilization, 100),
         averageSavings: optimized.length > 0 ? totalSavings / optimized.length : 0,
-        pendingJoinRequests: joinRequestStats.pending
+        pendingJoinRequests: joinRequestStats.pending,
+        // ✅ ADD: Detailed status breakdown
+        statusBreakdown: {
+          pending_approval: pending.filter(t => t.status === 'pending_approval').length,
+          pending_urgent: pending.filter(t => t.status === 'pending_urgent').length,
+          auto_approved: autoApproved.length,
+          approved: approved.length,
+          approved_solo: approvedSolo.length,
+          optimized: optimized.length,
+          rejected: rejected.length,
+          cancelled: cancelled.length,
+          expired: expired.length,
+        }
       })
 
-      // Set pending actions with real data - FIX: Use formatDate and formatTime
+      // ✅ REFINED: Set pending actions with ONLY trips that need admin action
       if (!isMountedRef.current) return
-      setPendingActions(pending.slice(0, 5).map(t => ({
+      setPendingActions(needsAdminApproval.slice(0, 5).map(t => ({
         id: t.id,
         type: 'approval',
         user: t.userName,
@@ -267,21 +323,26 @@ export function AdminDashboardClient() {
         date: formatDate(t.departureDate),
         time: formatTime(t.departureDate),
         estimatedCost: t.estimatedCost,
+        status: t.status, // ✅ Include actual status for detailed display
+        isUrgent: t.is_urgent || t.status === 'pending_urgent',
         trip: t
       })))
 
       // Recent optimizations with real data - FIX: Group by optimizedGroupId to avoid duplicates
-      // Group trips by optimizedGroupId first
+      // ✅ FIXED: Only include trips that actually have optimizedGroupId
       const groupedOptimizations = new Map<string, Trip[]>()
 
       optimized.forEach(trip => {
-        if (trip.optimizedGroupId) {
+        // ✅ CRITICAL FIX: Only include trips that are truly optimized (have groupId)
+        if (trip.optimizedGroupId && trip.optimizedGroupId.trim() !== '') {
           if (!groupedOptimizations.has(trip.optimizedGroupId)) {
             groupedOptimizations.set(trip.optimizedGroupId, [])
           }
           groupedOptimizations.get(trip.optimizedGroupId)!.push(trip)
         }
       })
+
+      console.log(`📊 Found ${groupedOptimizations.size} optimization groups from ${optimized.length} optimized trips`)
 
       // Convert to array and sort by most recent updatedAt within each group
       const optimizationGroups = Array.from(groupedOptimizations.entries())
@@ -292,10 +353,14 @@ export function AdminDashboardClient() {
           )
           const latestTrip = sortedTrips[0]
 
-          // Calculate total savings for the entire group
-          const totalSavings = trips.reduce((sum, t) =>
-            sum + ((t.estimatedCost || 0) - (t.actualCost || t.estimatedCost || 0)), 0
-          )
+          // ✅ FIXED: Calculate real savings only when actualCost exists
+          const totalSavings = trips.reduce((sum, t) => {
+            if (t.estimatedCost && t.actualCost) {
+              const savings = t.estimatedCost - t.actualCost
+              return sum + (savings > 0 ? savings : 0)
+            }
+            return sum
+          }, 0)
 
           return {
             id: groupId,
@@ -309,6 +374,8 @@ export function AdminDashboardClient() {
         })
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 5)
+
+      console.log(`✅ Displaying ${optimizationGroups.length} recent optimization groups`)
 
       if (!isMountedRef.current) return
       setRecentOptimizations(optimizationGroups)
@@ -662,7 +729,10 @@ export function AdminDashboardClient() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-yellow-600 hover:shadow-md transition-shadow cursor-pointer" onClick={handleViewAllPending}>
+            <Card
+              className="border-l-4 border-l-yellow-600 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={handleViewAllPending}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
                 <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -675,7 +745,10 @@ export function AdminDashboardClient() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-purple-600 hover:shadow-md transition-shadow cursor-pointer" onClick={handleViewAllJoinRequests}>
+            <Card
+              className="border-l-4 border-l-purple-600 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={handleViewAllJoinRequests}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Join Requests</CardTitle>
                 <UserPlus className="h-4 w-4 text-purple-600" />
@@ -767,15 +840,132 @@ export function AdminDashboardClient() {
             </Card>
           </div>
 
+          {/* Status Breakdown - Chi tiết từng trạng thái */}
+          <Card>
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+              <CardTitle className="flex items-center gap-2">
+                <div className="h-8 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full" />
+                Trip Status Breakdown
+              </CardTitle>
+              <CardDescription>
+                Detailed view of all trip statuses in the system
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {/* Pending Approval */}
+                <div className="p-4 rounded-lg border border-yellow-200 bg-yellow-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                    <p className="text-xs font-medium text-yellow-800">Pending Approval</p>
+                  </div>
+                  <p className="text-2xl font-bold text-yellow-700">{stats.statusBreakdown.pending_approval}</p>
+                  <p className="text-xs text-yellow-600 mt-1">Chờ phê duyệt</p>
+                </div>
+
+                {/* Pending Urgent */}
+                <div className="p-4 rounded-lg border border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-orange-500 animate-pulse" />
+                    <p className="text-xs font-medium text-orange-800">Pending Urgent</p>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-700">{stats.statusBreakdown.pending_urgent}</p>
+                  <p className="text-xs text-orange-600 mt-1">Khẩn cấp (&lt;24h)</p>
+                </div>
+
+                {/* Auto Approved */}
+                <div className="p-4 rounded-lg border border-green-200 bg-green-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-green-500" />
+                    <p className="text-xs font-medium text-green-800">Auto Approved</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700">{stats.statusBreakdown.auto_approved}</p>
+                  <p className="text-xs text-green-600 mt-1">Tự động duyệt</p>
+                </div>
+
+                {/* Approved */}
+                <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
+                    <p className="text-xs font-medium text-emerald-800">Approved</p>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-700">{stats.statusBreakdown.approved}</p>
+                  <p className="text-xs text-emerald-600 mt-1">Đã duyệt</p>
+                </div>
+
+                {/* Approved Solo */}
+                <div className="p-4 rounded-lg border border-teal-200 bg-teal-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-teal-500" />
+                    <p className="text-xs font-medium text-teal-800">Approved Solo</p>
+                  </div>
+                  <p className="text-2xl font-bold text-teal-700">{stats.statusBreakdown.approved_solo}</p>
+                  <p className="text-xs text-teal-600 mt-1">Đã duyệt (1 người)</p>
+                </div>
+
+                {/* Optimized */}
+                <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-blue-500" />
+                    <p className="text-xs font-medium text-blue-800">Optimized</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-700">{stats.statusBreakdown.optimized}</p>
+                  <p className="text-xs text-blue-600 mt-1">Đã tối ưu hóa</p>
+                </div>
+
+                {/* Rejected */}
+                <div className="p-4 rounded-lg border border-red-200 bg-red-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-red-500" />
+                    <p className="text-xs font-medium text-red-800">Rejected</p>
+                  </div>
+                  <p className="text-2xl font-bold text-red-700">{stats.statusBreakdown.rejected}</p>
+                  <p className="text-xs text-red-600 mt-1">Đã từ chối</p>
+                </div>
+
+                {/* Cancelled */}
+                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-gray-500" />
+                    <p className="text-xs font-medium text-gray-800">Cancelled</p>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-700">{stats.statusBreakdown.cancelled}</p>
+                  <p className="text-xs text-gray-600 mt-1">Đã hủy</p>
+                </div>
+
+                {/* Expired */}
+                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-3 w-3 rounded-full bg-amber-500" />
+                    <p className="text-xs font-medium text-amber-800">Expired</p>
+                  </div>
+                  <p className="text-2xl font-bold text-amber-700">{stats.statusBreakdown.expired}</p>
+                  <p className="text-xs text-amber-600 mt-1">Đã hết hạn</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Alerts */}
           {(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) && (
             <Alert className="border-yellow-200 bg-yellow-50">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
               <AlertTitle>Action Required</AlertTitle>
               <AlertDescription>
-                You have {stats.pendingApprovals} trips waiting for approval
-                {stats.pendingJoinRequests > 0 && ` and ${stats.pendingJoinRequests} join requests`}
-                waiting for review. Please check them to ensure smooth operations.
+                {stats.pendingApprovals > 0 && (
+                  <div>
+                    You have <strong>{stats.pendingApprovals}</strong> trips that require admin approval
+                    (excluding auto-approved and manager-approved trips).
+                  </div>
+                )}
+                {stats.pendingJoinRequests > 0 && (
+                  <div className="mt-1">
+                    You also have <strong>{stats.pendingJoinRequests}</strong> join requests waiting for review.
+                  </div>
+                )}
+                <div className="mt-2 text-xs">
+                  Please check them to ensure smooth operations.
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -801,9 +991,21 @@ export function AdminDashboardClient() {
                     pendingActions.map((action) => (
                       <div key={action.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border">
                         <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+                          <div className={`h-2 w-2 rounded-full ${action.isUrgent ? 'bg-orange-500 animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
                           <div>
-                            <p className="text-sm font-medium">{action.user}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium">{action.user}</p>
+                              {/* ✅ Show detailed status badge */}
+                              {action.isUrgent ? (
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-[10px] px-1.5 py-0">
+                                  ⚡ URGENT
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-[10px] px-1.5 py-0">
+                                  ⏳ PENDING
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-500">{action.route}</p>
                             <p className="text-xs text-gray-400">{action.date} at {action.time}</p>
                           </div>
@@ -950,7 +1152,7 @@ export function AdminDashboardClient() {
                 </TabsList>
 
                 <TabsContent value="optimization" className="space-y-4">
-                  <TripOptimization />
+                  <TripOptimization onOptimizationChange={loadAdminDashboard} />
                 </TabsContent>
 
                 <TabsContent value="management" className="space-y-4">

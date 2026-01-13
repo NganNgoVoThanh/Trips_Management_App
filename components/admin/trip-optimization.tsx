@@ -22,7 +22,11 @@ import { calculateDistance, getLocationName, formatCurrency, config } from "@/li
 import { aiOptimizer, OptimizationProposal } from "@/lib/ai-optimizer"
 import { authService } from "@/lib/auth-service"
 
-export function TripOptimization() {
+interface TripOptimizationProps {
+  onOptimizationChange?: () => void
+}
+
+export function TripOptimization({ onOptimizationChange }: TripOptimizationProps = {}) {
   const { toast } = useToast()
   const [proposals, setProposals] = useState<OptimizationProposal[]>([])
   const [pendingTrips, setPendingTrips] = useState<Trip[]>([])
@@ -167,26 +171,32 @@ export function TripOptimization() {
     }
 
     setApprovingId(proposalId)
-    
+
     try {
       const proposal = proposals.find(p => p.id === proposalId)
       if (!proposal) {
         throw new Error("Proposal not found")
       }
-      
-      // ✅ FIX: Pass groupId properly to the backend
+
+      // Approve optimization via backend
       await fabricService.approveOptimization(proposalId)
-      
-      // Update UI - remove approved proposal
+
+      // Update UI immediately - just remove from proposals list
       setProposals(proposals.filter(p => p.id !== proposalId))
-      
-      // Reload data to get updated trips
-      await loadData()
-      
+
+      // Update pending trips count without full reload
+      const affectedTripIds = proposal.trips.map(t => t.id)
+      setPendingTrips(pendingTrips.filter(t => !affectedTripIds.includes(t.id)))
+
       toast({
-        title: "Proposal Approved",
-        description: `Optimization approved for ${proposal.trips.length} trips. Notifications have been sent.`,
+        title: "✅ Proposal Approved",
+        description: `Optimized ${proposal.trips.length} trips successfully. Notifications sent to employees.`,
       })
+
+      // Notify parent component of change with small delay to ensure backend updates complete
+      setTimeout(() => {
+        onOptimizationChange?.()
+      }, 500)
     } catch (error: any) {
       console.error('Approval error:', error)
       toast({
@@ -210,18 +220,21 @@ export function TripOptimization() {
     }
 
     setRejectingId(proposalId)
-    
+
     try {
-      // ✅ FIX: Pass groupId properly to the backend
+      // Reject optimization via backend
       await fabricService.rejectOptimization(proposalId)
-      
-      // Update UI - remove rejected proposal
+
+      // Update UI immediately - just remove from proposals list
       setProposals(proposals.filter(p => p.id !== proposalId))
-      
+
       toast({
-        title: "Proposal Rejected",
-        description: "The optimization proposal has been rejected",
+        title: "❌ Proposal Rejected",
+        description: "Optimization rejected. Trips remain as individual requests.",
       })
+
+      // Notify parent component of change
+      onOptimizationChange?.()
     } catch (error: any) {
       console.error('Rejection error:', error)
       toast({

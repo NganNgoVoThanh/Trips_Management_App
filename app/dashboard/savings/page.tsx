@@ -6,14 +6,17 @@ import { DashboardHeader } from "@/components/dashboard/header"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Download, TrendingDown, DollarSign, Car, Leaf } from "lucide-react"
 import { fabricService } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
 
 
 export default function SavingsPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const { toast } = useToast()
   const [savings, setSavings] = useState({
     total: 0,
     thisMonth: 0,
@@ -26,25 +29,26 @@ export default function SavingsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    loadSavingsData()
-  }, [])
+    if (session?.user?.id) {
+      loadSavingsData()
+    }
+  }, [session])
 
   const loadSavingsData = async () => {
     try {
-      const user = authService.getCurrentUser()
-      if (!user) {
+      if (!session?.user?.id) {
         router.push('/')
         return
       }
 
-      const trips = await fabricService.getTrips({ userId: user.id })
+      const trips = await fabricService.getTrips({ userId: session.user.id })
       const optimizedTrips = trips.filter(t => t.status === 'optimized')
-      
-      // Calculate savings
+
+      // Calculate savings - FIXED: Only when actualCost exists
       const totalSavings = optimizedTrips.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
         return sum
       }, 0)
@@ -57,9 +61,9 @@ export default function SavingsPage() {
         return d.getMonth() === thisMonth && d.getFullYear() === thisYear
       })
       const thisMonthSavings = thisMonthTrips.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
         return sum
       }, 0)
@@ -70,24 +74,33 @@ export default function SavingsPage() {
         return d.getFullYear() === thisYear
       })
       const thisYearSavings = thisYearTrips.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
         return sum
       }, 0)
+
+      // Calculate percentage saved
+      const totalEstimatedCost = optimizedTrips.reduce((sum, t) => sum + (t.estimatedCost || 0), 0)
+      const percentageSaved = totalEstimatedCost > 0 ? (totalSavings / totalEstimatedCost) * 100 : 0
 
       setSavings({
         total: totalSavings,
         thisMonth: thisMonthSavings,
         thisYear: thisYearSavings,
         averagePerTrip: optimizedTrips.length > 0 ? totalSavings / optimizedTrips.length : 0,
-        co2Saved: totalSavings / 10000 * 2.3,
+        co2Saved: totalSavings / 10000 * 2.3, // Rough estimate
         tripsOptimized: optimizedTrips.length,
-        percentageSaved: 25 // Average 25% savings
+        percentageSaved: Math.round(percentageSaved)
       })
     } catch (error) {
       console.error('Error loading savings:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load savings data",
+        variant: "destructive"
+      })
     } finally {
       setIsLoading(false)
     }

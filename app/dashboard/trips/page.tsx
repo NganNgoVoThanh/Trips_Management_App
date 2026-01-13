@@ -19,10 +19,11 @@ import {
   BarChart3
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
-import { getStatusBadge, getStatusLabel, getStatusIcon } from "@/lib/trip-status-config"
+import { getStatusBadge, getStatusLabel, getStatusIcon, TripStatus } from "@/lib/trip-status-config"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { useToast } from "@/components/ui/use-toast"
 import {
   Select,
   SelectContent,
@@ -34,6 +35,8 @@ import { Progress } from "@/components/ui/progress"
 
 export default function AllTripsPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const { toast } = useToast()
   const [trips, setTrips] = useState<Trip[]>([])
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -51,8 +54,10 @@ export default function AllTripsPage() {
   })
 
   useEffect(() => {
-    loadTrips()
-  }, [])
+    if (session?.user?.id) {
+      loadTrips()
+    }
+  }, [session])
 
   useEffect(() => {
     filterTrips()
@@ -62,16 +67,20 @@ export default function AllTripsPage() {
   const loadTrips = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
-      if (!user) {
+      if (!session?.user?.id) {
         router.push('/')
         return
       }
 
-      const allTrips = await fabricService.getTrips({ userId: user.id })
+      const allTrips = await fabricService.getTrips({ userId: session.user.id })
       setTrips(allTrips)
     } catch (error) {
       console.error('Error loading trips:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load trips",
+        variant: "destructive"
+      })
     } finally {
       setIsLoading(false)
     }
@@ -330,8 +339,6 @@ export default function AllTripsPage() {
                   <SelectItem value="auto_approved">Auto-Approved</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="approved_solo">Approved (Solo)</SelectItem>
-                  <SelectItem value="pending_optimization">Pending Optimization</SelectItem>
-                  <SelectItem value="proposed">Proposed</SelectItem>
                   <SelectItem value="optimized">Optimized</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -382,8 +389,8 @@ export default function AllTripsPage() {
                         <span className="font-medium">
                           {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                         </span>
-                        <Badge className={getStatusBadge(trip.status)}>
-                          {getStatusIcon(trip.status)} {getStatusLabel(trip.status)}
+                        <Badge className={getStatusBadge(trip.status as TripStatus)}>
+                          {getStatusIcon(trip.status as TripStatus)} {getStatusLabel(trip.status as TripStatus)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-500 ml-7">

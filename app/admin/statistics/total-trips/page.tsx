@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Car, TrendingUp, Calendar, MapPin, Download, Filter, Loader2 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { useSession } from "next-auth/react"
 import {
   Select,
   SelectContent,
@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress"
 export default function TotalTripsPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [trips, setTrips] = useState<Trip[]>([])
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -42,8 +43,10 @@ export default function TotalTripsPage() {
   })
 
   useEffect(() => {
-    loadTripsData()
-  }, [])
+    if (status !== 'loading') {
+      loadTripsData()
+    }
+  }, [status, session])
 
   useEffect(() => {
     filterTrips()
@@ -51,8 +54,10 @@ export default function TotalTripsPage() {
 
   const loadTripsData = async () => {
     try {
-      const user = authService.getCurrentUser()
-      if (!user || user.role !== 'admin') {
+      // Check NextAuth session
+      if (status === 'loading') return
+
+      if (!session?.user || session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }

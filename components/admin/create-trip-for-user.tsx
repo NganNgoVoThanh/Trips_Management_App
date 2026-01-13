@@ -581,7 +581,7 @@ export function CreateTripForUser() {
               <Input
                 id="ccEmailInput"
                 type="email"
-                placeholder="Enter email (e.g., admin@intersnack.com.vn)"
+                placeholder="Enter email (e.g., colleague@intersnack.com.vn)"
                 value={formData.ccEmailInput}
                 onChange={(e) => handleInputChange('ccEmailInput', e.target.value)}
                 onKeyDown={(e) => {

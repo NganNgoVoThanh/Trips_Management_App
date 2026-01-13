@@ -22,13 +22,18 @@ async function migrateTripsStatusEnum(connection: mysql.Connection) {
     await connection.query(`
       ALTER TABLE trips
       MODIFY COLUMN status ENUM(
-        'pending', 'confirmed', 'optimized', 'cancelled', 'draft',
-        'approved', 'rejected',
-        'pending_approval', 'pending_urgent', 'auto_approved', 'approved_solo',
-        'pending_optimization', 'proposed', 'expired'
-      ) DEFAULT 'pending'
+        'pending_approval',
+        'pending_urgent',
+        'auto_approved',
+        'approved',
+        'approved_solo',
+        'optimized',
+        'rejected',
+        'cancelled',
+        'expired'
+      ) DEFAULT 'pending_approval'
     `);
-    console.log('✅ Updated trips.status ENUM');
+    console.log('✅ Updated trips.status ENUM to new convention');
   } catch (error: any) {
     if (!error.message.includes('Duplicate')) {
       console.log('⚠️ trips.status ENUM:', error.message);

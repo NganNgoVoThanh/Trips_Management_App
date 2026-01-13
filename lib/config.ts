@@ -3,13 +3,10 @@ export const config = {
   // Company domain
   companyDomain: '@intersnack.com.vn',
   
-  // Admin emails list
-  adminEmails: [
-    'admin@intersnack.com.vn',
-    'manager@intersnack.com.vn',
-    'operations@intersnack.com.vn',
-    // Add more admin emails as needed
-  ],
+  // Admin emails list - Update with real SSO user emails
+  adminEmails: ['ngan.ngo@intersnack.com.vn'
+    // Add your admin emails here, e.g.: 'yourname@intersnack.com.vn'
+  ] as string[],
   
   // Company departments
   departments: [

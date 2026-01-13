@@ -322,7 +322,7 @@ export function ProfileSetupWizardEmail({ currentUser, onComplete }: ProfileSetu
                     onBlur={() => {
                       if (managerEmail) validateEmail(managerEmail);
                     }}
-                    placeholder="manager@intersnack.com.vn"
+                    placeholder="yourmanager@intersnack.com.vn"
                     className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C00000] focus:border-transparent ${emailError ? 'border-red-500' : 'border-gray-300'
                       }`}
                   />

@@ -290,7 +290,7 @@ export function ManagementDashboard() {
             <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="admin@intersnack.com.vn"
+                  placeholder="user@intersnack.com.vn"
                   value={newAdminEmail}
                   onChange={(e) => setNewAdminEmail(e.target.value)}
                 />

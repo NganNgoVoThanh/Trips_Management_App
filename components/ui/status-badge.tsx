@@ -58,10 +58,9 @@ export function ApprovedBadge({ auto = false, solo = false, size = "md" }: { aut
   return <StatusBadge status={status} size={size} />;
 }
 
-export function OptimizationBadge({ stage = "pending", size = "md" }: { stage?: "pending" | "proposed" | "optimized"; size?: "sm" | "md" | "lg" }) {
+export function OptimizationBadge({ stage = "approved", size = "md" }: { stage?: "approved" | "optimized"; size?: "sm" | "md" | "lg" }) {
   const statusMap = {
-    pending: "pending_optimization" as TripStatus,
-    proposed: "proposed" as TripStatus,
+    approved: "approved" as TripStatus,
     optimized: "optimized" as TripStatus,
   };
 

@@ -231,12 +231,6 @@ export function TripManagement() {
               <SelectItem value="approved_solo">
                 Approved (Solo) ({trips.filter(t => t.status === 'approved_solo').length})
               </SelectItem>
-              <SelectItem value="pending_optimization">
-                Pending Optimization ({trips.filter(t => t.status === 'pending_optimization').length})
-              </SelectItem>
-              <SelectItem value="proposed">
-                Proposed ({trips.filter(t => t.status === 'proposed').length})
-              </SelectItem>
               <SelectItem value="optimized">
                 Optimized ({trips.filter(t => t.status === 'optimized').length})
               </SelectItem>

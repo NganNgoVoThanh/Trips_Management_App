@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Users, Calendar, MapPin, Car, DollarSign, Clock, Loader2 } from "lucide-react"
 import { fabricService, OptimizationGroup, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
+import { useSession } from "next-auth/react"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter, useParams } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -17,19 +17,19 @@ export default function OptimizationDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [optimization, setOptimization] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (params.id) {
+    if (params.id && status !== 'loading') {
       loadOptimizationDetail(params.id as string)
     }
-  }, [params.id])
+  }, [params.id, status, session])
 
   const loadOptimizationDetail = async (groupId: string) => {
     try {
-      const user = authService.getCurrentUser()
-      if (!user || user.role !== 'admin') {
+      if (!session?.user || session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }

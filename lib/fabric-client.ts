@@ -36,7 +36,8 @@ class FabricClientService {
   async getTrips(filters?: {
     userId?: string;
     status?: string;
-    includeTemp?: boolean
+    includeTemp?: boolean;
+    dataType?: string;
   }): Promise<Trip[]> {
     if (!this.isClient) {
       console.warn('⚠️ getTrips called on server side - skipping');
@@ -48,6 +49,7 @@ class FabricClientService {
       if (filters?.userId) params.append('userId', filters.userId);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.includeTemp) params.append('includeTemp', 'true');
+      if (filters?.dataType) params.append('dataType', filters.dataType);
       // Add cache busting to ensure fresh data
       params.append('_t', Date.now().toString());
 

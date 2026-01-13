@@ -517,10 +517,16 @@ export async function sendApprovalEmail(data: ApprovalEmailData): Promise<boolea
 
 export async function sendUrgentAlertToAdmin(data: ApprovalEmailData): Promise<boolean> {
   try {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      console.warn('⚠️ ADMIN_EMAIL not configured, skipping urgent alert');
+      return false;
+    }
+
     console.log(`🚨 Sending urgent alert to admin for trip ${data.tripId}`);
 
     const emailNotification: EmailNotification = {
-      to: ['admin@intersnack.com.vn'],
+      to: [adminEmail],
       subject: `🚨 [URGENT TRIP] ${data.userName} - Cần xử lý trong 24h`,
       html: `
 <!DOCTYPE html>

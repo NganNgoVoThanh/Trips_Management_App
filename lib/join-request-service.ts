@@ -4,6 +4,7 @@ import { authService } from './auth-service';
 import { emailService } from './email-service';
 import { toMySQLDateTime, getCurrentVietnamTime } from './utils'; // ✅ Import từ utils
 import { TripStatus } from './trip-status-config';
+import { getLocationName } from './config'; // ✅ Import for email templates
 
 // Check if we're on server side
 const isServer = typeof window === 'undefined';
@@ -319,8 +320,11 @@ class JoinRequestService {
         await this.updateJoinRequestLocal(updatedRequest);
       }
 
-      await this.addUserToTrip(request);
-      await this.sendApprovalNotification(updatedRequest);
+      // Add user to trip and get info about instant join
+      const tripInfo = await this.addUserToTrip(request);
+
+      // Send appropriate notification based on join type
+      await this.sendApprovalNotification(updatedRequest, tripInfo.isInstantJoin);
     } catch (error) {
       console.error('Error approving join request:', error);
       throw error;
@@ -736,10 +740,10 @@ Please review this request in the admin panel.`;
         ? [request.requesterManagerEmail]
         : [];
 
-      // Send to admin (you may need to configure admin email in env)
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@intersnack.com.vn';
+      // Send to admin (requires ADMIN_EMAIL env variable)
+      const adminEmail = process.env.ADMIN_EMAIL;
 
-      if (emailService.isServiceConfigured()) {
+      if (adminEmail && emailService.isServiceConfigured()) {
         await emailService.sendEmail({
           to: adminEmail,
           cc: ccRecipients,
@@ -811,14 +815,82 @@ You will receive another email once your request has been reviewed.`;
     }
   }
 
-  private async sendApprovalNotification(request: JoinRequest): Promise<void> {
+  private async sendApprovalNotification(request: JoinRequest, isInstantJoin: boolean = false): Promise<void> {
     try {
-      const subject = '✅ Trip Join Request Approved - Manager Approval Required';
-      const body = `Great news! Your join request has been approved by admin.
+      // Different email based on instant join or normal approval
+      if (isInstantJoin) {
+        // ⚡ INSTANT JOIN - Trip confirmed immediately
+        const subject = '🎉 Trip Join Request Approved - Trip Confirmed!';
+        const body = `Congratulations! Your join request has been approved and your trip is CONFIRMED.
 
 Trip Details:
-• From: ${request.tripDetails.departureLocation}
-• To: ${request.tripDetails.destination}
+• From: ${getLocationName(request.tripDetails.departureLocation)}
+• To: ${getLocationName(request.tripDetails.destination)}
+• Date: ${request.tripDetails.departureDate}
+• Time: ${request.tripDetails.departureTime}
+${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
+
+✅ STATUS: Your trip is CONFIRMED and ready!
+
+You joined an already-optimized trip. Your manager has been notified for information purposes only (no approval needed).
+
+Safe travels! 🚗`;
+
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #10b981;">🎉 Trip Join Request Approved</h2>
+            <p>Congratulations! Your request to join the trip has been <strong style="color: #10b981;">approved</strong> and your trip is <strong style="color: #10b981;">CONFIRMED</strong>!</p>
+
+            <div style="background: #d1fae5; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #10b981;">
+              <h3 style="margin-top: 0; color: #065f46;">Trip Details</h3>
+              <p><strong>From:</strong> ${getLocationName(request.tripDetails.departureLocation)}</p>
+              <p><strong>To:</strong> ${getLocationName(request.tripDetails.destination)}</p>
+              <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+              <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
+            </div>
+
+            ${request.adminNotes ? `
+              <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Admin Notes:</strong> ${request.adminNotes}</p>
+              </div>
+            ` : ''}
+
+            <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+              <h3 style="margin: 0; color: #065f46;">✅ Status: CONFIRMED</h3>
+              <p style="margin: 10px 0 0 0; color: #047857;">Your trip is ready! No further action needed.</p>
+            </div>
+
+            <div style="background: #fef3c7; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+              <p style="margin: 0; color: #92400e;"><strong>ℹ️ Note:</strong> You joined an already-optimized trip. Your manager has been notified for information only.</p>
+            </div>
+
+            <p style="color: #666;">Safe travels! 🚗</p>
+          </div>
+        `;
+
+        // CC manager for FYI
+        const ccRecipients = request.requesterManagerEmail ? [request.requesterManagerEmail] : [];
+
+        if (emailService.isServiceConfigured()) {
+          await emailService.sendEmail({
+            to: request.requesterEmail,
+            cc: ccRecipients,
+            subject,
+            text: body,
+            html
+          });
+          console.log(`✅ Instant join confirmation sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+        } else {
+          console.log('📧 [DRY RUN] Would send instant join confirmation to:', request.requesterEmail);
+        }
+      } else {
+        // 📋 NORMAL APPROVAL - Manager approval required
+        const subject = '✅ Trip Join Request Approved - Manager Approval Required';
+        const body = `Great news! Your join request has been approved by admin.
+
+Trip Details:
+• From: ${getLocationName(request.tripDetails.departureLocation)}
+• To: ${getLocationName(request.tripDetails.destination)}
 • Date: ${request.tripDetails.departureDate}
 • Time: ${request.tripDetails.departureTime}
 ${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
@@ -826,51 +898,52 @@ ${request.adminNotes ? `\nAdmin Notes: ${request.adminNotes}` : ''}
 ⚠️ NEXT STEP: Your trip is now pending your manager's approval.
 ${request.requesterManagerEmail ? `Your manager (${request.requesterManagerEmail}) will receive an email to approve this trip.` : 'You will be notified once your trip is fully confirmed.'}`;
 
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #4caf50;">✅ Trip Join Request Approved</h2>
-          <p>Great news! Your request to join the trip has been <strong style="color: #4caf50;">approved by admin</strong>.</p>
+        const html = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #4caf50;">✅ Trip Join Request Approved</h2>
+            <p>Great news! Your request to join the trip has been <strong style="color: #4caf50;">approved by admin</strong>.</p>
 
-          <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4caf50;">
-            <h3 style="margin-top: 0; color: #2e7d32;">Trip Details</h3>
-            <p><strong>From:</strong> ${request.tripDetails.departureLocation}</p>
-            <p><strong>To:</strong> ${request.tripDetails.destination}</p>
-            <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
-            <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
-          </div>
-
-          ${request.adminNotes ? `
-            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="margin: 0;"><strong>Admin Notes:</strong> ${request.adminNotes}</p>
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4caf50;">
+              <h3 style="margin-top: 0; color: #2e7d32;">Trip Details</h3>
+              <p><strong>From:</strong> ${getLocationName(request.tripDetails.departureLocation)}</p>
+              <p><strong>To:</strong> ${getLocationName(request.tripDetails.destination)}</p>
+              <p><strong>Date:</strong> ${request.tripDetails.departureDate}</p>
+              <p><strong>Time:</strong> ${request.tripDetails.departureTime}</p>
             </div>
-          ` : ''}
 
-          <div style="background: #fff9e6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff9800;">
-            <h3 style="margin-top: 0; color: #e65100;">⚠️ Next Step: Manager Approval Required</h3>
-            <p style="margin: 0;">Your trip is now <strong>pending your manager's approval</strong>.</p>
-            ${request.requesterManagerEmail ? `<p style="margin: 10px 0 0 0;">Your manager (<strong>${request.requesterManagerEmail}</strong>) will receive an email to approve this trip.</p>` : ''}
+            ${request.adminNotes ? `
+              <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Admin Notes:</strong> ${request.adminNotes}</p>
+              </div>
+            ` : ''}
+
+            <div style="background: #fff9e6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ff9800;">
+              <h3 style="margin-top: 0; color: #e65100;">⚠️ Next Step: Manager Approval Required</h3>
+              <p style="margin: 0;">Your trip is now <strong>pending your manager's approval</strong>.</p>
+              ${request.requesterManagerEmail ? `<p style="margin: 10px 0 0 0;">Your manager (<strong>${request.requesterManagerEmail}</strong>) will receive an email to approve this trip.</p>` : ''}
+            </div>
+
+            <p style="color: #666;">You will be notified once your manager approves the trip. 📧</p>
           </div>
+        `;
 
-          <p style="color: #666;">You will be notified once your manager approves the trip. 📧</p>
-        </div>
-      `;
+        // 🔥 NEW: CC Manager if exists
+        const ccRecipients = request.requesterManagerEmail
+          ? [request.requesterManagerEmail]
+          : [];
 
-      // 🔥 NEW: CC Manager if exists
-      const ccRecipients = request.requesterManagerEmail
-        ? [request.requesterManagerEmail]
-        : [];
-
-      if (emailService.isServiceConfigured()) {
-        await emailService.sendEmail({
-          to: request.requesterEmail,
-          cc: ccRecipients,
-          subject,
-          text: body,
-          html
-        });
-        console.log(`✅ Join request approval sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
-      } else {
-        console.log('📧 [DRY RUN] Would send approval to:', request.requesterEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+        if (emailService.isServiceConfigured()) {
+          await emailService.sendEmail({
+            to: request.requesterEmail,
+            cc: ccRecipients,
+            subject,
+            text: body,
+            html
+          });
+          console.log(`✅ Join request approval sent to ${request.requesterEmail}${ccRecipients.length > 0 ? ` (CC: ${ccRecipients.join(', ')})` : ''}`);
+        } else {
+          console.log('📧 [DRY RUN] Would send approval to:', request.requesterEmail, ccRecipients.length > 0 ? `CC: ${ccRecipients.join(', ')}` : '');
+        }
       }
     } catch (error) {
       console.error('Error sending approval notification:', error);
@@ -954,7 +1027,7 @@ Trip Details:
     }
   }
 
-  private async addUserToTrip(request: JoinRequest): Promise<void> {
+  private async addUserToTrip(request: JoinRequest): Promise<{ isInstantJoin: boolean; tripStatus: string }> {
     try {
       // Get the original trip to copy details
       const originalTrip = await fabricService.getTripById(request.tripId);
@@ -992,15 +1065,35 @@ Trip Details:
         }
       }
 
-      // 🔥 Determine trip status: pending_approval or pending_urgent (for joined trips, always need manager approval)
-      // Check if trip is urgent (< 24 hours)
+      // 🔥 OPTION 3 HYBRID LOGIC: Determine trip status based on original trip status
       const departureDateTime = new Date(`${originalTrip.departureDate}T${originalTrip.departureTime}`);
       const now = new Date();
       const hoursUntilDeparture = (departureDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
       const isUrgent = hoursUntilDeparture < 24;
 
-      // 🔥 NEW LOGIC: Joined trips ALWAYS need manager approval (even if original trip is already optimized)
-      const tripStatus: TripStatus = managerEmail ? (isUrgent ? 'pending_urgent' : 'pending_approval') : 'auto_approved';
+      let tripStatus: TripStatus;
+      let requireManagerApproval = false;
+      let isInstantJoin = false;
+
+      // Check original trip status to determine join behavior
+      if (originalTrip.status === 'optimized') {
+        // ⚡ SCENARIO 2: Join vào optimized trip → INSTANT JOIN
+        tripStatus = 'optimized';
+        requireManagerApproval = false;
+        isInstantJoin = true;
+        console.log('⚡ INSTANT JOIN: Joining optimized trip, no manager approval needed');
+      } else if (['approved', 'auto_approved'].includes(originalTrip.status)) {
+        // 📋 SCENARIO 1: Join vào approved trip → CẦN MANAGER APPROVAL
+        tripStatus = managerEmail
+          ? (isUrgent ? 'pending_urgent' : 'pending_approval')
+          : 'auto_approved';
+        requireManagerApproval = managerEmail ? true : false;
+        isInstantJoin = false;
+        console.log('📋 NORMAL FLOW: Joining approved trip, manager approval required');
+      } else {
+        // ❌ SCENARIO 3: Trip chưa approve hoặc invalid status
+        throw new Error(`Cannot join trip with status: ${originalTrip.status}. Only approved or optimized trips can be joined.`);
+      }
 
       // Create a new trip for the user with the same details as the original trip
       const newTrip = {
@@ -1016,13 +1109,13 @@ Trip Details:
         vehicleType: originalTrip.vehicleType,
         estimatedCost: originalTrip.estimatedCost,
         actualCost: originalTrip.actualCost,
-        status: tripStatus, // 🔥 NEW: Requires manager approval
-        optimizedGroupId: originalTrip.optimizedGroupId, // Will join the same group AFTER manager approval
+        status: tripStatus, // Status based on Option 3 logic
+        optimizedGroupId: originalTrip.optimizedGroupId, // Copy from original trip
         originalDepartureTime: originalTrip.originalDepartureTime,
         notified: false,
-        dataType: 'final' as const,
+        dataType: 'raw' as const, // ✅ CRITICAL: Joined trips are RAW trips (real trips that can be optimized)
         parentTripId: originalTrip.id, // Track which trip this was joined from
-        managerApprovalStatus: 'pending', // 🔥 NEW: Track manager approval
+        managerApprovalStatus: isInstantJoin ? 'approved' : 'pending', // Auto-approved for instant join
         managerEmail: managerEmail || undefined,
         managerName: managerName || undefined,
       };
@@ -1031,12 +1124,22 @@ Trip Details:
       const createdTrip = await fabricService.createTrip(newTrip);
 
       console.log('✅ Trip created for', request.requesterName, 'with status:', tripStatus);
-      console.log('✅ Manager approval required:', managerEmail ? `Yes (${managerEmail})` : 'No (auto-approved)');
+      console.log('✅ Instant join:', isInstantJoin);
+      console.log('✅ Manager approval required:', requireManagerApproval ? `Yes (${managerEmail})` : 'No');
 
-      // 🔥 Send manager approval email if needed
-      if (managerEmail && emailService.isServiceConfigured()) {
-        await emailService.sendManagerApprovalEmail(createdTrip, managerEmail, managerName || '');
-        console.log(`✅ Manager approval email sent to ${managerEmail}`);
+      // 🔥 Send appropriate email based on join type
+      if (isInstantJoin) {
+        // Instant join → Send FYI email to manager (no approval needed)
+        if (managerEmail && emailService.isServiceConfigured()) {
+          await emailService.sendManagerFYIEmail(createdTrip, managerEmail, managerName || '');
+          console.log(`✅ Manager FYI email sent to ${managerEmail} (instant join)`);
+        }
+      } else if (requireManagerApproval) {
+        // Normal flow → Send manager approval email
+        if (managerEmail && emailService.isServiceConfigured()) {
+          await emailService.sendManagerApprovalEmail(createdTrip, managerEmail, managerName || '');
+          console.log(`✅ Manager approval email sent to ${managerEmail}`);
+        }
       }
 
       console.log('✅ New trip created with details:', {
@@ -1044,10 +1147,17 @@ Trip Details:
         userId: createdTrip.userId,
         userName: createdTrip.userName,
         status: createdTrip.status,
-        managerApprovalStatus: 'pending',
+        managerApprovalStatus: isInstantJoin ? 'approved' : 'pending',
         optimizedGroupId: createdTrip.optimizedGroupId,
-        parentTripId: createdTrip.parentTripId
+        parentTripId: createdTrip.parentTripId,
+        isInstantJoin
       });
+
+      // Return trip info for email notification
+      return {
+        isInstantJoin,
+        tripStatus
+      };
     } catch (error) {
       console.error('Error adding user to trip:', error);
       throw error; // Propagate error to prevent silent failure

@@ -116,7 +116,11 @@
       "Bash(if exist STATUS-AUDIT-REPORT.md del STATUS-AUDIT-REPORT.md)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(node migrate-old-statuses.js:*)",
+      "Bash(node scripts/migrate-old-statuses.js:*)",
+      "Bash(ls:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

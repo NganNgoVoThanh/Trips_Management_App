@@ -9,27 +9,29 @@ import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, CheckCircle, XCircle, Clock, MapPin, Loader2 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { emailService } from "@/lib/email-service"
-import { authService } from "@/lib/auth-service"
 import { getLocationName, formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
-import { formatDate, formatTime } from "@/lib/utils" // ✅ THÊM import formatDateTime
+import { formatDate, formatTime } from "@/lib/utils"
+import { useSession } from "next-auth/react"
 
 export default function ApprovalsPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [pendingTrips, setPendingTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadPendingTrips()
-  }, [])
+    if (status !== 'loading') {
+      loadPendingTrips()
+    }
+  }, [status])
 
   const loadPendingTrips = async () => {
     try {
-      const user = authService.getCurrentUser()
-      if (!user || user.role !== 'admin') {
+      if (!session?.user || session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }

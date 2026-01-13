@@ -256,49 +256,109 @@ Best regards,
 Intersnack Trips Management Team
       `.trim();
 
+      // Calculate time difference for display
+      const getTimeDiff = (original: string, newTime: string) => {
+        const [origHour, origMin] = original.split(':').map(Number);
+        const [newHour, newMin] = newTime.split(':').map(Number);
+        const diff = (newHour * 60 + newMin) - (origHour * 60 + origMin);
+        if (diff === 0) return 'No change';
+        if (diff > 0) return `+${diff} minutes later`;
+        return `${Math.abs(diff)} minutes earlier`;
+      };
+
       const html = `
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px; }
-    .trip-details { background-color: white; padding: 15px; margin: 15px 0; border-radius: 8px; border: 1px solid #e5e7eb; }
-    .highlight { color: #2563eb; font-weight: bold; }
-    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 20px; background-color: #f3f4f6; }
+    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    .header { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+    .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.95; }
+    .content { padding: 30px; }
+    .greeting { font-size: 16px; color: #374151; margin-bottom: 20px; }
+    .alert-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px; }
+    .alert-box strong { color: #92400e; display: block; margin-bottom: 8px; font-size: 15px; }
+    .alert-box p { margin: 0; color: #78350f; font-size: 14px; line-height: 1.5; }
+    .trip-card { background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; margin: 20px 0; }
+    .trip-card h3 { margin: 0 0 15px 0; color: #111827; font-size: 16px; border-bottom: 2px solid #dc2626; padding-bottom: 10px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #6b7280; font-size: 14px; font-weight: 500; }
+    .info-value { color: #111827; font-size: 14px; font-weight: 600; text-align: right; }
+    .time-change { background: #fff7ed; border: 2px solid #fb923c; border-radius: 8px; padding: 16px; margin: 15px 0; text-align: center; }
+    .time-change .old-time { color: #9ca3af; text-decoration: line-through; font-size: 18px; margin-bottom: 5px; }
+    .time-change .arrow { color: #dc2626; font-size: 24px; font-weight: bold; margin: 5px 0; }
+    .time-change .new-time { color: #dc2626; font-size: 24px; font-weight: bold; margin-top: 5px; }
+    .time-change .diff { color: #ea580c; font-size: 13px; margin-top: 8px; font-weight: 600; }
+    .savings-box { background: #d1fae5; border: 2px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center; }
+    .savings-box .amount { color: #065f46; font-size: 22px; font-weight: bold; }
+    .savings-box .label { color: #047857; font-size: 13px; margin-top: 5px; }
+    .footer { background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; }
+    .footer p { margin: 5px 0; color: #6b7280; font-size: 13px; }
+    .action-notice { background: #fee2e2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 20px 0; border-radius: 6px; }
+    .action-notice p { margin: 0; color: #991b1b; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h2>Your Trip Has Been Optimized</h2>
+      <h1>🚗 Your Trip Has Been Optimized</h1>
+      <p>Important schedule update for your upcoming trip</p>
     </div>
+
     <div class="content">
-      <p>Dear ${userTrips[0].userName || 'Employee'},</p>
-      
-      <p>Your upcoming trip(s) have been optimized for cost efficiency. Here are the details:</p>
-      
-      ${userTrips.map(trip => `
-        <div class="trip-details">
-          <p><strong>Route:</strong> ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}</p>
-          <p><strong>Date:</strong> ${new Date(trip.departureDate).toLocaleDateString()}</p>
-          <p><strong>Original Time:</strong> ${trip.originalDepartureTime || trip.departureTime}</p>
-          <p class="highlight"><strong>New Time:</strong> ${proposedDepartureTime}</p>
+      <p class="greeting">Dear <strong>${userTrips[0].userName || 'Employee'}</strong>,</p>
+
+      <div class="alert-box">
+        <strong>⚠️ Trip Schedule Updated</strong>
+        <p>Your trip has been combined with colleagues traveling the same route to save costs. Please review the new departure time below.</p>
+      </div>
+
+      ${userTrips.map(trip => {
+        const originalTime = trip.originalDepartureTime || trip.departureTime;
+        const timeDiff = getTimeDiff(originalTime, proposedDepartureTime);
+
+        return `
+        <div class="trip-card">
+          <h3>📍 ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}</h3>
+
+          <div class="info-row">
+            <span class="info-label">📅 Date:</span>
+            <span class="info-value">${new Date(trip.departureDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+          </div>
+
+          <div class="time-change">
+            <div class="old-time">Original: ${originalTime}</div>
+            <div class="arrow">▼</div>
+            <div class="new-time">NEW TIME: ${proposedDepartureTime}</div>
+            <div class="diff">${timeDiff}</div>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">🚙 Vehicle:</span>
+            <span class="info-value">${vehicleInfo}</span>
+          </div>
         </div>
-      `).join('')}
-      
-      <div class="trip-details">
-        <p><strong>Vehicle Type:</strong> ${vehicleInfo}</p>
-        <p><strong>Estimated Company Savings:</strong> ${formatCurrency(estimatedSavings)}</p>
+        `;
+      }).join('')}
+
+      <div class="savings-box">
+        <div class="amount">${formatCurrency(estimatedSavings)}</div>
+        <div class="label">💰 Estimated Company Savings</div>
       </div>
-      
-      <p>Please note the updated departure time. If you have any concerns or conflicts with the new schedule, please contact the admin team immediately.</p>
-      
-      <div class="footer">
-        <p>Best regards,<br/>Intersnack Trips Management Team</p>
+
+      <div class="action-notice">
+        <p><strong>⏰ Action Required:</strong> Please adjust your schedule to the new departure time. If this change causes any conflicts, contact the admin team immediately.</p>
       </div>
+    </div>
+
+    <div class="footer">
+      <p><strong>Intersnack Trips Management Team</strong></p>
+      <p>This is an automated notification. Please do not reply to this email.</p>
     </div>
   </div>
 </body>
@@ -664,6 +724,172 @@ Trips Management System
     });
 
     console.log(`✅ Manager approval email sent to ${managerEmail} for joined trip ${trip.id}`);
+  }
+
+  /**
+   * Send FYI email to manager when user joins optimized trip (no approval needed)
+   * This is for Option 3 - Instant Join scenario
+   */
+  async sendManagerFYIEmail(trip: Trip, managerEmail: string, managerName: string): Promise<void> {
+    if (!managerEmail) {
+      console.warn('No manager email provided for FYI notification');
+      return;
+    }
+
+    const subject = `[FYI] ${trip.userName} Joined Optimized Trip`;
+
+    const body = `
+Dear ${managerName},
+
+This is an informational notice (no action required).
+
+${trip.userName} (${trip.userEmail}) has joined an already-optimized business trip.
+
+Trip Details:
+• Employee: ${trip.userName} (${trip.userEmail})
+• From: ${getLocationName(trip.departureLocation || '')}
+• To: ${getLocationName(trip.destination || '')}
+• Departure: ${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}
+• Return: ${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}
+${trip.vehicleType ? `• Vehicle: ${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}` : ''}
+${trip.estimatedCost ? `• Estimated Cost: ${formatCurrency(trip.estimatedCost)}` : ''}
+
+Status: ✅ Confirmed (Auto-approved)
+
+This trip was previously approved and optimized with other employees traveling the same route. Your team member has been added to this shared trip for cost efficiency.
+
+NO ACTION REQUIRED from you. This is for your information only.
+
+Best regards,
+Trips Management System
+`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">ℹ️ Trip Join Notification</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">For Your Information - No Action Required</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Dear <strong>${managerName}</strong>,
+      </p>
+
+      <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+        This is an informational notice. <strong>No action is required from you.</strong>
+      </p>
+
+      <div style="background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #065f46; font-size: 14px;">
+          <strong>✅ Auto-Confirmed:</strong> ${trip.userName} has joined an already-optimized trip that was previously approved.
+        </p>
+      </div>
+
+      <!-- Trip Details -->
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px; border-bottom: 2px solid #10b981; padding-bottom: 10px;">
+          Trip Details
+        </h3>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px; width: 40%;"><strong>Employee:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Email:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>From:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.departureLocation || '')}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>To:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.destination || '')}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Departure:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Return:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</td>
+          </tr>
+          ${trip.vehicleType ? `
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Vehicle:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
+          </tr>
+          ` : ''}
+          ${trip.estimatedCost ? `
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Estimated Cost:</strong></td>
+            <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: bold;">${formatCurrency(trip.estimatedCost)}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Status:</strong></td>
+            <td style="padding: 8px 0; color: #10b981; font-size: 14px; font-weight: bold;">✅ Confirmed</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Info Notice -->
+      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+          <strong>ℹ️ Why no approval needed?</strong><br>
+          This trip was already approved and optimized with other employees traveling the same route. Your team member has been added to this shared trip for cost efficiency.
+        </p>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f0fdf4; border-radius: 8px;">
+        <p style="color: #065f46; font-size: 16px; font-weight: bold; margin: 0;">
+          ✅ No Action Required
+        </p>
+        <p style="color: #047857; font-size: 14px; margin: 10px 0 0 0;">
+          This email is for your information only.
+        </p>
+      </div>
+
+      <p style="color: #999; font-size: 12px; margin: 30px 0 0 0; line-height: 1.6;">
+        Best regards,<br>
+        <strong>Trips Management System</strong>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+      <p style="color: #6c757d; font-size: 12px; margin: 0;">
+        This is an automated message from Trips Management System. Please do not reply to this email.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+    await this.sendEmail({
+      to: managerEmail,
+      cc: [trip.userEmail], // CC user
+      subject,
+      text: body,
+      html,
+      category: 'notification'
+    });
+
+    console.log(`✅ Manager FYI email sent to ${managerEmail} for instant join trip ${trip.id}`);
   }
 
   /**

@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Calendar, Clock, Filter, Search, Activity, Download, ChevronLeft } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import {
   Select,
   SelectContent,
@@ -21,6 +21,7 @@ import {
 
 export default function ActivityPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [activities, setActivities] = useState<any[]>([])
   const [filteredActivities, setFilteredActivities] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -29,8 +30,10 @@ export default function ActivityPage() {
   const [dateFilter, setDateFilter] = useState("")
 
   useEffect(() => {
-    loadActivities()
-  }, [])
+    if (status !== 'loading') {
+      loadActivities()
+    }
+  }, [status])
 
   useEffect(() => {
     filterActivities()
@@ -39,13 +42,12 @@ export default function ActivityPage() {
   const loadActivities = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
-      if (!user) {
+      if (!session?.user) {
         router.push('/')
         return
       }
 
-      const trips = await fabricService.getTrips({ userId: user.id })
+      const trips = await fabricService.getTrips({ userId: session.user.id })
       
       // Convert trips to activities with more details
       const activityList = trips.map(trip => ({

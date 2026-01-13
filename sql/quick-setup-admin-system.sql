@@ -29,7 +29,7 @@ CALL sp_grant_admin_role(
   'your-email@intersnack.com.vn',    -- Replace with actual email
   'super_admin',
   NULL,
-  'admin@intersnack.com.vn',          -- Replace with your current admin email
+  'your-admin-email@intersnack.com.vn',          -- Replace with your current admin email
   'Setup initial Super Admin',
   NULL,
   NULL
@@ -46,7 +46,7 @@ CALL sp_grant_admin_role(
   'pt-manager@intersnack.com.vn',    -- Replace with Phan Thiết manager email
   'location_admin',
   'loc-phan-thiet',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Setup Phan Thiết Factory Manager',
   NULL,
   NULL
@@ -59,7 +59,7 @@ CALL sp_grant_admin_role(
   'tn-manager@intersnack.com.vn',    -- Replace with Tây Ninh manager email
   'location_admin',
   'loc-tay-ninh',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Setup Tây Ninh Factory Manager',
   NULL,
   NULL
@@ -72,7 +72,7 @@ CALL sp_grant_admin_role(
   'la-manager@intersnack.com.vn',    -- Replace with Long An manager email
   'location_admin',
   'loc-long-an',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Setup Long An Factory Manager',
   NULL,
   NULL
@@ -85,7 +85,7 @@ CALL sp_grant_admin_role(
   'hcm-manager@intersnack.com.vn',   -- Replace with HCM office manager email
   'location_admin',
   'loc-ho-chi-minh',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Setup Hồ Chí Minh Office Manager',
   NULL,
   NULL

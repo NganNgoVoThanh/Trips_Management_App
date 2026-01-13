@@ -8,26 +8,28 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Zap, TrendingDown, Users, Calendar, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { fabricService, OptimizationGroup, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { useSession } from "next-auth/react"
 
 export default function OptimizationsPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [optimizations, setOptimizations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingGroupId, setProcessingGroupId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadOptimizations()
-  }, [])
+    if (status !== 'loading') {
+      loadOptimizations()
+    }
+  }, [status, session])
 
   const loadOptimizations = async () => {
     try {
-      const user = authService.getCurrentUser()
-      if (!user || user.role !== 'admin') {
+      if (!session?.user || session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }
@@ -53,7 +55,13 @@ export default function OptimizationsPage() {
           route: trips.length > 0 ?
             `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` :
             'N/A',
-          date: trips.length > 0 ? trips[0].departureDate : 'N/A'
+          date: trips.length > 0 ?
+            new Date(trips[0].departureDate).toLocaleDateString('vi-VN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).split('/').reverse().join('-') // Format: YYYY-MM-DD
+            : 'N/A'
         }
       })
 

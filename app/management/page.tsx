@@ -28,7 +28,8 @@ import {
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { formatCurrency, getLocationName, config } from "@/lib/config"
-import { formatDateTime, formatDate} from "@/lib/utils" // ✅ THÊM import formatDateTime
+import { formatDateTime, formatDate} from "@/lib/utils"
+import { getStatusLabel, getStatusBadge, getStatusIcon, TripStatus } from "@/lib/trip-status-config"
 import {
   Select,
   SelectContent,
@@ -451,8 +452,8 @@ export default function ManagementDashboard() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium">{formatDateTime(trip.createdAt)}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {trip.status}
+                          <Badge variant="outline" className={`text-xs ${getStatusBadge(trip.status as TripStatus)}`}>
+                            {getStatusIcon(trip.status as TripStatus)} {getStatusLabel(trip.status as TripStatus)}
                           </Badge>
                         </div>
                       </div>
@@ -629,7 +630,9 @@ export default function ManagementDashboard() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <Badge variant="outline">{trip.status}</Badge>
+                          <Badge className={getStatusBadge(trip.status as TripStatus)}>
+                            {getStatusIcon(trip.status as TripStatus)} {getStatusLabel(trip.status as TripStatus)}
+                          </Badge>
                           {trip.estimatedCost && (
                             <p className="text-sm text-gray-500 mt-1">
                               {formatCurrency(trip.estimatedCost)}

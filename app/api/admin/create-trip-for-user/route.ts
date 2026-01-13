@@ -60,6 +60,34 @@ export async function POST(request: NextRequest) {
 
     const connection = await getConnection();
 
+    // ✅ DUPLICATE PREVENTION: Check if duplicate trip exists
+    const emailToCheck = userEmail || (isManualEntry && userEmployeeId ? `employee-${userEmployeeId}@temp.local` : null);
+
+    if (emailToCheck) {
+      const [existingTrips] = await connection.query<any[]>(
+        `SELECT * FROM trips
+         WHERE user_email = ?
+         AND departure_location = ?
+         AND destination = ?
+         AND departure_date = ?
+         AND departure_time = ?`,
+        [emailToCheck, departureLocation, destination, departureDate, departureTime]
+      );
+
+      if (existingTrips.length > 0) {
+        await connection.end();
+        console.log(`⚠️ Duplicate trip detected for ${emailToCheck}`);
+        return NextResponse.json(
+          {
+            error: 'Duplicate trip detected',
+            message: `A trip with these exact details already exists for this user (${departureLocation} → ${destination} on ${departureDate} at ${departureTime}).`,
+            existingTripId: existingTrips[0].id,
+          },
+          { status: 409 } // 409 Conflict
+        );
+      }
+    }
+
     let user: any;
     let autoApprove = false;
 
@@ -120,8 +148,22 @@ export async function POST(request: NextRequest) {
     // Create trip
     const tripId = uuidv4();
 
-    // Determine final status based on user type and auto-approve logic
-    const finalStatus = autoApprove ? (isManualEntry ? 'auto_approved' : 'approved_solo') : 'pending_approval';
+    // ✅ FIXED: Admin-created trips should ALWAYS be approved
+    // - Manual entry (employee not in system): 'auto_approved'
+    // - Existing user WITHOUT manager: 'approved_solo'
+    // - Existing user WITH manager: 'approved' (admin overrides manager approval)
+    let finalStatus: string;
+
+    if (isManualEntry) {
+      finalStatus = 'auto_approved'; // Manual entry employees
+    } else if (!user.manager_email) {
+      finalStatus = 'approved_solo'; // No manager (CEO/Founder)
+    } else {
+      // ✅ CRITICAL FIX: Admin creates trip → Should be 'approved', NOT 'pending_approval'
+      // Admin has authority to create approved trips on behalf of employees
+      finalStatus = 'approved';
+      autoApprove = true; // Set this to true for consistency
+    }
 
     // Ensure all required columns exist (run migration if needed)
     try {

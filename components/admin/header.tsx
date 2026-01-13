@@ -222,7 +222,7 @@ export function AdminHeader() {
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name || 'Administrator'}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email || 'admin@intersnack.com.vn'}
+                  {user?.email || 'Not logged in'}
                 </p>
                 <Badge className="mt-1 w-fit bg-red-100 text-red-700">Administrator</Badge>
               </div>

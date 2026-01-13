@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Car, TrendingUp, Users, Gauge, Download, Loader2 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
+import { useSession } from "next-auth/react"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -47,7 +47,10 @@ export default function VehicleUtilizationPage() {
   const loadVehicleData = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
+      const { data: session, status } = useSession()
+      if (status === 'loading') return
+
+      const user = session?.user
       if (!user || user.role !== 'admin') {
         router.push('/dashboard')
         return

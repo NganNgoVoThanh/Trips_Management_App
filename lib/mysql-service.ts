@@ -70,6 +70,9 @@ export interface Trip {
   is_urgent?: boolean;
   auto_approved?: boolean;
   purpose?: string;
+  // Admin creation tracking
+  created_by_admin?: boolean;
+  admin_email?: string;
 }
 
 export interface OptimizationGroup {
@@ -340,12 +343,16 @@ class MySQLService {
 
 
   // Get all trips
-  async getTrips(filters?: { 
-    userId?: string; 
-    status?: string; 
+  async getTrips(filters?: {
+    userId?: string;
+    userEmail?: string;
+    status?: string;
     includeTemp?: boolean;
     optimizedGroupId?: string;
     dataType?: string;
+    departureLocation?: string;
+    destination?: string;
+    departureDate?: string;
   }): Promise<Trip[]> {
     if (!this.ensureServerSide('getTrips')) return [];
 
@@ -355,10 +362,14 @@ class MySQLService {
       let query = 'SELECT * FROM trips';
       const conditions: string[] = [];
       const params: any[] = [];
-      
+
       if (filters?.userId) {
         conditions.push('user_id = ?');
         params.push(filters.userId);
+      }
+      if (filters?.userEmail) {
+        conditions.push('user_email = ?');
+        params.push(filters.userEmail);
       }
       if (filters?.status) {
         conditions.push('status = ?');
@@ -371,6 +382,18 @@ class MySQLService {
       if (filters?.dataType) {
         conditions.push('data_type = ?');
         params.push(filters.dataType);
+      }
+      if (filters?.departureLocation) {
+        conditions.push('departure_location = ?');
+        params.push(filters.departureLocation);
+      }
+      if (filters?.destination) {
+        conditions.push('destination = ?');
+        params.push(filters.destination);
+      }
+      if (filters?.departureDate) {
+        conditions.push('departure_date = ?');
+        params.push(filters.departureDate);
       }
       
       if (conditions.length > 0) {
@@ -480,10 +503,21 @@ async approveOptimization(groupId: string): Promise<void> {
     if (Array.isArray(tempRows)) {
       for (const tempTrip of tempRows) {
         const camelTrip = this.toCamelCase(tempTrip);
-        
+
         if (camelTrip.parentTripId) {
+          // ✅ CRITICAL FIX: Get original departure_time before updating
+          const [originalRows] = await connection.query(
+            'SELECT departure_time FROM trips WHERE id = ?',
+            [camelTrip.parentTripId]
+          );
+
+          const originalTime = Array.isArray(originalRows) && originalRows.length > 0
+            ? (originalRows[0] as any).departure_time
+            : camelTrip.departureTime;
+
+          // Update parent trip with optimized data from TEMP
           await connection.query(
-            `UPDATE trips SET 
+            `UPDATE trips SET
               data_type = ?,
               status = ?,
               departure_time = ?,
@@ -496,15 +530,17 @@ async approveOptimization(groupId: string): Promise<void> {
             [
               'final',
               'optimized',
-              camelTrip.departureTime,
-              camelTrip.vehicleType,
+              camelTrip.departureTime, // ← Use optimized time from TEMP
+              camelTrip.vehicleType, // ← Use optimized vehicle from TEMP
               camelTrip.actualCost,
               camelTrip.optimizedGroupId,
-              camelTrip.originalDepartureTime,
-              mysqlNow, // ✅ Dùng MySQL format
+              originalTime, // ← Save original time
+              mysqlNow,
               camelTrip.parentTripId
             ]
           );
+
+          console.log(`✅ Trip ${camelTrip.parentTripId} optimized: ${originalTime} → ${camelTrip.departureTime}`);
         }
       }
     }

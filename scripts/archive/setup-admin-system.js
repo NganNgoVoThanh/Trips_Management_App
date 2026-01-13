@@ -236,7 +236,7 @@ async function setupAdminSystem() {
     // =====================================================
     console.log('👑 Step 5: Assigning initial Super Admin...');
 
-    const superAdminEmail = 'admin@intersnack.com.vn';
+    const superAdminEmail = process.env.ADMIN_EMAIL || 'your-admin-email@intersnack.com.vn';
 
     const [result] = await connection.query(`
       UPDATE users
@@ -289,7 +289,7 @@ async function setupAdminSystem() {
     console.log('\n✅ Admin Management System setup completed successfully!');
     console.log('\n📝 Next steps:');
     console.log('1. Restart the application to reload auth configuration');
-    console.log('2. Login as admin@intersnack.com.vn to test Super Admin access');
+    console.log('2. Login with your admin email to test Super Admin access');
     console.log('3. Navigate to /admin/manage-admins (will be created next)');
 
   } catch (error) {

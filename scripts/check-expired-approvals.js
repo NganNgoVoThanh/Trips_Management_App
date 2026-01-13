@@ -28,7 +28,7 @@ async function sendExpiredNotification(tripData) {
   });
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:50001';
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@intersnack.com.vn';
+  const adminEmail = process.env.ADMIN_EMAIL; // Admin email from environment
 
   // Email to user
   const userEmailOptions = {

@@ -95,8 +95,8 @@ export async function sendExpiredLinkNotificationToUser(data: ExpiredNotificatio
         <h3 style="margin-top: 0;">🔧 Action Required:</h3>
         <p>Please contact Admin for manual processing:</p>
         <ul>
-          <li>Email: <a href="mailto:admin@intersnack.com.vn">admin@intersnack.com.vn</a></li>
-          <li>Or contact directly via Slack/Teams</li>
+          <li>Contact the admin team via Slack/Teams</li>
+          <li>Or submit a new trip request through the system</li>
         </ul>
         <p style="margin-bottom: 0;">Provide the <strong>Trip ID</strong> when contacting Admin for faster processing.</p>
       </div>
@@ -130,8 +130,8 @@ ${data.tripDetails.purpose ? `- Purpose: ${data.tripDetails.purpose}` : ''}
 
 🔧 ACTION REQUIRED:
 Please contact Admin for manual processing:
-- Email: admin@intersnack.com.vn
-- Or contact directly via Slack/Teams
+- Contact the admin team via Slack/Teams
+- Or submit a new trip request through the system
 
 Provide the Trip ID when contacting Admin for faster processing.
 
@@ -155,7 +155,11 @@ Intersnack Trips Management Team
  * Send notification to admin when approval link is expired
  */
 export async function sendExpiredLinkNotificationToAdmin(data: ExpiredNotificationData): Promise<void> {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@intersnack.com.vn';
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    console.warn('⚠️ ADMIN_EMAIL not configured, skipping admin notification');
+    return;
+  }
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:50001';
 
   const subject = `🔔 [Action Required] Expired Approval Link - ${data.userName}`;

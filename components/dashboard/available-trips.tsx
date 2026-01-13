@@ -63,28 +63,37 @@ export function AvailableTrips() {
     try {
       setIsLoading(true)
 
-      // Load all trips (including pending trips that haven't been grouped yet)
-      const allTrips = await fabricService.getTrips()
+      // Load all RAW trips
+      const allTrips = await fabricService.getTrips({ dataType: 'raw' })
 
       // ✅ Get current user from NextAuth session
       const user = session?.user
 
-      // Filter for future trips with available seats
-      const today = new Date()
-      today.setHours(0, 0, 0, 0) // Reset time to start of day for accurate comparison
+      // ✅ OPTION 3 FILTER: Only show approved/optimized trips, exclude expired trips
+      const now = new Date()
 
-      const availableTrips = allTrips.filter((trip: { departureDate: string | number | Date; status: string; userId: string }) => {
-        const tripDate = new Date(trip.departureDate)
-        tripDate.setHours(0, 0, 0, 0)
-        const isFutureTrip = tripDate >= today
+      // Valid statuses: Only approved or optimized trips (manager/admin approved)
+      const validStatuses = ['approved', 'auto_approved', 'optimized']
 
-        // Show only approved_solo, approved, auto_approved, and optimized trips (trips that are confirmed and have available seats)
-        const isValidStatus = trip.status === 'approved_solo' || trip.status === 'approved' || trip.status === 'auto_approved' || trip.status === 'optimized'
+      const availableTrips = allTrips.filter((trip: { departureDate: string | number | Date; departureTime?: string; status: string; userId: string }) => {
+        // ✅ 1. Check status: Only approved/auto_approved/optimized
+        if (!validStatuses.includes(trip.status)) return false
 
-        // ✅ Exclude trips that belong to current user (to avoid showing duplicate)
-        const isNotUserTrip = !user || trip.userId !== user.id
+        // ✅ 2. Exclude user's own trips
+        if (user && trip.userId === user.id) return false
 
-        return isFutureTrip && isValidStatus && isNotUserTrip
+        // ✅ 3. Check trip not expired (departure date/time >= now)
+        const tripDateTime = new Date(trip.departureDate)
+        if (trip.departureTime) {
+          const [hours, minutes] = trip.departureTime.split(':')
+          tripDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+        } else {
+          tripDateTime.setHours(23, 59, 59, 999) // If no time, use end of day
+        }
+
+        if (tripDateTime < now) return false // Expired trip
+
+        return true
       })
 
       // Group trips by optimization group to show available seats
@@ -493,15 +502,33 @@ export function AvailableTrips() {
                   <div key={trip.id} className="rounded-lg border p-4 shadow-sm transition-all hover:shadow">
                     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                       <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-medium">
                             {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                           </h3>
+
+                          {/* Trip Status Badge */}
+                          {trip.status === 'optimized' && (
+                            <Badge className="bg-blue-500 text-white hover:bg-blue-600">
+                              ⚡ Instant Join
+                            </Badge>
+                          )}
+                          {trip.status === 'approved' && (
+                            <Badge className="bg-green-500 text-white hover:bg-green-600">
+                              ✓ Approved
+                            </Badge>
+                          )}
+                          {trip.status === 'auto_approved' && (
+                            <Badge className="bg-teal-500 text-white hover:bg-teal-600">
+                              ✓ Auto-Approved
+                            </Badge>
+                          )}
+
                           <Badge variant="secondary">
                             {trip.availableSeats} seats available
                           </Badge>
                           {requestStatus && (
-                            <Badge 
+                            <Badge
                               variant={
                                 requestStatus === 'approved' ? 'default' :
                                 requestStatus === 'pending' ? 'outline' :
@@ -544,8 +571,13 @@ export function AvailableTrips() {
                         </div>
                         
                         {trip.status === 'optimized' && (
+                          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            ⚡ Instant Join: This optimized trip is confirmed immediately upon admin approval (no manager approval needed)
+                          </div>
+                        )}
+                        {trip.status === 'approved' && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                             This is an optimized group trip with cost savings
+                            ✓ Approved Trip: Manager approval will be required after admin approves your join request
                           </div>
                         )}
 

@@ -81,6 +81,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ DUPLICATE PREVENTION: Check if user already has a trip with same details
+    const existingTrips = await fabricService.getTrips({
+      userEmail,
+      departureLocation: tripData.departureLocation,
+      destination: tripData.destination,
+      departureDate: tripData.departureDate,
+    });
+
+    if (existingTrips.length > 0) {
+      // Check if exact duplicate exists (same time too)
+      const exactDuplicate = existingTrips.find(
+        trip => trip.departureTime === tripData.departureTime
+      );
+
+      if (exactDuplicate) {
+        console.log(`⚠️ Duplicate trip detected for ${userEmail} - Trip ID: ${exactDuplicate.id}`);
+        return NextResponse.json(
+          {
+            error: 'Duplicate trip detected',
+            message: `You already have a trip with these exact details (${tripData.departureLocation} → ${tripData.destination} on ${tripData.departureDate} at ${tripData.departureTime}). Please check your existing trips.`,
+            existingTripId: exactDuplicate.id,
+          },
+          { status: 409 } // 409 Conflict
+        );
+      }
+    }
+
     // Calculate if urgent (< 24 hours)
     const departureDateTime = new Date(`${tripData.departureDate}T${tripData.departureTime}`);
     const now = new Date();

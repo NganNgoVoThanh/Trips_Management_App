@@ -32,9 +32,11 @@ export async function POST(request: NextRequest) {
     const allTrips = await fabricService.getTrips({ dataType: 'raw' });
 
     // Filter trips that are eligible for optimization
+    // ✅ CRITICAL FIX: Exclude trips that already have optimizedGroupId
     const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved', 'approved_solo'];
     const tripsToOptimize = allTrips.filter(trip =>
-      eligibleStatuses.includes(trip.status as TripStatus)
+      eligibleStatuses.includes(trip.status as TripStatus) &&
+      !trip.optimizedGroupId // ✅ Don't re-optimize trips already in a group
     );
 
     if (tripsToOptimize.length === 0) {
@@ -48,15 +50,10 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Found ${tripsToOptimize.length} trips eligible for optimization (${allTrips.length} total trips)`);
     console.log(`   Status breakdown: ${tripsToOptimize.map(t => t.status).join(', ')}`);
 
-    // Step 2: Update status to 'pending_optimization'
-    for (const trip of tripsToOptimize) {
-      await fabricService.updateTrip(trip.id, {
-        status: 'pending_optimization' as TripStatus
-      });
-    }
-    console.log(`✓ Updated ${tripsToOptimize.length} trips to 'pending_optimization'`);
+    // ✅ FIXED: Don't change trip status - keep as 'approved' until optimization is done
+    // Trips will be updated to 'optimized' only when optimization group is approved
 
-    // Step 3: Run AI optimizer
+    // Step 2: Run AI optimizer
     const proposals = await aiOptimizer.optimizeTrips(tripsToOptimize);
 
     if (proposals.length === 0) {
@@ -96,12 +93,13 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Created optimization group: ${groupId}`);
 
       // Create TEMP trips for this group
+      // ✅ FIX: Use 'pending_approval' instead of 'draft' (not in ENUM)
       for (const trip of proposal.trips) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id, createdAt, updatedAt, ...tripData } = trip;
         await fabricService.createTrip({
           ...tripData,
-          status: 'draft' as TripStatus,
+          status: 'pending_approval' as TripStatus, // ✅ Valid ENUM value
           dataType: 'temp',
           optimizedGroupId: groupId,
           departureTime: proposal.proposedDepartureTime,
@@ -110,10 +108,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update original RAW trips to 'proposed' status
+      // Update original RAW trips - keep as 'approved' but add groupId
+      // ✅ FIX: Don't change to 'proposed' (not in ENUM), keep original status
       for (const trip of proposal.trips) {
         await fabricService.updateTrip(trip.id, {
-          status: 'proposed' as TripStatus,
+          // Keep original approved status, just link to optimization group
           optimizedGroupId: groupId
         });
         totalTripsAffected++;

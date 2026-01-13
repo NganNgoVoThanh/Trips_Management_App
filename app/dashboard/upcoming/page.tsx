@@ -17,31 +17,36 @@ import {
   Download
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { authService } from "@/lib/auth-service"
 import { formatCurrency, getLocationName } from "@/lib/config"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
+import { useToast } from "@/components/ui/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getStatusBadge, getStatusLabel, getStatusIcon, TripStatus } from "@/lib/trip-status-config"
 
 export default function UpcomingTripsPage() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const { toast } = useToast()
   const [trips, setTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("this-week")
 
   useEffect(() => {
-    loadUpcomingTrips()
-  }, [])
+    if (session?.user?.id) {
+      loadUpcomingTrips()
+    }
+  }, [session])
 
   const loadUpcomingTrips = async () => {
     try {
       setIsLoading(true)
-      const user = authService.getCurrentUser()
-      if (!user) {
+      if (!session?.user?.id) {
         router.push('/')
         return
       }
 
-      const allTrips = await fabricService.getTrips({ userId: user.id })
+      const allTrips = await fabricService.getTrips({ userId: session.user.id })
       
       // Filter upcoming trips
       const today = new Date()
@@ -62,6 +67,11 @@ export default function UpcomingTripsPage() {
       setTrips(upcoming)
     } catch (error) {
       console.error('Error loading trips:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load upcoming trips",
+        variant: "destructive"
+      })
     } finally {
       setIsLoading(false)
     }
@@ -103,14 +113,6 @@ export default function UpcomingTripsPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'bg-blue-100 text-blue-800'
-      case 'optimized': return 'bg-green-100 text-green-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
   const getDaysUntil = (date: string) => {
     const today = new Date()
@@ -180,8 +182,8 @@ export default function UpcomingTripsPage() {
 
             {/* Additional Info */}
             <div className="flex items-center gap-3 text-sm">
-              <Badge className={getStatusColor(trip.status)}>
-                {trip.status}
+              <Badge className={getStatusBadge(trip.status as TripStatus)}>
+                {getStatusIcon(trip.status as TripStatus)} {getStatusLabel(trip.status as TripStatus)}
               </Badge>
               {trip.vehicleType && (
                 <span className="flex items-center gap-1 text-gray-600">

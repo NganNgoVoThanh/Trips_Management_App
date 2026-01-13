@@ -7,13 +7,10 @@ export type TripStatus =
   | 'auto_approved'
   | 'approved'
   | 'approved_solo'
-  | 'pending_optimization'
-  | 'proposed'
   | 'optimized'
   | 'rejected'
   | 'cancelled'
   | 'expired'
-  | 'draft'
   | 'pending' // Legacy
   | 'confirmed'; // Legacy
 
@@ -70,53 +67,31 @@ export const TRIP_STATUS_CONFIG: Record<TripStatus, StatusConfig> = {
     badge: 'bg-cyan-100 text-cyan-800 border-cyan-300',
     icon: '✓',
     label: 'Approved',
-    description: 'Manager approved, eligible for optimization',
-    userMessage:
-      'Your trip is approved. We may combine it with similar trips for optimization.',
-    adminMessage: 'Approved - can be optimized with similar trips',
+    description: 'Manager approved - trip is ready',
+    userMessage: 'Your trip has been approved by your manager',
+    adminMessage: 'Trip approved by manager - ready to process',
     emailSubject: 'Trip Request Approved by Manager',
   },
 
   approved_solo: {
     badge: 'bg-green-100 text-green-800 border-green-300',
     icon: '✓',
-    label: 'Approved (Solo)',
-    description: 'Approved individual trip - no optimization',
-    userMessage: 'Your trip is approved and ready to go!',
-    adminMessage: 'Approved individual trip (cannot be optimized)',
+    label: 'Approved',
+    description: 'Manager approved - trip is ready',
+    userMessage: 'Your trip has been approved by your manager',
+    adminMessage: 'Trip approved by manager - ready to process',
     emailSubject: 'Trip Request Approved - Ready to Go',
   },
 
   // ==========================================
-  // STAGE 3: OPTIMIZATION PROCESS
+  // STAGE 3: OPTIMIZATION (OPTIONAL)
   // ==========================================
-
-  pending_optimization: {
-    badge: 'bg-purple-100 text-purple-800 border-purple-300',
-    icon: '🔄',
-    label: 'Pending Optimization',
-    description: 'Awaiting AI optimization analysis',
-    userMessage:
-      'Your trip is being analyzed for optimization with similar trips',
-    adminMessage: 'Ready for AI optimization (similar trips available)',
-    emailSubject: 'Trip Pending Optimization Review',
-  },
-
-  proposed: {
-    badge: 'bg-purple-100 text-purple-700 border-purple-300',
-    icon: '💡',
-    label: 'Proposed',
-    description: 'AI optimization proposed, awaiting admin approval',
-    userMessage: 'An optimization has been proposed for your trip',
-    adminMessage: 'AI proposed optimization - review and approve/reject',
-    emailSubject: 'Trip Optimization Proposal Available',
-  },
 
   optimized: {
     badge: 'bg-purple-100 text-purple-900 border-purple-400',
     icon: '🎯',
     label: 'Optimized',
-    description: 'Trip successfully optimized',
+    description: 'Trip successfully optimized for cost savings',
     userMessage: 'Your trip has been optimized for cost savings!',
     adminMessage: 'Trip optimized and finalized',
     emailSubject: 'Trip Optimized Successfully - Details Inside',
@@ -154,16 +129,6 @@ export const TRIP_STATUS_CONFIG: Record<TripStatus, StatusConfig> = {
     userMessage: 'Approval request expired - please contact admin',
     adminMessage: 'Approval expired - manual processing required',
     emailSubject: 'Trip Approval Expired - Action Required',
-  },
-
-  draft: {
-    badge: 'bg-slate-100 text-slate-600 border-slate-300',
-    icon: '📝',
-    label: 'Draft',
-    description: 'Temporary optimization proposal',
-    userMessage: 'Optimization proposal in progress',
-    adminMessage: 'Temporary proposal (not finalized)',
-    emailSubject: 'Trip Optimization Draft',
   },
   
   // Legacy support
@@ -224,11 +189,7 @@ export function getEmailSubject(status: TripStatus): string {
 export const STATUS_CATEGORIES = {
   pending: ['pending_approval', 'pending_urgent'] as TripStatus[],
   approved: ['auto_approved', 'approved', 'approved_solo'] as TripStatus[],
-  optimization: [
-    'pending_optimization',
-    'proposed',
-    'optimized',
-  ] as TripStatus[],
+  optimized: ['optimized'] as TripStatus[],
   terminal: ['rejected', 'cancelled', 'expired'] as TripStatus[],
   all: Object.keys(TRIP_STATUS_CONFIG) as TripStatus[],
 };
@@ -244,9 +205,9 @@ export function isFinalStatus(status: TripStatus): boolean {
   ].includes(status);
 }
 
-// Check if status can be optimized
+// Check if status can be optimized (approved trips waiting for optimization)
 export function canOptimize(status: TripStatus): boolean {
-  return ['approved', 'auto_approved', 'approved_solo', 'pending_optimization', 'proposed'].includes(status);
+  return ['approved', 'auto_approved'].includes(status);
 }
 
 // Check if status is pending approval

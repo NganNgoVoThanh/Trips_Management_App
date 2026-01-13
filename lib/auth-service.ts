@@ -12,11 +12,10 @@ export interface User {
   createdAt: string;
 }
 
-// ONLY THESE 3 EMAILS ARE ADMINS - EVERYTHING ELSE IS USER
-const ADMIN_EMAILS = [
-  'admin@intersnack.com.vn',
-  'manager@intersnack.com.vn',
-  'operations@intersnack.com.vn'
+// ONLY THESE EMAILS ARE ADMINS - EVERYTHING ELSE IS USER
+// Update this list with real SSO user emails who should have admin access
+const ADMIN_EMAILS: string[] = ['ngan.ngo@intersnack.com.vn'
+  // Add your admin emails here, e.g.: 'ngan.ngo@intersnack.com.vn'
 ];
 
 class AuthService {

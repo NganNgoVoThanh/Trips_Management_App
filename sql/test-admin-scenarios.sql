@@ -20,7 +20,7 @@ CALL sp_grant_admin_role(
   'it.manager@intersnack.com.vn',
   'super_admin',
   NULL,
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'IT Manager - Full system access',
   NULL, NULL
 );
@@ -38,7 +38,7 @@ CALL sp_grant_admin_role(
   'nguyen.van.a@intersnack.com.vn',
   'location_admin',
   'loc-phan-thiet',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Phan Thiết Factory Manager',
   NULL, NULL
 );
@@ -50,7 +50,7 @@ CALL sp_grant_admin_role(
   'tran.thi.b@intersnack.com.vn',
   'location_admin',
   'loc-tay-ninh',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Tây Ninh Factory Manager',
   NULL, NULL
 );
@@ -62,7 +62,7 @@ CALL sp_grant_admin_role(
   'le.van.c@intersnack.com.vn',
   'location_admin',
   'loc-long-an',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Long An Factory Manager',
   NULL, NULL
 );
@@ -74,7 +74,7 @@ CALL sp_grant_admin_role(
   'pham.thi.d@intersnack.com.vn',
   'location_admin',
   'loc-ho-chi-minh',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'HCM Office Manager',
   NULL, NULL
 );
@@ -95,7 +95,7 @@ WHERE email = 'nguyen.van.a@intersnack.com.vn';
 /*
 CALL sp_revoke_admin_role(
   'nguyen.van.a@intersnack.com.vn',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Transferred from Phan Thiết to Tây Ninh',
   NULL, NULL
 );
@@ -107,7 +107,7 @@ CALL sp_grant_admin_role(
   'nguyen.van.a@intersnack.com.vn',
   'location_admin',
   'loc-tay-ninh',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Transferred to Tây Ninh Factory',
   NULL, NULL
 );
@@ -129,7 +129,7 @@ SELECT '=== SCENARIO 4: Promote to Super Admin ===' as test_scenario;
 /*
 CALL sp_revoke_admin_role(
   'nguyen.van.a@intersnack.com.vn',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Promotion to Super Admin',
   NULL, NULL
 );
@@ -138,7 +138,7 @@ CALL sp_grant_admin_role(
   'nguyen.van.a@intersnack.com.vn',
   'super_admin',
   NULL,
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Promoted to Super Admin for excellent performance',
   NULL, NULL
 );
@@ -154,7 +154,7 @@ SELECT '=== SCENARIO 5: Employee Resignation ===' as test_scenario;
 /*
 CALL sp_revoke_admin_role(
   'nguyen.van.a@intersnack.com.vn',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Employee resigned',
   NULL, NULL
 );
@@ -174,10 +174,10 @@ SELECT '=== SCENARIO 6: Temporary Admin (3 months) ===' as test_scenario;
 -- Assign temporary admin while permanent admin is on leave
 /*
 CALL sp_grant_admin_role(
-  'temp.admin@intersnack.com.vn',
+  'temp.user@intersnack.com.vn',
   'location_admin',
   'loc-phan-thiet',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Temporary admin while Nguyen Van A is on maternity leave (3 months)',
   NULL, NULL
 );
@@ -186,8 +186,8 @@ CALL sp_grant_admin_role(
 -- After 3 months, revoke
 /*
 CALL sp_revoke_admin_role(
-  'temp.admin@intersnack.com.vn',
-  'admin@intersnack.com.vn',
+  'temp.user@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Temporary assignment ended',
   NULL, NULL
 );
@@ -205,7 +205,7 @@ CALL sp_grant_admin_role(
   'deputy.manager@intersnack.com.vn',
   'location_admin',
   'loc-phan-thiet',
-  'admin@intersnack.com.vn',
+  'your-admin-email@intersnack.com.vn',
   'Deputy Factory Manager - Additional admin for PT',
   NULL, NULL
 );
