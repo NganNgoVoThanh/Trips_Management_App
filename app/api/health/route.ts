@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
+  // ✅ SECURITY FIX: Never expose credentials in health endpoint
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -18,11 +19,18 @@ export async function GET() {
     },
     checks: {} as any,
     environment: {
-      DB_HOST: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
-      DB_PORT: process.env.DB_PORT || '3306',
-      DB_USER: process.env.DB_USER || 'tripsmgm-rndus2',
-      DB_NAME: process.env.DB_NAME || 'tripsmgm-mydb002',
-      DB_PASSWORD: process.env.DB_PASSWORD ? 'wXKBvt0SRytjvER4e2Hp' : 'wXKBvt0SRytjvER4e2Hp'
+      DB_HOST_CONFIGURED: !!process.env.DB_HOST,
+      DB_PORT_CONFIGURED: !!process.env.DB_PORT,
+      DB_USER_CONFIGURED: !!process.env.DB_USER,
+      DB_NAME_CONFIGURED: !!process.env.DB_NAME,
+      DB_PASSWORD_CONFIGURED: !!process.env.DB_PASSWORD,
+      // ✅ Show config status, NOT actual values
+      ALL_REQUIRED_VARS_SET: !!(
+        process.env.DB_HOST &&
+        process.env.DB_USER &&
+        process.env.DB_PASSWORD &&
+        process.env.DB_NAME
+      )
     }
   };
 

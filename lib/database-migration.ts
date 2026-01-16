@@ -164,25 +164,75 @@ async function migrateAdminOverrideLogTable(connection: mysql.Connection) {
   try {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS admin_override_log (
-        id VARCHAR(255) PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
         trip_id VARCHAR(255) NOT NULL,
+        action_type ENUM('approve', 'reject') NOT NULL,
         admin_email VARCHAR(255) NOT NULL,
         admin_name VARCHAR(255),
-        action ENUM('approve', 'reject') NOT NULL,
         reason TEXT,
         original_status VARCHAR(50),
         new_status VARCHAR(50),
-        override_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        override_reason VARCHAR(100) DEFAULT 'EXPIRED_APPROVAL_LINK',
+        user_email VARCHAR(255),
+        user_name VARCHAR(255),
+        manager_email VARCHAR(255),
         ip_address VARCHAR(50),
         user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_trip_id (trip_id),
         INDEX idx_admin_email (admin_email),
-        INDEX idx_override_at (override_at)
+        INDEX idx_created_at (created_at),
+        INDEX idx_action_type (action_type)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Created admin_override_log table');
   } catch (error: any) {
     console.log('⚠️ admin_override_log table:', error.message);
+  }
+}
+
+/**
+ * Migrate admin_override_log table to add missing columns
+ */
+async function migrateAdminOverrideLogColumns(connection: mysql.Connection) {
+  const columns = [
+    {
+      name: 'action_type',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN action_type ENUM('approve', 'reject') NOT NULL DEFAULT 'approve' AFTER trip_id`,
+    },
+    {
+      name: 'override_reason',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN override_reason VARCHAR(100) DEFAULT 'EXPIRED_APPROVAL_LINK'`,
+    },
+    {
+      name: 'user_email',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN user_email VARCHAR(255)`,
+    },
+    {
+      name: 'user_name',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN user_name VARCHAR(255)`,
+    },
+    {
+      name: 'manager_email',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN manager_email VARCHAR(255)`,
+    },
+    {
+      name: 'created_at',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+    },
+  ];
+
+  for (const column of columns) {
+    try {
+      await connection.query(column.sql);
+      console.log(`✅ Added column: admin_override_log.${column.name}`);
+    } catch (error: any) {
+      if (error.message.includes('Duplicate column')) {
+        // Column already exists, skip
+      } else {
+        console.log(`⚠️ admin_override_log.${column.name}:`, error.message);
+      }
+    }
   }
 }
 
@@ -344,6 +394,7 @@ export async function ensureAuditTables() {
   const connection = await getConnection();
   try {
     await migrateAdminOverrideLogTable(connection);
+    await migrateAdminOverrideLogColumns(connection);
     await migrateApprovalAuditLogTable(connection);
   } finally {
     await connection.end();

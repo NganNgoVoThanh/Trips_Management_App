@@ -90,9 +90,12 @@ export default function ActiveEmployeesPage() {
         
         if (trip.status === 'optimized') {
           userStats.optimizedTrips += 1
-          if (trip.estimatedCost) {
-            const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-            userStats.savings += (trip.estimatedCost - actualCost)
+          // ✅ FIX: Only count savings if we have both estimated and actual cost
+          if (trip.estimatedCost && trip.actualCost) {
+            const savings = trip.estimatedCost - trip.actualCost
+            if (savings > 0) {
+              userStats.savings += savings
+            }
           }
         }
         

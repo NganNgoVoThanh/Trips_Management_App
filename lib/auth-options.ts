@@ -159,12 +159,19 @@ export const authOptions: NextAuthOptions = {
 
           // Get the actual database user ID
           const mysql = await import('mysql2/promise');
-          const connection = await mysql.default.createConnection({
-            host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+
+          // ✅ SECURITY: Check DB credentials availability
+          if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+            console.error('❌ Database credentials not configured. Cannot fetch user ID from database.');
+            // Don't throw during auth - allow login to continue
+            databaseUserId = `temp-${user.id}`; // Use Azure ID as fallback
+          } else {
+            const connection = await mysql.default.createConnection({
+            host: process.env.DB_HOST,
             port: parseInt(process.env.DB_PORT || '3306'),
-            user: process.env.DB_USER || 'tripsmgm-rndus2',
-            password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-            database: process.env.DB_NAME || 'tripsmgm-mydb002',
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
           });
 
           const [userRows] = await connection.query<any[]>(
@@ -178,6 +185,7 @@ export const authOptions: NextAuthOptions = {
             databaseUserId = userRows[0].id;
             console.log('✅ Database user ID:', databaseUserId);
           }
+          } // Close else block
         } catch (error) {
           console.error('❌ Error creating/updating user:', error);
         }
@@ -202,12 +210,19 @@ export const authOptions: NextAuthOptions = {
         try {
           const { createOrUpdateUserOnLogin } = await import('@/lib/user-service');
           const mysql = await import('mysql2/promise');
-          const connection = await mysql.default.createConnection({
-            host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+
+          // ✅ SECURITY: Check DB credentials availability
+          if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+            console.error('❌ Database credentials not configured. Cannot fetch user ID from database.');
+            // Don't throw during auth - allow login to continue
+            databaseUserId = `temp-${user.id}`; // Use Azure ID as fallback
+          } else {
+            const connection = await mysql.default.createConnection({
+            host: process.env.DB_HOST,
             port: parseInt(process.env.DB_PORT || '3306'),
-            user: process.env.DB_USER || 'tripsmgm-rndus2',
-            password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-            database: process.env.DB_NAME || 'tripsmgm-mydb002',
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
           });
 
           const [rows] = await connection.query<any[]>(
@@ -225,6 +240,7 @@ export const authOptions: NextAuthOptions = {
             token.adminType = 'none';
             token.adminLocationId = undefined;
           }
+          } // Close else block
         } catch (error) {
           console.error('❌ Failed to load admin_type from database:', error);
           token.adminType = 'none';
@@ -258,12 +274,18 @@ export const authOptions: NextAuthOptions = {
           // Reload admin_type and admin_location_id from database
           try {
             const mysql = await import('mysql2/promise');
+
+            // ✅ SECURITY: Require DB credentials from environment variables
+            if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+              throw new Error('Database credentials not configured. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in environment variables.');
+            }
+
             const connection = await mysql.default.createConnection({
-              host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+              host: process.env.DB_HOST,
               port: parseInt(process.env.DB_PORT || '3306'),
-              user: process.env.DB_USER || 'tripsmgm-rndus2',
-              password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-              database: process.env.DB_NAME || 'tripsmgm-mydb002',
+              user: process.env.DB_USER,
+              password: process.env.DB_PASSWORD,
+              database: process.env.DB_NAME,
             });
 
             const [rows] = await connection.query<any[]>(

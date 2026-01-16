@@ -94,12 +94,15 @@ export default function ThisMonthPage() {
       const cancelled = thisMonthTrips.filter((t: Trip) => t.status === 'cancelled')
 
       // Calculate costs
+      // ✅ FIX: Use actual costs, don't assume 25% savings
       const totalCost = thisMonthTrips.reduce((sum: number, t: Trip) => sum + (t.actualCost || t.estimatedCost || 0), 0)
       const totalSavings = optimized.reduce((sum: number, trip: Trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        // Only count savings if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
+        // If no actual cost available, we can't calculate real savings
         return sum
       }, 0)
 

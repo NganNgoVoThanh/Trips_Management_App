@@ -3,14 +3,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import mysql from 'mysql2/promise'
 import { getServerUser } from '@/lib/server-auth'
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Create connection helper
 async function getDbConnection() {
+  // ✅ SECURITY: Require database credentials from environment variables
+  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+    throw new Error(
+      'Database credentials not configured. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in environment variables. ' +
+      'See .env.example for configuration template.'
+    );
+  }
+
   return await mysql.createConnection({
-    host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+    host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'tripsmgm-rndus2',
-    password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-    database: process.env.DB_NAME || 'tripsmgm-mydb002'
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
   })
 }
 

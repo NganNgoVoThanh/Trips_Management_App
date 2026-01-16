@@ -75,6 +75,9 @@ export async function sendManagerConfirmationEmail(data: ManagerConfirmationData
   });
 
   try {
+    // Generate unique ID for the confirmation record
+    const confirmationId = `confirm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Generate token
     const token = generateToken();
     const expiresAt = new Date();
@@ -83,9 +86,9 @@ export async function sendManagerConfirmationEmail(data: ManagerConfirmationData
     // Store confirmation token
     await connection.query(
       `INSERT INTO manager_confirmations
-       (user_id, manager_email, token, type, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [data.userId, data.managerEmail, token, data.type, expiresAt]
+       (id, user_id, manager_email, token, type, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [confirmationId, data.userId, data.managerEmail, token, data.type, expiresAt]
     );
 
     // Generate confirmation URLs

@@ -262,11 +262,12 @@ export function AdminDashboardClient() {
 
       const uniqueEmployees = new Set(allTrips.map(t => t.userId)).size
 
-      // Calculate real savings
+      // ✅ FIX: Calculate real savings using actual costs only
       const totalSavings = optimized.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        // Only count savings if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
         return sum
       }, 0)

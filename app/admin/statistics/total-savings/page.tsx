@@ -58,12 +58,14 @@ export default function TotalSavingsPage() {
       const allTrips = await fabricService.getTrips()
       const optimizedTrips = allTrips.filter(t => t.status === 'optimized')
       
-      // Calculate total savings
+      // ✅ FIX: Calculate total savings using actual costs only
       const totalSavings = optimizedTrips.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        // Only count savings if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
+        // If no actual cost, we can't calculate real savings
         return sum
       }, 0)
 
@@ -74,10 +76,12 @@ export default function TotalSavingsPage() {
         return tripYear === currentYear
       })
       
+      // ✅ FIX: Calculate YTD savings using actual costs only
       const ytdSavings = ytdTrips.reduce((sum, trip) => {
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          return sum + (trip.estimatedCost - actualCost)
+        // Only count savings if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          return sum + (savings > 0 ? savings : 0)
         }
         return sum
       }, 0)
@@ -106,11 +110,13 @@ export default function TotalSavingsPage() {
           }
         }
         
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          const savings = trip.estimatedCost - actualCost
-          monthlyData[monthKey].savings += savings
-          monthlyData[monthKey].tripsOptimized += 1
+        // ✅ FIX: Only count if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          if (savings > 0) {
+            monthlyData[monthKey].savings += savings
+            monthlyData[monthKey].tripsOptimized += 1
+          }
         }
       })
 

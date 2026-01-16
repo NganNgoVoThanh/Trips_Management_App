@@ -11,18 +11,26 @@ const isServer = typeof window === 'undefined';
 // Initialize pool only on server side
 const getPool = async () => {
   if (pool) return pool;
-  
+
   if (!isServer) {
     throw new Error('MySQL cannot be used in browser');
   }
-  
+
+  // ✅ SECURITY: Require database credentials from environment variables
+  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+    throw new Error(
+      'Database credentials not configured. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in environment variables. ' +
+      'See .env.example for configuration template.'
+    );
+  }
+
   const mysql = await import('mysql2/promise');
   pool = mysql.default.createPool({
-    host: process.env.DB_HOST || 'vnicc-lxwb001vh.isrk.local',
+    host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'tripsmgm-rndus2',
-    password: process.env.DB_PASSWORD || 'wXKBvt0SRytjvER4e2Hp',
-    database: process.env.DB_NAME || 'tripsmgm-mydb002',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 20, // Tăng từ 10 lên 20 để xử lý nhiều concurrent connections
     queueLimit: 10, // Thay đổi từ 0 để queue requests thay vì reject ngay
@@ -34,7 +42,7 @@ const getPool = async () => {
   });
 
   console.log('✓ MySQL Connection Pool initialized');
-  console.log(`✓ Database: ${process.env.DB_NAME || 'tripsmgm-mydb002'}`);
+  console.log(`✓ Database: ${process.env.DB_NAME}`);
 
   return pool;
 };

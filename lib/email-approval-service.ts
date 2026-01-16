@@ -58,7 +58,12 @@ export interface NoManagerNotificationData {
 // ========================================
 
 export function generateApprovalToken(data: ApprovalToken): string {
-  const secret = process.env.APPROVAL_TOKEN_SECRET || 'default-secret-change-me';
+  // ✅ SECURITY: Require approval token secret from environment
+  const secret = process.env.APPROVAL_TOKEN_SECRET;
+
+  if (!secret) {
+    throw new Error('APPROVAL_TOKEN_SECRET is not configured. Please set it in environment variables.');
+  }
 
   // Token expires in 48 hours
   return jwt.sign(data, secret, {
@@ -68,7 +73,13 @@ export function generateApprovalToken(data: ApprovalToken): string {
 
 export function verifyApprovalToken(token: string): ApprovalToken | null {
   try {
-    const secret = process.env.APPROVAL_TOKEN_SECRET || 'default-secret-change-me';
+    // ✅ SECURITY: Require approval token secret from environment
+    const secret = process.env.APPROVAL_TOKEN_SECRET;
+
+    if (!secret) {
+      throw new Error('APPROVAL_TOKEN_SECRET is not configured. Please set it in environment variables.');
+    }
+
     const decoded = jwt.verify(token, secret) as ApprovalToken;
     return decoded;
   } catch (error) {
@@ -826,8 +837,16 @@ export async function sendNoManagerNotificationToAdmin(data: NoManagerNotificati
   try {
     const emailHTML = generateNoManagerNotificationHTML(data);
 
+    // ✅ SECURITY: Use configurable admin email instead of hardcoded
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL;
+
+    if (!adminEmail) {
+      console.error('❌ ADMIN_EMAIL or SUPER_ADMIN_EMAIL not configured in environment variables');
+      return false;
+    }
+
     const emailNotification: EmailNotification = {
-      to: 'ngan.ngo@intersnack.com',
+      to: adminEmail,
       subject: '⚠️ Xác thực nhân viên không có quản lý - ' + data.userName,
       html: emailHTML,
       category: 'alert',

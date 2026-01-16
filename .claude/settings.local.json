@@ -120,7 +120,15 @@
       "Bash(node migrate-old-statuses.js:*)",
       "Bash(node scripts/migrate-old-statuses.js:*)",
       "Bash(ls:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(node test-statistics-fix.js:*)",
+      "Bash(node find-duplicates.js:*)",
+      "Bash(node cleanup-and-migrate.js:*)",
+      "Bash(node:*)",
+      "Bash(nslookup:*)",
+      "Bash(grep:*)",
+      "Bash(echo:*)",
+      "Bash(copy .env.local .env)"
     ],
     "deny": [],
     "ask": []
