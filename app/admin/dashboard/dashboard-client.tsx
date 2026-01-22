@@ -894,279 +894,264 @@ export function AdminDashboardClient() {
             </Card>
           </div>
 
-          {/* Status Breakdown - Chi tiết từng trạng thái */}
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <div className="h-8 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full" />
-                Trip Status Breakdown
-              </CardTitle>
-              <CardDescription>
-                Detailed view of all trip statuses in the system
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {/* Pending Approval */}
-                <div className="p-4 rounded-lg border border-yellow-200 bg-yellow-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-yellow-500" />
-                    <p className="text-xs font-medium text-yellow-800">Pending Approval</p>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-700">{stats.statusBreakdown.pending_approval}</p>
-                  <p className="text-xs text-yellow-600 mt-1">Chờ phê duyệt</p>
-                </div>
-
-                {/* Pending Urgent */}
-                <div className="p-4 rounded-lg border border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-orange-500 animate-pulse" />
-                    <p className="text-xs font-medium text-orange-800">Pending Urgent</p>
-                  </div>
-                  <p className="text-2xl font-bold text-orange-700">{stats.statusBreakdown.pending_urgent}</p>
-                  <p className="text-xs text-orange-600 mt-1">Khẩn cấp (&lt;24h)</p>
-                </div>
-
-                {/* Auto Approved */}
-                <div className="p-4 rounded-lg border border-green-200 bg-green-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-green-500" />
-                    <p className="text-xs font-medium text-green-800">Auto Approved</p>
-                  </div>
-                  <p className="text-2xl font-bold text-green-700">{stats.statusBreakdown.auto_approved}</p>
-                  <p className="text-xs text-green-600 mt-1">Tự động duyệt</p>
-                </div>
-
-                {/* Approved */}
-                <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                    <p className="text-xs font-medium text-emerald-800">Approved</p>
-                  </div>
-                  <p className="text-2xl font-bold text-emerald-700">{stats.statusBreakdown.approved}</p>
-                  <p className="text-xs text-emerald-600 mt-1">Đã duyệt</p>
-                </div>
-
-                {/* Approved Solo */}
-                <div className="p-4 rounded-lg border border-teal-200 bg-teal-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-teal-500" />
-                    <p className="text-xs font-medium text-teal-800">Approved Solo</p>
-                  </div>
-                  <p className="text-2xl font-bold text-teal-700">{stats.statusBreakdown.approved_solo}</p>
-                  <p className="text-xs text-teal-600 mt-1">Đã duyệt (1 người)</p>
-                </div>
-
-                {/* Optimized */}
-                <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-blue-500" />
-                    <p className="text-xs font-medium text-blue-800">Optimized</p>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-700">{stats.statusBreakdown.optimized}</p>
-                  <p className="text-xs text-blue-600 mt-1">Đã tối ưu hóa</p>
-                </div>
-
-                {/* Rejected */}
-                <div className="p-4 rounded-lg border border-red-200 bg-red-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-red-500" />
-                    <p className="text-xs font-medium text-red-800">Rejected</p>
-                  </div>
-                  <p className="text-2xl font-bold text-red-700">{stats.statusBreakdown.rejected}</p>
-                  <p className="text-xs text-red-600 mt-1">Đã từ chối</p>
-                </div>
-
-                {/* Cancelled */}
-                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-gray-500" />
-                    <p className="text-xs font-medium text-gray-800">Cancelled</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-700">{stats.statusBreakdown.cancelled}</p>
-                  <p className="text-xs text-gray-600 mt-1">Đã hủy</p>
-                </div>
-
-                {/* Expired */}
-                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-3 w-3 rounded-full bg-amber-500" />
-                    <p className="text-xs font-medium text-amber-800">Expired</p>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-700">{stats.statusBreakdown.expired}</p>
-                  <p className="text-xs text-amber-600 mt-1">Đã hết hạn</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Alerts */}
-          {(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) && (
-            <Alert className="border-yellow-200 bg-yellow-50">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <AlertTitle>Action Required</AlertTitle>
-              <AlertDescription>
-                {stats.pendingApprovals > 0 && (
-                  <div>
-                    You have <strong>{stats.pendingApprovals}</strong> trips that require admin approval
-                    (excluding auto-approved and manager-approved trips).
-                  </div>
-                )}
-                {stats.pendingJoinRequests > 0 && (
-                  <div className="mt-1">
-                    You also have <strong>{stats.pendingJoinRequests}</strong> join requests waiting for review.
-                  </div>
-                )}
-                <div className="mt-2 text-xs">
-                  Please check them to ensure smooth operations.
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Pending Actions & Recent Optimizations */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Pending Actions */}
-            <Card className="h-full">
-              <CardHeader className="bg-gray-50 border-b">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                    Pending Actions
-                  </CardTitle>
-                  <Badge variant="outline" className="bg-yellow-50">
-                    {pendingActions.length} items
-                  </Badge>
-                </div>
+          {/* Quick Overview - System Overview for Admin */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            {/* Actionable Summary Card */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="h-5 w-5 text-blue-600" />
+                  System Overview
+                </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  {pendingActions.length > 0 ? (
-                    pendingActions.map((action) => (
-                      <div key={action.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border">
-                        <div className="flex items-center gap-3">
-                          <div className={`h-2 w-2 rounded-full ${action.isUrgent ? 'bg-orange-500 animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium">{action.user}</p>
-                              {/* ✅ Show detailed status badge */}
-                              {action.isUrgent ? (
-                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-[10px] px-1.5 py-0">
-                                  ⚡ URGENT
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-[10px] px-1.5 py-0">
-                                  ⏳ PENDING
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-500">{action.route}</p>
-                            <p className="text-xs text-gray-400">{action.date} at {action.time}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {action.estimatedCost && (
-                            <span className="text-xs font-medium text-gray-600">
-                              {formatCurrency(action.estimatedCost)}
-                            </span>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            onClick={() => handleReviewTrip(action)}
-                          >
-                            <Eye className="mr-1 h-3 w-3" />
-                            Review
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
-                      <p>All caught up!</p>
-                      <p className="text-xs mt-1">No pending actions</p>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Needs Action */}
+                  <div
+                    className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 cursor-pointer hover:shadow-md transition-all"
+                    onClick={handleViewAllPending}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-amber-700 uppercase tracking-wide">Needs Action</span>
+                      {(stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent) > 0 && (
+                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                      )}
                     </div>
-                  )}
+                    <p className="text-3xl font-bold text-amber-700">
+                      {stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      {stats.statusBreakdown.pending_urgent > 0 && (
+                        <span className="text-orange-600 font-medium">{stats.statusBreakdown.pending_urgent} urgent</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Approved */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-green-700 uppercase tracking-wide">Approved</span>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                    <p className="text-3xl font-bold text-green-700">
+                      {stats.statusBreakdown.approved + stats.statusBreakdown.auto_approved + stats.statusBreakdown.approved_solo}
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">Ready to optimize</p>
+                  </div>
+
+                  {/* Optimized */}
+                  <div
+                    className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 cursor-pointer hover:shadow-md transition-all"
+                    onClick={handleViewAllOptimizations}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">Optimized</span>
+                      <Zap className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <p className="text-3xl font-bold text-blue-700">{stats.statusBreakdown.optimized}</p>
+                    <p className="text-xs text-blue-600 mt-1">Trips combined</p>
+                  </div>
+
+                  {/* Closed */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Closed</span>
+                    </div>
+                    <p className="text-3xl font-bold text-gray-600">
+                      {stats.statusBreakdown.rejected + stats.statusBreakdown.cancelled + stats.statusBreakdown.expired}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Rejected / Cancelled / Expired</p>
+                  </div>
                 </div>
-                {pendingActions.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
+              </CardContent>
+            </Card>
+
+            {/* Action Alert Card */}
+            <Card className={`${(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) ? 'border-amber-300 bg-amber-50/50' : 'border-green-300 bg-green-50/50'}`}>
+              <CardContent className="pt-6">
+                {(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-full bg-amber-100">
+                        <AlertCircle className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <h3 className="font-semibold text-amber-800">Action Required</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {stats.pendingApprovals > 0 && (
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between bg-white hover:bg-amber-50 border-amber-200"
+                          onClick={handleViewAllPending}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-amber-600" />
+                            <span>{stats.pendingApprovals} trips pending</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {stats.pendingJoinRequests > 0 && (
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between bg-white hover:bg-purple-50 border-purple-200"
+                          onClick={handleViewAllJoinRequests}
+                        >
+                          <span className="flex items-center gap-2">
+                            <UserPlus className="h-4 w-4 text-purple-600" />
+                            <span>{stats.pendingJoinRequests} join requests</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4 text-center">
+                    <div className="p-3 rounded-full bg-green-100 mb-3">
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                    </div>
+                    <h3 className="font-semibold text-green-800">All Caught Up!</h3>
+                    <p className="text-sm text-green-600 mt-1">No pending actions</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activities - 2 columns */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Pending Actions - Compact View */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    Pending Trips
+                  </CardTitle>
+                  {pendingActions.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-xs text-red-600 hover:text-red-700 h-7"
                       onClick={handleViewAllPending}
                     >
-                      View All Pending
-                      <ChevronRight className="ml-1 h-4 w-4" />
+                      View All
+                      <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {pendingActions.length > 0 ? (
+                  <div className="space-y-2">
+                    {pendingActions.slice(0, 4).map((action) => (
+                      <div
+                        key={action.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
+                          action.isUrgent ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                        }`}
+                        onClick={() => handleReviewTrip(action)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${action.isUrgent ? 'bg-orange-500 animate-pulse' : 'bg-amber-500'}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">{action.user}</p>
+                              {action.isUrgent && (
+                                <Badge className="bg-orange-100 text-orange-700 border-0 text-[10px] px-1.5 py-0">
+                                  URGENT
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">{action.route}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs font-medium">{action.date}</p>
+                            <p className="text-xs text-gray-400">{action.time}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
+                    <p className="text-sm font-medium text-gray-600">No pending trips</p>
+                    <p className="text-xs text-gray-400">All trips have been processed</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Recent Optimizations */}
-            <Card className="h-full">
-              <CardHeader className="bg-gray-50 border-b">
+            {/* Recent Optimizations - Compact View */}
+            <Card>
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-green-600" />
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Zap className="h-4 w-4 text-blue-600" />
                     Recent Optimizations
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={handleViewAllOptimizations}
-                  >
-                    View All
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  {recentOptimizations.length > 0 ? (
-                    recentOptimizations.map((opt) => (
-                      <div key={opt.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border">
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 rounded-full bg-green-500" />
-                          <div>
-                            <p className="text-sm font-medium">Combined {opt.trips} trips</p>
-                            <p className="text-xs text-gray-500">{opt.route}</p>
-                            <p className="text-xs text-green-600 font-medium">
-                              Saved {formatCurrency(opt.savings)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs text-gray-500">{opt.date}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 text-xs ml-2"
-                            onClick={() => router.push(`/admin/optimizations/${opt.groupId}`)}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Activity className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p>No recent optimizations</p>
-                      <Button
-                        variant="link"
-                        className="text-red-600 mt-2"
-                        onClick={handleRunOptimization}
-                      >
-                        Run optimization now →
-                      </Button>
-                    </div>
+                  {recentOptimizations.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-red-600 hover:text-red-700 h-7"
+                      onClick={handleViewAllOptimizations}
+                    >
+                      View All
+                      <ChevronRight className="ml-1 h-3 w-3" />
+                    </Button>
                   )}
                 </div>
+              </CardHeader>
+              <CardContent>
+                {recentOptimizations.length > 0 ? (
+                  <div className="space-y-2">
+                    {recentOptimizations.slice(0, 4).map((opt) => (
+                      <div
+                        key={opt.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100 cursor-pointer hover:bg-blue-100 transition-all"
+                        onClick={() => router.push(`/admin/optimizations/${opt.groupId}`)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-1.5 rounded-full bg-blue-100">
+                            <Zap className="h-3 w-3 text-blue-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{opt.trips} trips combined</p>
+                            <p className="text-xs text-gray-500 truncate">{opt.route}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs font-medium text-green-600">
+                              {opt.savings > 0 ? `Saved ${formatCurrency(opt.savings)}` : 'Combined'}
+                            </p>
+                            <p className="text-xs text-gray-400">{opt.date}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Activity className="h-10 w-10 text-gray-300 mb-2" />
+                    <p className="text-sm font-medium text-gray-600">No recent optimizations</p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-red-600 mt-1 h-auto p-0"
+                      onClick={handleRunOptimization}
+                    >
+                      Run optimization now
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
