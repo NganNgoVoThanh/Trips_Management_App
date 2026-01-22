@@ -128,7 +128,9 @@
       "Bash(nslookup:*)",
       "Bash(grep:*)",
       "Bash(echo:*)",
-      "Bash(copy .env.local .env)"
+      "Bash(copy .env.local .env)",
+      "Bash(test:*)",
+      "Bash(Select-Object -First 100)"
     ],
     "deny": [],
     "ask": []

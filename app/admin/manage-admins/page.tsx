@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, MapPin, UserPlus, UserMinus, Search, RefreshCw, Activity, Users } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/header';
+import PendingAdminAssignments from '@/components/admin/pending-admin-assignments';
 
 interface Location {
   id: string;
@@ -126,7 +127,11 @@ export default function ManageAdminsPage() {
   };
 
   const handleGrantAdmin = async () => {
-    if (!selectedUser) return;
+    const targetEmail = selectedUser?.email || searchQuery;
+    if (!targetEmail || !targetEmail.includes('@')) {
+      alert('❌ Please enter a valid email address');
+      return;
+    }
 
     setActionLoading(true);
     try {
@@ -134,25 +139,44 @@ export default function ManageAdminsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetUserEmail: selectedUser.email,
+          targetUserEmail: targetEmail,
           adminType: grantAdminType,
           locationId: grantAdminType === 'location_admin' ? grantLocationId : null,
           reason: grantReason,
         }),
       });
 
+      // Check if response is JSON
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', text);
+        alert(`❌ Server error (${res.status}). Please sign out and sign in again.`);
+        return;
+      }
+
       const data = await res.json();
 
       if (res.ok) {
-        alert('✅ Admin role granted successfully!');
+        if (data.isPending) {
+          alert('✅ User not found in system. Admin invitation email has been sent. The user will receive admin role upon first login.');
+        } else {
+          alert('✅ Admin role granted successfully!');
+        }
         setGrantDialogOpen(false);
         resetGrantForm();
         fetchData();
       } else {
-        alert(`❌ Error: ${data.error}`);
+        // Show debug info if available
+        if (data.debug) {
+          console.log('Debug info:', data.debug);
+          alert(`❌ ${data.error}\n\nYour current role: ${data.debug.role}\nAdmin type: ${data.debug.adminType}\n\n${data.debug.hint || ''}`);
+        } else {
+          alert(`❌ Error: ${data.error}`);
+        }
       }
     } catch (error) {
-      alert('❌ Error granting admin role');
+      alert('❌ Error granting admin role. Please sign out and sign in again.');
       console.error(error);
     } finally {
       setActionLoading(false);
@@ -271,6 +295,11 @@ export default function ManageAdminsPage() {
         </Button>
       </div>
 
+      {/* Pending Admin Assignments Section */}
+      <div className="mb-8">
+        <PendingAdminAssignments />
+      </div>
+
       {/* Admins List */}
       <Card className="p-6 shadow-sm">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Current Admins</h2>
@@ -339,16 +368,28 @@ export default function ManageAdminsPage() {
             <DialogTitle>Grant Admin Role</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Search User */}
+            {/* User Email */}
             <div>
-              <Label>Search User</Label>
+              <Label>User Email *</Label>
               <div className="flex gap-2 mt-1">
                 <Input
-                  placeholder="Enter email or name..."
+                  placeholder="Enter email or search for existing user..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     searchUsers(e.target.value);
+                    // Auto-create a pseudo user object from email
+                    if (e.target.value.includes('@')) {
+                      setSelectedUser({
+                        id: 'new',
+                        email: e.target.value,
+                        name: e.target.value,
+                        employee_id: null,
+                        department: null,
+                        current_role: 'user',
+                        current_admin_type: 'none'
+                      });
+                    }
                   }}
                 />
                 <Button variant="outline" onClick={() => searchUsers(searchQuery)}>
@@ -380,7 +421,8 @@ export default function ManageAdminsPage() {
               )}
             </div>
 
-            {selectedUser && (
+            {/* Show fields when email is valid or user is selected */}
+            {(selectedUser || searchQuery.includes('@')) && (
               <>
                 {/* Admin Type */}
                 <div>
@@ -407,7 +449,7 @@ export default function ManageAdminsPage() {
                       <SelectContent>
                         {locations.map((loc) => (
                           <SelectItem key={loc.id} value={loc.id}>
-                            {loc.code} - {loc.name} ({loc.province})
+                            {loc.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -435,7 +477,7 @@ export default function ManageAdminsPage() {
             <Button
               className="bg-red-600 hover:bg-red-700"
               onClick={handleGrantAdmin}
-              disabled={!selectedUser || (grantAdminType === 'location_admin' && !grantLocationId) || actionLoading}
+              disabled={(!selectedUser && !searchQuery.includes('@')) || (grantAdminType === 'location_admin' && !grantLocationId) || actionLoading}
             >
               {actionLoading ? 'Processing...' : 'Grant Admin Role'}
             </Button>

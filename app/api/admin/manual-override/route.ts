@@ -37,6 +37,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Determine if user is Location Admin
+  const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId;
+  const adminLocationId = session.user.adminLocationId;
+
+  // Ensure required tables and columns exist BEFORE querying
+  try {
+    await ensureAuditTables();
+  } catch (migrationError) {
+    console.error('❌ Failed to run migrations:', migrationError);
+  }
+
   let connection: mysql.Connection | null = null;
 
   try {
@@ -48,8 +59,29 @@ export async function GET(request: NextRequest) {
       database: process.env.DB_NAME,
     });
 
+    // For Location Admin, get location name for matching
+    let locationName = adminLocationId;
+    if (isLocationAdmin && adminLocationId) {
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+      if (locRows.length > 0) {
+        locationName = locRows[0].name;
+      }
+    }
+
+    // Build location filter for Location Admin
+    let locationFilter = '';
+    let locationParams: any[] = [];
+    if (isLocationAdmin && adminLocationId) {
+      locationFilter = `AND (t.departure_location = ? OR t.departure_location = ? OR t.destination = ? OR t.destination = ?)`;
+      locationParams = [adminLocationId, locationName, adminLocationId, locationName];
+    }
+
     // Get trips with pending manager approval that are >48h old
-    // Exclude cancelled trips and trips where departure has already passed
+    // These are trips waiting for manager approval that have exceeded the 48-hour window
+    // Only include trips that are still in pending_approval or pending_urgent status
     const [trips] = await connection.query(`
       SELECT
         t.id,
@@ -68,6 +100,7 @@ export async function GET(request: NextRequest) {
         t.status,
         t.created_at,
         t.manager_approval_status,
+        t.manager_approval_token,
         t.expired_notification_sent,
         t.expired_notified_at,
         u.manager_email,
@@ -82,23 +115,27 @@ export async function GET(request: NextRequest) {
       FROM trips t
       LEFT JOIN users u ON t.user_id = u.id
       WHERE t.manager_approval_status = 'pending'
-        AND t.status NOT IN ('cancelled', 'rejected', 'expired')
+        AND t.status IN ('pending_approval', 'pending_urgent')
         AND TIMESTAMPDIFF(HOUR, t.created_at, NOW()) > 48
+        ${locationFilter}
       ORDER BY t.departure_date ASC, t.departure_time ASC
-    `) as any[];
+    `, locationParams) as any[];
 
-    // Get statistics
-    const [stats] = await connection.query(`
+    // Get statistics (filtered by location for Location Admin)
+    const statsQuery = `
       SELECT
         COUNT(*) as total_expired,
         SUM(CASE WHEN expired_notification_sent = TRUE THEN 1 ELSE 0 END) as notified_count,
         SUM(CASE WHEN expired_notification_sent = FALSE OR expired_notification_sent IS NULL THEN 1 ELSE 0 END) as pending_notification_count,
-        SUM(CASE WHEN departure_date < CURDATE() THEN 1 ELSE 0 END) as past_departure_count
+        SUM(CASE WHEN departure_date < CURDATE() THEN 1 ELSE 0 END) as past_departure_count,
+        SUM(CASE WHEN status = 'pending_urgent' THEN 1 ELSE 0 END) as urgent_count
       FROM trips
       WHERE manager_approval_status = 'pending'
-        AND status NOT IN ('cancelled', 'rejected', 'expired')
+        AND status IN ('pending_approval', 'pending_urgent')
         AND TIMESTAMPDIFF(HOUR, created_at, NOW()) > 48
-    `) as any[];
+        ${isLocationAdmin && adminLocationId ? `AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)` : ''}
+    `;
+    const [stats] = await connection.query(statsQuery, locationParams) as any[];
 
     // Get recent override history (last 20)
     const [overrideHistory] = await connection.query(`
@@ -154,6 +191,10 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
+
+  // Determine if user is Location Admin
+  const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId;
+  const adminLocationId = session.user.adminLocationId;
 
   let connection: mysql.Connection | null = null;
 
@@ -242,6 +283,35 @@ export async function POST(request: NextRequest) {
       const userEmail = trip.user_email || trip.user_email_from_user;
       const userName = trip.user_name || trip.user_name_from_user;
 
+      // === LOCATION ADMIN PERMISSION CHECK ===
+      // Location Admin can only override trips involving their assigned location
+      if (isLocationAdmin && adminLocationId) {
+        // Get location name
+        const [locRows] = await connection.query(
+          'SELECT name FROM locations WHERE id = ? LIMIT 1',
+          [adminLocationId]
+        ) as any[];
+        const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+        // Check if trip involves admin's location
+        const tripInvolvesLocation =
+          trip.departure_location === adminLocationId ||
+          trip.departure_location === locationName ||
+          trip.destination === adminLocationId ||
+          trip.destination === locationName;
+
+        if (!tripInvolvesLocation) {
+          await connection.rollback();
+          return NextResponse.json(
+            {
+              error: 'Permission denied',
+              details: `As a Location Admin for ${locationName}, you can only override trips that involve your assigned location.`
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       // === EXCEPTION HANDLING ===
 
       // 1. Check if trip is already processed
@@ -257,20 +327,35 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 2. Check if trip status is not valid for override
-      if (['cancelled', 'rejected', 'expired'].includes(trip.status)) {
+      // 2. Check if trip status is valid for manual override
+      // Only trips in 'pending_approval' or 'pending_urgent' status can be manually overridden
+      if (!['pending_approval', 'pending_urgent'].includes(trip.status)) {
         await connection.rollback();
         return NextResponse.json(
           {
             error: 'Trip cannot be overridden',
-            details: `This trip has been ${trip.status} and cannot be processed.`,
+            details: `This trip has status "${trip.status}" and cannot be manually overridden. Only trips with "pending_approval" or "pending_urgent" status can be processed.`,
             currentStatus: trip.status
           },
           { status: 400 }
         );
       }
 
-      // 3. Check if departure date has already passed (warning, allow force)
+      // 3. Check if trip meets the 48-hour threshold
+      const hoursOld = Math.floor((Date.now() - new Date(trip.created_at).getTime()) / (1000 * 60 * 60));
+      if (hoursOld < 48 && !forceOverride) {
+        await connection.rollback();
+        return NextResponse.json(
+          {
+            error: 'Trip not eligible for override',
+            details: `This trip is only ${hoursOld} hours old. Manual override is only allowed for trips older than 48 hours.`,
+            hoursOld: hoursOld
+          },
+          { status: 400 }
+        );
+      }
+
+      // 4. Check if departure date has already passed (warning, allow force)
       if (trip.is_past_departure && action === 'approve' && !forceOverride) {
         await connection.rollback();
         return NextResponse.json(
@@ -284,7 +369,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 4. Check if user is still active
+      // 5. Check if user is still active
       if (trip.user_status === 'inactive' || trip.user_status === 'disabled') {
         await connection.rollback();
         return NextResponse.json(
@@ -484,6 +569,13 @@ export async function PUT(request: NextRequest) {
       { error: 'Unauthorized - Admin access required' },
       { status: 401 }
     );
+  }
+
+  // Ensure required tables and columns exist BEFORE querying
+  try {
+    await ensureAuditTables();
+  } catch (migrationError) {
+    console.error('❌ Failed to run migrations:', migrationError);
   }
 
   let connection: mysql.Connection | null = null;

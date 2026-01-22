@@ -19,12 +19,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/logo1.jpg", sizes: "any" },
-      { url: "/logo1.jpg", sizes: "32x32", type: "image/jpeg" },
-      { url: "/logo1.jpg", sizes: "16x16", type: "image/jpeg" },
+      { url: "/logo1.png", sizes: "any" },
+      { url: "/logo1.png", sizes: "32x32", type: "image/png" },
+      { url: "/logo1.png", sizes: "16x16", type: "image/png" },
     ],
-    shortcut: "/logo1.jpg",
-    apple: "/logo1.jpg",
+    shortcut: "/logo1.png",
+    apple: "/logo1.png",
   },
 };
 

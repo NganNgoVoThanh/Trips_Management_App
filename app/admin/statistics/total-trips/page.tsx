@@ -43,10 +43,11 @@ export default function TotalTripsPage() {
   })
 
   useEffect(() => {
+    // Only run when status is not loading
     if (status !== 'loading') {
       loadTripsData()
     }
-  }, [status, session])
+  }, [status]) // Removed session from deps to prevent re-render loops
 
   useEffect(() => {
     filterTrips()
@@ -54,11 +55,19 @@ export default function TotalTripsPage() {
 
   const loadTripsData = async () => {
     try {
-      // Check NextAuth session
-      if (status === 'loading') return
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
 
-      if (!session?.user || session.user.role !== 'admin') {
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
+        return
+      }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
         return
       }
 

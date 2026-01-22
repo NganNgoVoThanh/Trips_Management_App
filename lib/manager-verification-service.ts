@@ -84,11 +84,12 @@ export async function sendManagerConfirmationEmail(data: ManagerConfirmationData
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
     // Store confirmation token
+    // Note: Table has additional required columns: user_email, pending_manager_email, confirmation_token
     await connection.query(
       `INSERT INTO manager_confirmations
-       (id, user_id, manager_email, token, type, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [confirmationId, data.userId, data.managerEmail, token, data.type, expiresAt]
+       (id, user_id, user_email, manager_email, pending_manager_email, token, confirmation_token, type, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [confirmationId, data.userId, data.userEmail, data.managerEmail, data.managerEmail, token, token, data.type, expiresAt]
     );
 
     // Generate confirmation URLs
@@ -120,9 +121,10 @@ export async function sendManagerConfirmationEmail(data: ManagerConfirmationData
 
 /**
  * Send initial manager confirmation email
+ * Clean, professional design with clear action buttons
  */
 async function sendInitialConfirmationEmail(data: ManagerConfirmationData & { confirmUrl: string; rejectUrl: string; expiresAt: Date }) {
-  const subject = `🔔 Manager Confirmation Request from ${data.userName}`;
+  const subject = `[Action Required] Manager Confirmation - ${data.userName}`;
 
   const html = `
 <!DOCTYPE html>
@@ -130,475 +132,104 @@ async function sendInitialConfirmationEmail(data: ManagerConfirmationData & { co
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Manager Confirmation Request</title>
-  <!--[if mso]>
-  <style type="text/css">
-    body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
-  </style>
-  <![endif]-->
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #1a1a1a;
-      background-color: #f4f6f9;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    .email-wrapper {
-      background-color: #f4f6f9;
-      padding: 40px 20px;
-      min-height: 100vh;
-    }
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-    }
-
-    /* Header with modern gradient */
-    .header {
-      background: linear-gradient(135deg, #C00000 0%, #A00000 50%, #800000 100%);
-      color: white;
-      padding: 48px 40px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .header::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-      animation: pulse 15s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 0.5; }
-      50% { transform: scale(1.1); opacity: 0.3; }
-    }
-    .header-icon {
-      background: rgba(255, 255, 255, 0.2);
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-      font-size: 42px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-      position: relative;
-      z-index: 1;
-    }
-    .header h1 {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-      position: relative;
-      z-index: 1;
-    }
-    .header p {
-      font-size: 15px;
-      opacity: 0.95;
-      font-weight: 400;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Content area */
-    .content {
-      padding: 48px 40px;
-      background-color: #ffffff;
-    }
-    .greeting {
-      font-size: 20px;
-      color: #1a1a1a;
-      margin-bottom: 16px;
-      font-weight: 600;
-    }
-    .intro-text {
-      font-size: 16px;
-      color: #4a5568;
-      margin-bottom: 32px;
-      line-height: 1.8;
-    }
-    .employee-name {
-      color: #C00000;
-      font-weight: 700;
-      font-size: 17px;
-    }
-
-    /* Employee info card with modern design */
-    .info-card {
-      background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%);
-      border: 2px solid #ffcccb;
-      border-radius: 12px;
-      padding: 28px;
-      margin: 32px 0;
-      box-shadow: 0 4px 16px rgba(192, 0, 0, 0.08);
-      position: relative;
-      overflow: hidden;
-    }
-    .info-card::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 6px;
-      background: linear-gradient(180deg, #C00000 0%, #ff4444 100%);
-    }
-    .info-card h3 {
-      color: #C00000;
-      font-size: 18px;
-      margin-bottom: 20px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      padding-left: 8px;
-    }
-    .info-card h3::before {
-      content: '👤';
-      margin-right: 10px;
-      font-size: 22px;
-    }
-    .info-row {
-      background: white;
-      border-radius: 8px;
-      padding: 16px;
-      margin: 12px 0;
-      margin-left: 8px;
-      transition: transform 0.2s ease;
-    }
-    .info-row:hover {
-      transform: translateX(4px);
-    }
-    .info-label {
-      color: #718096;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      display: block;
-      margin-bottom: 6px;
-    }
-    .info-value {
-      color: #1a1a1a;
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    /* Responsibilities section */
-    .responsibilities {
-      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-      border-radius: 12px;
-      padding: 28px;
-      margin: 32px 0;
-      border: 1px solid #e2e8f0;
-    }
-    .responsibilities h4 {
-      color: #2d3748;
-      font-size: 17px;
-      margin-bottom: 16px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-    }
-    .responsibilities h4::before {
-      content: '📋';
-      margin-right: 10px;
-      font-size: 20px;
-    }
-    .responsibilities-intro {
-      color: #718096;
-      font-size: 14px;
-      margin-bottom: 16px;
-      font-style: italic;
-    }
-    .responsibilities ul {
-      list-style: none;
-      padding: 0;
-    }
-    .responsibilities li {
-      padding: 12px 0 12px 36px;
-      position: relative;
-      color: #2d3748;
-      font-size: 15px;
-      line-height: 1.7;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .responsibilities li:last-child {
-      border-bottom: none;
-    }
-    .responsibilities li::before {
-      content: '✓';
-      position: absolute;
-      left: 0;
-      top: 12px;
-      width: 24px;
-      height: 24px;
-      background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-      color: white;
-      font-weight: bold;
-      font-size: 14px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Action section with prominent CTA */
-    .action-section {
-      text-align: center;
-      margin: 40px 0;
-      padding: 40px 24px;
-      background: linear-gradient(135deg, #f7fafc 0%, #ffffff 100%);
-      border-radius: 12px;
-      border: 2px dashed #cbd5e0;
-    }
-    .action-label {
-      font-size: 18px;
-      color: #2d3748;
-      font-weight: 700;
-      margin-bottom: 28px;
-      display: block;
-    }
-    .button-container {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      display: inline-block;
-      padding: 18px 48px;
-      text-decoration: none;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 16px;
-      letter-spacing: 0.3px;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      border: none;
-      cursor: pointer;
-      min-width: 160px;
-    }
-    .btn-confirm {
-      background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-      color: white !important;
-      box-shadow: 0 4px 20px rgba(39, 174, 96, 0.35);
-    }
-    .btn-confirm:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 28px rgba(39, 174, 96, 0.45);
-    }
-    .btn-reject {
-      background: white;
-      color: #e53e3e !important;
-      border: 2px solid #e53e3e;
-      box-shadow: 0 4px 16px rgba(229, 62, 62, 0.2);
-    }
-    .btn-reject:hover {
-      background: #e53e3e;
-      color: white !important;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 28px rgba(229, 62, 62, 0.4);
-    }
-
-    /* Notice box */
-    .notice-box {
-      background: linear-gradient(135deg, #fffaf0 0%, #fef5e7 100%);
-      border-left: 6px solid #f39c12;
-      border-radius: 12px;
-      padding: 24px 28px;
-      margin: 32px 0;
-      box-shadow: 0 2px 12px rgba(243, 156, 18, 0.1);
-    }
-    .notice-box-title {
-      color: #d68910;
-      font-size: 17px;
-      font-weight: 700;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-    }
-    .notice-box-title::before {
-      content: '⚠️';
-      margin-right: 10px;
-      font-size: 22px;
-    }
-    .notice-box ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .notice-box li {
-      padding: 10px 0 10px 28px;
-      color: #7d6608;
-      font-size: 14px;
-      position: relative;
-      line-height: 1.6;
-    }
-    .notice-box li::before {
-      content: '●';
-      position: absolute;
-      left: 8px;
-      color: #f39c12;
-      font-weight: bold;
-      font-size: 16px;
-    }
-    .notice-box strong {
-      color: #c27803;
-      font-weight: 700;
-    }
-
-    /* Footer */
-    .footer {
-      background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-      color: #e2e8f0;
-      padding: 32px 40px;
-      text-align: center;
-    }
-    .footer p {
-      font-size: 14px;
-      margin: 8px 0;
-      opacity: 0.95;
-    }
-    .footer-divider {
-      height: 1px;
-      background: rgba(255,255,255,0.15);
-      margin: 16px auto;
-      max-width: 80%;
-    }
-    .company-name {
-      color: #ffffff;
-      font-weight: 700;
-    }
-    .footer-copyright {
-      font-size: 12px;
-      opacity: 0.7;
-      margin-top: 12px;
-      color: #a0aec0;
-    }
-
-    /* Responsive design */
-    @media only screen and (max-width: 600px) {
-      .email-wrapper { padding: 20px 12px; }
-      .content { padding: 32px 24px; }
-      .header { padding: 36px 24px; }
-      .header h1 { font-size: 24px; }
-      .header-icon { width: 64px; height: 64px; font-size: 32px; }
-      .button-container { flex-direction: column; gap: 12px; }
-      .btn {
-        display: block;
-        width: 100%;
-        padding: 16px 24px;
-        margin: 0;
-      }
-      .info-card, .responsibilities, .notice-box { padding: 20px; }
-      .action-section { padding: 28px 20px; }
-    }
-
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-      .email-wrapper { background-color: #1a1a1a; }
-      .container { background-color: #2d2d2d; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
-      .content { background-color: #2d2d2d; }
-      .greeting { color: #f0f0f0; }
-      .intro-text { color: #c0c0c0; }
-      .info-row { background: #3a3a3a; }
-      .info-value { color: #f0f0f0; }
-      .responsibilities { background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%); }
-      .responsibilities li { color: #e0e0e0; border-bottom-color: #4a4a4a; }
-      .action-section { background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%); border-color: #4a4a4a; }
-      .action-label { color: #f0f0f0; }
-      .btn-reject { background: #3a3a3a; }
-    }
-  </style>
+  <title>Manager Confirmation</title>
 </head>
-<body>
-  <div class="email-wrapper">
-    <div class="container">
-      <!-- Header Section -->
-      <div class="header">
-        <div class="header-icon">✋</div>
-        <h1>Manager Confirmation Required</h1>
-        <p>Trips Management System • Intersnack Vietnam</p>
-      </div>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
 
-      <!-- Main Content -->
-      <div class="content">
-        <div class="greeting">Dear Manager,</div>
+  <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="520" cellspacing="0" cellpadding="0" border="0" style="max-width: 520px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
 
-        <p class="intro-text">
-          <span class="employee-name">${data.userName}</span> has designated you as their direct reporting manager in the Trips Management System.
-          Your confirmation is required to activate their account and enable trip request submissions.
-        </p>
+          <!-- Red Header Bar -->
+          <tr>
+            <td style="background-color: #C00000; padding: 24px 32px;">
+              <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <span style="color: #ffffff; font-size: 18px; font-weight: 700;">Trips Management</span>
+                  </td>
+                  <td align="right">
+                    <span style="color: rgba(255,255,255,0.8); font-size: 12px;">Intersnack Vietnam</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-        <!-- Employee Information Card -->
-        <div class="info-card">
-          <h3>Employee Information</h3>
-          <div class="info-row">
-            <span class="info-label">Full Name</span>
-            <div class="info-value">${data.userName}</div>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Email Address</span>
-            <div class="info-value">${data.userEmail}</div>
-          </div>
-        </div>
+          <!-- Content -->
+          <tr>
+            <td style="padding: 32px;">
 
-        <!-- Responsibilities Section -->
-        <div class="responsibilities">
-          <h4>Your Responsibilities</h4>
-          <p class="responsibilities-intro">By confirming this manager-employee relationship, you agree to:</p>
-          <ul>
-            <li>Review and approve or reject business trip requests submitted by this employee</li>
-            <li>Receive email notifications when trip approvals are pending</li>
-            <li>Be listed as the official reporting manager for this employee in the system</li>
-          </ul>
-        </div>
+              <p style="margin: 0 0 20px 0; color: #333; font-size: 15px; line-height: 1.5;">
+                Dear Manager,
+              </p>
 
-        <!-- Call to Action -->
-        <div class="action-section">
-          <span class="action-label">Please respond to this request</span>
-          <div class="button-container">
-            <a href="${data.confirmUrl}" class="btn btn-confirm">✓ Confirm & Approve</a>
-            <a href="${data.rejectUrl}" class="btn btn-reject">✗ Decline Request</a>
-          </div>
-        </div>
+              <p style="margin: 0 0 24px 0; color: #555; font-size: 14px; line-height: 1.6;">
+                <strong style="color: #C00000;">${data.userName}</strong> (${data.userEmail}) has requested you as their reporting manager.
+              </p>
 
-        <!-- Important Notice -->
-        <div class="notice-box">
-          <div class="notice-box-title">Important Information</div>
-          <ul>
-            <li>This confirmation link expires on <strong>${data.expiresAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong></li>
-            <li>Only confirm if you are <strong>indeed this employee's direct manager</strong></li>
-            <li>If you did not expect this request or believe it's incorrect, please <strong>decline it</strong> and contact HR immediately</li>
-            <li>One-click action required - no login necessary</li>
-          </ul>
-        </div>
-      </div>
+              <!-- Question -->
+              <p style="margin: 0 0 24px 0; color: #333; font-size: 14px; font-weight: 600; text-align: center;">
+                Do you confirm this manager-employee relationship?
+              </p>
 
-      <!-- Footer -->
-      <div class="footer">
-        <p>This is an automated notification from <span class="company-name">Trips Management System</span></p>
-        <div class="footer-divider"></div>
-        <p>Need help? Contact your HR department or IT support</p>
-        <p class="footer-copyright">© ${new Date().getFullYear()} Intersnack Vietnam. All rights reserved.</p>
-      </div>
-    </div>
-  </div>
+              <!-- Action Buttons - Outlook Desktop Compatible -->
+              <table cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto 32px auto;">
+                <tr>
+                  <td align="center" style="padding-right: 10px;">
+                    <table cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td align="center" style="background-color: #16a34a; border-radius: 6px;">
+                          <a href="${data.confirmUrl}" target="_blank" style="font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none; display: inline-block; padding: 14px 36px; font-family: Arial, sans-serif;">CONFIRM</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="center" style="padding-left: 10px;">
+                    <table cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td align="center" style="background-color: #ffffff; border: 2px solid #dc2626; border-radius: 6px;">
+                          <a href="${data.rejectUrl}" target="_blank" style="font-size: 15px; font-weight: bold; color: #dc2626; text-decoration: none; display: inline-block; padding: 12px 34px; font-family: Arial, sans-serif;">DECLINE</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Brief Info -->
+              <p style="margin: 0 0 8px 0; color: #666; font-size: 13px; line-height: 1.5;">
+                By confirming, you will:
+              </p>
+              <ul style="margin: 0 0 20px 0; padding-left: 20px; color: #666; font-size: 13px; line-height: 1.8;">
+                <li>Approve/reject their business trip requests</li>
+                <li>Receive notifications for pending approvals</li>
+              </ul>
+
+              <!-- Expiry Note -->
+              <p style="margin: 0; padding: 12px 16px; background-color: #fef3c7; border-radius: 4px; color: #92400e; font-size: 12px;">
+                This link expires on <strong>${data.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>. No login required.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9f9f9; padding: 16px 32px; border-top: 1px solid #eee;">
+              <p style="margin: 0; color: #999; font-size: 11px; text-align: center;">
+                This is an automated email from Trips Management System.<br>
+                © ${new Date().getFullYear()} Intersnack Vietnam
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
 </body>
 </html>
   `;

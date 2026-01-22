@@ -4,7 +4,7 @@ import { authService } from './auth-service';
 import { emailService } from './email-service';
 import { toMySQLDateTime, getCurrentVietnamTime } from './utils'; // ✅ Import từ utils
 import { TripStatus } from './trip-status-config';
-import { getLocationName } from './config'; // ✅ Import for email templates
+import { getLocationName, getVehiclePassengerCapacity } from './config'; // ✅ Import for email templates and capacity check
 
 // Check if we're on server side
 const isServer = typeof window === 'undefined';
@@ -240,6 +240,61 @@ class JoinRequestService {
           if (isAlreadyParticipant) {
             throw new Error('You are already a participant in this optimized trip group');
           }
+        }
+
+        // ✅ NEW: Check vehicle passenger capacity (excluding driver)
+        try {
+          // Get the original trip details
+          const [tripRows] = await (await getPool()).query(
+            'SELECT vehicle_type, num_passengers FROM trips WHERE id = ? LIMIT 1',
+            [tripId]
+          ) as any[];
+
+          if (Array.isArray(tripRows) && tripRows.length > 0) {
+            const trip = tripRows[0];
+            const vehicleType = trip.vehicle_type;
+            const currentPassengers = trip.num_passengers || 0;
+
+            // Get passenger capacity (excluding driver seat)
+            const passengerCapacity = getVehiclePassengerCapacity(vehicleType);
+
+            // Count current approved join requests for this trip
+            const approvedRequests = await this.getJoinRequests({
+              tripId,
+              status: 'approved'
+            });
+
+            const totalPassengers = currentPassengers + approvedRequests.length + 1; // +1 for this new request
+
+            if (totalPassengers > passengerCapacity) {
+              const vehicleNames: Record<string, string> = {
+                'car': '4-seater car',
+                'car-4': '4-seater car',
+                'van': '7-seater van',
+                'car-7': '7-seater van',
+                'bus': '16-seater bus',
+                'van-16': '16-seater bus',
+                'truck': 'truck'
+              };
+              const vehicleName = vehicleNames[vehicleType] || vehicleType;
+
+              throw new Error(
+                `Cannot join this trip: Vehicle is at full capacity. ` +
+                `This ${vehicleName} can carry ${passengerCapacity} passengers (excluding driver), ` +
+                `but already has ${currentPassengers + approvedRequests.length} passenger(s). ` +
+                `No more seats available.`
+              );
+            }
+
+            console.log(`✅ Capacity check passed: ${totalPassengers}/${passengerCapacity} passengers for ${vehicleType}`);
+          }
+        } catch (capacityError: any) {
+          // If it's our custom capacity error, re-throw it
+          if (capacityError.message.includes('Cannot join this trip')) {
+            throw capacityError;
+          }
+          // Otherwise, log but don't block (for backwards compatibility)
+          console.warn('⚠️ Could not check vehicle capacity:', capacityError.message);
         }
       }
 
@@ -1161,13 +1216,13 @@ Trip Details:
 
       // Check original trip status to determine join behavior
       if (originalTrip.status === 'optimized') {
-        // ⚡ SCENARIO 2: Join vào optimized trip → INSTANT JOIN
+        // ⚡ SCENARIO 1: Join vào optimized trip → INSTANT JOIN
         tripStatus = 'optimized';
         requireManagerApproval = false;
         isInstantJoin = true;
         console.log('⚡ INSTANT JOIN: Joining optimized trip, no manager approval needed');
-      } else if (['approved', 'auto_approved'].includes(originalTrip.status)) {
-        // 📋 SCENARIO 1: Join vào approved trip → CẦN MANAGER APPROVAL
+      } else if (['approved', 'approved_solo', 'auto_approved'].includes(originalTrip.status)) {
+        // 📋 SCENARIO 2: Join vào approved trip → CẦN MANAGER APPROVAL
         tripStatus = managerEmail
           ? (isUrgent ? 'pending_urgent' : 'pending_approval')
           : 'auto_approved';
@@ -1175,8 +1230,14 @@ Trip Details:
         isInstantJoin = false;
         console.log('📋 NORMAL FLOW: Joining approved trip, manager approval required');
       } else {
-        // ❌ SCENARIO 3: Trip chưa approve hoặc invalid status
-        throw new Error(`Cannot join trip with status: ${originalTrip.status}. Only approved or optimized trips can be joined.`);
+        // 📋 SCENARIO 3: Join vào pending/other trip → CẦN MANAGER APPROVAL (admin đã approve join request)
+        // Admin approval = approve join request, user still needs manager approval for their own trip
+        tripStatus = managerEmail
+          ? (isUrgent ? 'pending_urgent' : 'pending_approval')
+          : 'auto_approved';
+        requireManagerApproval = managerEmail ? true : false;
+        isInstantJoin = false;
+        console.log(`📋 ADMIN-APPROVED JOIN: Original trip status is ${originalTrip.status}, creating new trip with manager approval flow`);
       }
 
       // Create a new trip for the user with the same details as the original trip

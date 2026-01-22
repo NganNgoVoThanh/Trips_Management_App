@@ -12,7 +12,8 @@ export type TripStatus =
   | 'cancelled'
   | 'expired'
   | 'pending' // Legacy
-  | 'confirmed'; // Legacy
+  | 'confirmed' // Legacy
+  | 'draft'; // For temp_trips (optimization proposals)
 
 export interface StatusConfig {
   badge: string;
@@ -149,6 +150,15 @@ export const TRIP_STATUS_CONFIG: Record<TripStatus, StatusConfig> = {
     userMessage: 'Your trip is approved. We may combine it with similar trips for optimization.',
     adminMessage: 'Approved - can be optimized with similar trips',
     emailSubject: 'Trip Request Approved by Manager',
+  },
+  draft: {
+    badge: 'bg-slate-100 text-slate-800 border-slate-300',
+    icon: '📝',
+    label: 'Draft',
+    description: 'Temporary trip - part of optimization proposal',
+    userMessage: 'This is a proposed optimization - pending admin approval',
+    adminMessage: 'Temp trip in optimization proposal',
+    emailSubject: 'Trip Optimization Proposal',
   },
 };
 

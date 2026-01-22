@@ -21,13 +21,7 @@ class AIOptimizer {
     // Check for API keys
     this.apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
     this.useOpenAI = true;
-    
-    // Log API configuration (without exposing key)
-    if (this.apiKey) {
-      console.log('AI Optimizer: API key configured');
-    } else {
-      console.log('AI Optimizer: No API key found, will use basic optimization only');
-    }
+    // Don't log here - will log when actually optimizing
   }
 
   async optimizeTrips(trips: Trip[]): Promise<OptimizationProposal[]> {

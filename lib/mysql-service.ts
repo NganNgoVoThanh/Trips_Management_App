@@ -69,6 +69,9 @@ export interface Trip {
   updatedAt: string;
   dataType?: 'raw' | 'temp' | 'final';
   parentTripId?: string;
+  // Passenger capacity tracking
+  numPassengers?: number;  // Number of passengers (excluding driver), defaults to 1
+  num_passengers?: number; // Snake case variant from database
   // Email approval workflow fields
   manager_approval_status?: 'pending' | 'approved' | 'rejected' | 'expired';
   manager_approval_token?: string;
@@ -204,6 +207,63 @@ class MySQLService {
     } catch (err: any) {
       console.error('âŒ MySQL error creating trip:', err.message);
       throw new Error(`Failed to create trip: ${err.message}`);
+    }
+  }
+
+  // Create temp trip (inserts into temp_trips table)
+  async createTempTrip(trip: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
+    const now = new Date();
+    const mysqlNow = now.toISOString().slice(0, 19).replace('T', ' ');
+
+    const newTrip: Trip = {
+      ...trip,
+      id: `temp-${this.generateId()}`,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      dataType: 'temp',
+      status: 'draft', // ✅ Use valid temp_trips ENUM value
+      notified: trip.notified ?? false
+    };
+
+    if (!this.ensureServerSide('createTempTrip')) return newTrip;
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // ✅ FIX: Only include fields that exist in temp_trips table
+      const allowedFields = [
+        'id', 'userId', 'userName', 'userEmail',
+        'departureLocation', 'destination', 'departureDate', 'departureTime',
+        'returnDate', 'returnTime', 'status', 'vehicleType',
+        'estimatedCost', 'actualCost', 'optimizedGroupId',
+        'originalDepartureTime', 'notified', 'dataType', 'parentTripId'
+      ];
+
+      const filteredTrip: any = {};
+      allowedFields.forEach(field => {
+        if (newTrip[field as keyof Trip] !== undefined) {
+          filteredTrip[field] = newTrip[field as keyof Trip];
+        }
+      });
+
+      const snakeData = this.toSnakeCase(filteredTrip);
+      snakeData.created_at = mysqlNow;
+      snakeData.updated_at = mysqlNow;
+
+      console.log('📝 Creating temp trip:', newTrip.id, 'for group:', trip.optimizedGroupId);
+
+      await connection.query(
+        `INSERT INTO temp_trips SET ?`,
+        [snakeData]
+      );
+
+      connection.release();
+      console.log('✓ Temp trip created:', newTrip.id);
+      return newTrip;
+    } catch (err: any) {
+      console.error('❌ Error creating temp trip:', err.message);
+      throw new Error(`Failed to create temp trip: ${err.message}`);
     }
   }
 
@@ -410,7 +470,7 @@ class MySQLService {
       
       query += ' ORDER BY created_at DESC';
       
-      const [rows] = await connection.query(query, params);
+      const [rows] = await connection.query(query, params) as any[];
       let allTrips = Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
 
       // Include temp trips if requested
@@ -418,7 +478,7 @@ class MySQLService {
         try {
           const [tempRows] = await connection.query(
             'SELECT * FROM temp_trips ORDER BY created_at DESC'
-          );
+          ) as any[];
           if (Array.isArray(tempRows)) {
             allTrips = [...allTrips, ...tempRows.map(r => this.toCamelCase(r) as Trip)];
           }
@@ -506,7 +566,7 @@ async approveOptimization(groupId: string): Promise<void> {
     const [tempRows] = await connection.query(
       'SELECT * FROM temp_trips WHERE optimized_group_id = ?',
       [groupId]
-    );
+    ) as any[];
 
     if (Array.isArray(tempRows)) {
       for (const tempTrip of tempRows) {
@@ -517,7 +577,7 @@ async approveOptimization(groupId: string): Promise<void> {
           const [originalRows] = await connection.query(
             'SELECT departure_time FROM trips WHERE id = ?',
             [camelTrip.parentTripId]
-          );
+          ) as any[];
 
           const originalTime = Array.isArray(originalRows) && originalRows.length > 0
             ? (originalRows[0] as any).departure_time
@@ -533,6 +593,7 @@ async approveOptimization(groupId: string): Promise<void> {
               actual_cost = ?,
               optimized_group_id = ?,
               original_departure_time = ?,
+              notified = ?,
               updated_at = ?
             WHERE id = ?`,
             [
@@ -543,6 +604,7 @@ async approveOptimization(groupId: string): Promise<void> {
               camelTrip.actualCost,
               camelTrip.optimizedGroupId,
               originalTime, // ← Save original time
+              true, // ← Mark as notified (email sent automatically on approve)
               mysqlNow,
               camelTrip.parentTripId
             ]
@@ -597,7 +659,7 @@ async rejectOptimization(groupId: string): Promise<void> {
     const [groupRows] = await connection.query(
       'SELECT trips FROM optimization_groups WHERE id = ?',
       [groupId]
-    );
+    ) as any[];
 
     if (Array.isArray(groupRows) && groupRows.length > 0) {
       const group = groupRows[0] as any;
@@ -629,7 +691,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       const [rows] = await connection.query(
         'SELECT * FROM temp_trips WHERE optimized_group_id = ?',
         [groupId]
-      );
+      ) as any[];
       connection.release();
       
       return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
@@ -650,7 +712,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       const [rows] = await connection.query(
         'SELECT * FROM trips WHERE id = ?',
         [id]
-      );
+      ) as any[];
 
       if (Array.isArray(rows) && rows.length > 0) {
         connection.release();
@@ -660,7 +722,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       const [tempRows] = await connection.query(
         'SELECT * FROM temp_trips WHERE id = ?',
         [id]
-      );
+      ) as any[];
 
       connection.release();
       
@@ -791,7 +853,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       
       query += ' ORDER BY created_at DESC';
       
-      const [rows] = await connection.query(query, params);
+      const [rows] = await connection.query(query, params) as any[];
       connection.release();
       
       if (Array.isArray(rows)) {
@@ -821,7 +883,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       const [rows] = await connection.query(
         'SELECT * FROM optimization_groups WHERE id = ?',
         [id]
-      );
+      ) as any[];
       connection.release();
 
       if (Array.isArray(rows) && rows.length > 0) {
@@ -953,7 +1015,7 @@ async rejectOptimization(groupId: string): Promise<void> {
       
       const [tripRows] = await connection.query(
         'SELECT data_type, status FROM trips'
-      );
+      ) as any[];
       
       const [tempRows] = await connection.query(
         'SELECT COUNT(*) as count FROM temp_trips'
@@ -1025,9 +1087,9 @@ async rejectOptimization(groupId: string): Promise<void> {
       const poolInstance = await getPool();
       const connection = await poolInstance.getConnection();
       
-      const [tripRows] = await connection.query('SELECT * FROM trips');
-      const [tempRows] = await connection.query('SELECT * FROM temp_trips');
-      const [groupRows] = await connection.query('SELECT * FROM optimization_groups');
+      const [tripRows] = await connection.query('SELECT * FROM trips') as any[];
+      const [tempRows] = await connection.query('SELECT * FROM temp_trips') as any[];
+      const [groupRows] = await connection.query('SELECT * FROM optimization_groups') as any[];
 
       connection.release();
 
@@ -1134,6 +1196,319 @@ async rejectOptimization(groupId: string): Promise<void> {
   // Check if connected to database
   public isDatabaseConnected(): boolean {
     return this.isConnected;
+  }
+
+  // ========================================
+  // LOCATION ADMIN SUPPORT METHODS
+  // ========================================
+
+  /**
+   * Get trips filtered by admin's location
+   * Location Admin can only see trips where departure OR destination matches their location
+   */
+  async getTripsForLocationAdmin(
+    adminLocationId: string,
+    filters?: {
+      status?: string;
+      searchTerm?: string;
+      departureDate?: string;
+    }
+  ): Promise<Trip[]> {
+    if (!this.ensureServerSide('getTripsForLocationAdmin')) return [];
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // Get the location name from location ID (e.g., 'PHAN-THIET-FACTORY' -> 'Phan Thiet Factory')
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+
+      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+      let query = `
+        SELECT * FROM trips
+        WHERE (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)
+      `;
+      const params: any[] = [adminLocationId, locationName, adminLocationId, locationName];
+
+      if (filters?.status && filters.status !== 'all') {
+        query += ' AND status = ?';
+        params.push(filters.status);
+      }
+
+      if (filters?.departureDate) {
+        query += ' AND departure_date = ?';
+        params.push(filters.departureDate);
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      const [rows] = await connection.query(query, params) as any[];
+      let trips = Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
+
+      // Apply search filter in memory if provided
+      if (filters?.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        trips = trips.filter(trip =>
+          trip.userName.toLowerCase().includes(searchLower) ||
+          trip.userEmail.toLowerCase().includes(searchLower) ||
+          trip.departureLocation.toLowerCase().includes(searchLower) ||
+          trip.destination.toLowerCase().includes(searchLower)
+        );
+      }
+
+      connection.release();
+      return trips;
+    } catch (err: any) {
+      console.error('❌ Error in getTripsForLocationAdmin:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get statistics filtered by admin's location
+   */
+  async getStatsForLocationAdmin(adminLocationId: string): Promise<{
+    totalTrips: number;
+    pendingApprovals: number;
+    approvedTrips: number;
+    optimizedTrips: number;
+    totalSavings: number;
+    activeEmployees: number;
+  }> {
+    if (!this.ensureServerSide('getStatsForLocationAdmin')) {
+      return {
+        totalTrips: 0,
+        pendingApprovals: 0,
+        approvedTrips: 0,
+        optimizedTrips: 0,
+        totalSavings: 0,
+        activeEmployees: 0
+      };
+    }
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // Get location name
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+      // Base WHERE clause for location filtering
+      const locationFilter = `(departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)`;
+      const locationParams = [adminLocationId, locationName, adminLocationId, locationName];
+
+      // Total trips
+      const [totalRows] = await connection.query(
+        `SELECT COUNT(*) as count FROM trips WHERE ${locationFilter}`,
+        locationParams
+      );
+      const totalTrips = totalRows[0]?.count || 0;
+
+      // Pending approvals
+      const [pendingRows] = await connection.query(
+        `SELECT COUNT(*) as count FROM trips WHERE ${locationFilter} AND status IN ('pending_approval', 'pending_urgent')`,
+        locationParams
+      );
+      const pendingApprovals = pendingRows[0]?.count || 0;
+
+      // Approved trips
+      const [approvedRows] = await connection.query(
+        `SELECT COUNT(*) as count FROM trips WHERE ${locationFilter} AND status = 'approved'`,
+        locationParams
+      );
+      const approvedTrips = approvedRows[0]?.count || 0;
+
+      // Optimized trips
+      const [optimizedRows] = await connection.query(
+        `SELECT COUNT(*) as count FROM trips WHERE ${locationFilter} AND status = 'optimized'`,
+        locationParams
+      );
+      const optimizedTrips = optimizedRows[0]?.count || 0;
+
+      // Total savings (from optimized trips)
+      const [savingsRows] = await connection.query(
+        `SELECT COALESCE(SUM(estimated_cost - COALESCE(actual_cost, 0)), 0) as savings
+         FROM trips
+         WHERE ${locationFilter} AND status = 'optimized' AND actual_cost IS NOT NULL`,
+        locationParams
+      );
+      const totalSavings = savingsRows[0]?.savings || 0;
+
+      // Active employees (unique users with trips in this location)
+      const [employeeRows] = await connection.query(
+        `SELECT COUNT(DISTINCT user_id) as count FROM trips WHERE ${locationFilter}`,
+        locationParams
+      );
+      const activeEmployees = employeeRows[0]?.count || 0;
+
+      connection.release();
+
+      return {
+        totalTrips,
+        pendingApprovals,
+        approvedTrips,
+        optimizedTrips,
+        totalSavings: Math.round(totalSavings),
+        activeEmployees
+      };
+    } catch (err: any) {
+      console.error('❌ Error in getStatsForLocationAdmin:', err.message);
+      return {
+        totalTrips: 0,
+        pendingApprovals: 0,
+        approvedTrips: 0,
+        optimizedTrips: 0,
+        totalSavings: 0,
+        activeEmployees: 0
+      };
+    }
+  }
+
+  /**
+   * Get optimization groups filtered by admin's location
+   * Only shows groups that contain trips involving the admin's location
+   */
+  async getOptimizationGroupsForLocationAdmin(
+    adminLocationId: string,
+    status?: string
+  ): Promise<OptimizationGroup[]> {
+    if (!this.ensureServerSide('getOptimizationGroupsForLocationAdmin')) return [];
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // Get location name
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+      // First get all optimization groups
+      let query = 'SELECT * FROM optimization_groups';
+      const params: any[] = [];
+
+      if (status) {
+        query += ' WHERE status = ?';
+        params.push(status);
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      const [groupRows] = await connection.query(query, params) as any[];
+
+      if (!Array.isArray(groupRows) || groupRows.length === 0) {
+        connection.release();
+        return [];
+      }
+
+      // Filter groups that contain trips from this location
+      const filteredGroups: OptimizationGroup[] = [];
+
+      for (const row of groupRows) {
+        const camel = this.toCamelCase(row);
+        const tripIds = JSON.parse(camel.trips);
+
+        if (Array.isArray(tripIds) && tripIds.length > 0) {
+          // Check if any trip in this group involves the admin's location
+          const [tripRows] = await connection.query(
+            `SELECT id FROM trips
+             WHERE id IN (?)
+             AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)
+             LIMIT 1`,
+            [tripIds, adminLocationId, locationName, adminLocationId, locationName]
+          );
+
+          if (Array.isArray(tripRows) && tripRows.length > 0) {
+            filteredGroups.push({
+              ...camel,
+              trips: tripIds
+            } as OptimizationGroup);
+          }
+        }
+      }
+
+      connection.release();
+      return filteredGroups;
+    } catch (err: any) {
+      console.error('❌ Error in getOptimizationGroupsForLocationAdmin:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Check if admin can manage a specific trip based on location
+   */
+  async canLocationAdminManageTrip(adminLocationId: string, tripId: string): Promise<boolean> {
+    if (!this.ensureServerSide('canLocationAdminManageTrip')) return false;
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // Get location name
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+      const [rows] = await connection.query(
+        `SELECT id FROM trips
+         WHERE id = ?
+         AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)
+         LIMIT 1`,
+        [tripId, adminLocationId, locationName, adminLocationId, locationName]
+      );
+
+      connection.release();
+      return Array.isArray(rows) && rows.length > 0;
+    } catch (err: any) {
+      console.error('❌ Error in canLocationAdminManageTrip:', err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Get approved trips for optimization filtered by location
+   */
+  async getApprovedTripsForLocationAdmin(adminLocationId: string): Promise<Trip[]> {
+    if (!this.ensureServerSide('getApprovedTripsForLocationAdmin')) return [];
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+
+      // Get location name
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [adminLocationId]
+      ) as any[];
+      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+
+      const [rows] = await connection.query(
+        `SELECT * FROM trips
+         WHERE status IN ('approved', 'auto_approved')
+         AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)
+         ORDER BY departure_date, departure_time`,
+        [adminLocationId, locationName, adminLocationId, locationName]
+      );
+
+      connection.release();
+      return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
+    } catch (err: any) {
+      console.error('❌ Error in getApprovedTripsForLocationAdmin:', err.message);
+      return [];
+    }
   }
 }
 

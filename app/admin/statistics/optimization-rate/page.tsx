@@ -24,6 +24,7 @@ interface MonthlyOptimization {
 export default function OptimizationRatePage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()  // ✅ FIX: Move useSession to top level
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({
     overallRate: 0,
@@ -41,19 +42,31 @@ export default function OptimizationRatePage() {
   const [statusBreakdown, setStatusBreakdown] = useState<any[]>([])
 
   useEffect(() => {
-    loadOptimizationData()
-  }, [])
+    // Only run when status is not loading
+    if (status !== 'loading') {
+      loadOptimizationData()
+    }
+  }, [status]) // Removed session from deps to prevent re-render loops
 
   const loadOptimizationData = async () => {
     try {
-      const { data: session, status } = useSession()
-      if (status === 'loading') return
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
 
-      const user = session?.user
-      if (!user || user.role !== 'admin') {
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
+        return
+      }
+
+      setIsLoading(true)
 
       const allTrips = await fabricService.getTrips()
       const optimizedTrips = allTrips.filter(t => t.status === 'optimized')

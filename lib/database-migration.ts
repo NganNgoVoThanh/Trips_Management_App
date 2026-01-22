@@ -138,22 +138,88 @@ async function migrateVehiclesTable(connection: mysql.Connection) {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS vehicles (
         id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        type VARCHAR(50) NOT NULL,
+        vehicle_number VARCHAR(50) NOT NULL UNIQUE,
+        vehicle_type ENUM('car', 'van', 'bus', 'truck') NOT NULL,
         capacity INT NOT NULL,
-        cost_per_km DECIMAL(10, 2) NOT NULL,
-        license_plate VARCHAR(50),
-        status ENUM('available', 'in_use', 'maintenance', 'retired') DEFAULT 'available',
+        driver_name VARCHAR(255),
+        driver_phone VARCHAR(50),
+        status ENUM('active', 'inactive') DEFAULT 'active',
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_status (status),
-        INDEX idx_type (type)
+        INDEX idx_vehicle_type (vehicle_type),
+        INDEX idx_vehicle_number (vehicle_number)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('✅ Created vehicles table');
   } catch (error: any) {
     console.log('⚠️ vehicles table:', error.message);
+  }
+}
+
+/**
+ * Migrate vehicles table columns (for existing tables with old schema)
+ */
+async function migrateVehiclesColumns(connection: mysql.Connection) {
+  const columns = [
+    {
+      name: 'vehicle_number',
+      sql: 'ALTER TABLE vehicles ADD COLUMN vehicle_number VARCHAR(50) NOT NULL UNIQUE',
+    },
+    {
+      name: 'vehicle_type',
+      sql: `ALTER TABLE vehicles ADD COLUMN vehicle_type ENUM('car', 'van', 'bus', 'truck') NOT NULL DEFAULT 'car'`,
+    },
+    {
+      name: 'driver_name',
+      sql: 'ALTER TABLE vehicles ADD COLUMN driver_name VARCHAR(255)',
+    },
+    {
+      name: 'driver_phone',
+      sql: 'ALTER TABLE vehicles ADD COLUMN driver_phone VARCHAR(50)',
+    },
+  ];
+
+  for (const column of columns) {
+    try {
+      await connection.query(column.sql);
+      console.log(`✅ Added column: vehicles.${column.name}`);
+    } catch (error: any) {
+      if (error.message.includes('Duplicate column')) {
+        // Column already exists, skip
+      } else {
+        console.log(`⚠️ vehicles.${column.name}:`, error.message);
+      }
+    }
+  }
+
+  // Remove old schema columns if they exist
+  const columnsToRemove = ['name', 'type', 'cost_per_km'];
+  for (const columnName of columnsToRemove) {
+    try {
+      await connection.query(`ALTER TABLE vehicles DROP COLUMN ${columnName}`);
+      console.log(`✅ Removed obsolete column: vehicles.${columnName}`);
+    } catch (error: any) {
+      if (error.message.includes("check that it exists") || error.message.includes("Can't DROP")) {
+        // Column doesn't exist, skip
+      } else {
+        console.log(`⚠️ vehicles.${columnName} removal:`, error.message);
+      }
+    }
+  }
+
+  // Update status enum to match new values
+  try {
+    await connection.query(`
+      ALTER TABLE vehicles
+      MODIFY COLUMN status ENUM('active', 'inactive') DEFAULT 'active'
+    `);
+    console.log('✅ Updated vehicles.status ENUM to new values');
+  } catch (error: any) {
+    if (!error.message.includes('Duplicate')) {
+      console.log('⚠️ vehicles.status ENUM:', error.message);
+    }
   }
 }
 
@@ -215,6 +281,14 @@ async function migrateAdminOverrideLogColumns(connection: mysql.Connection) {
     {
       name: 'manager_email',
       sql: `ALTER TABLE admin_override_log ADD COLUMN manager_email VARCHAR(255)`,
+    },
+    {
+      name: 'ip_address',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN ip_address VARCHAR(50)`,
+    },
+    {
+      name: 'user_agent',
+      sql: `ALTER TABLE admin_override_log ADD COLUMN user_agent TEXT`,
     },
     {
       name: 'created_at',
@@ -297,6 +371,47 @@ async function migrateManagerConfirmationsTable(connection: mysql.Connection) {
 }
 
 /**
+ * Create pending_admin_assignments table if not exists
+ */
+async function migratePendingAdminAssignmentsTable(connection: mysql.Connection) {
+  try {
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS pending_admin_assignments (
+        id VARCHAR(255) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        admin_type ENUM('super_admin', 'location_admin') NOT NULL,
+        location_id VARCHAR(255) NULL,
+        location_name VARCHAR(255) NULL,
+        assigned_by_email VARCHAR(255) NOT NULL,
+        assigned_by_name VARCHAR(255),
+        reason TEXT,
+        expires_at TIMESTAMP NOT NULL,
+        activated BOOLEAN DEFAULT FALSE,
+        activated_at TIMESTAMP NULL,
+        activated_user_id VARCHAR(255) NULL,
+        invitation_sent BOOLEAN DEFAULT FALSE,
+        invitation_sent_at TIMESTAMP NULL,
+        reminder_sent_count INT DEFAULT 0,
+        last_reminder_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        INDEX idx_email (email),
+        INDEX idx_expires_at (expires_at),
+        INDEX idx_activated (activated),
+        INDEX idx_assigned_by (assigned_by_email),
+        INDEX idx_admin_type (admin_type),
+
+        FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Created pending_admin_assignments table');
+  } catch (error: any) {
+    console.log('⚠️ pending_admin_assignments table:', error.message);
+  }
+}
+
+/**
  * Add missing columns to users table
  */
 async function migrateUsersColumns(connection: mysql.Connection) {
@@ -355,9 +470,12 @@ export async function runDatabaseMigrations() {
 
     // New tables
     await migrateVehiclesTable(connection);
+    await migrateVehiclesColumns(connection);
     await migrateAdminOverrideLogTable(connection);
+    await migrateAdminOverrideLogColumns(connection);
     await migrateApprovalAuditLogTable(connection);
     await migrateManagerConfirmationsTable(connection);
+    await migratePendingAdminAssignmentsTable(connection);
 
     console.log('\n✅ All database migrations completed successfully!');
   } catch (error: any) {
@@ -385,6 +503,7 @@ export async function ensureVehiclesTable() {
   const connection = await getConnection();
   try {
     await migrateVehiclesTable(connection);
+    await migrateVehiclesColumns(connection);
   } finally {
     await connection.end();
   }

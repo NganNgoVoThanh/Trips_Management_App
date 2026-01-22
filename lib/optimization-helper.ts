@@ -36,11 +36,10 @@ export async function checkOptimizationPotential(tripId: string): Promise<boolea
     // If there are 2+ trips (including this one), can optimize
     const canOptimize = approvedSimilarTrips.length >= 2;
 
-    console.log(`🔍 Optimization check for trip ${tripId}:`);
-    console.log(`   - Route: ${trip.departureLocation} → ${trip.destination}`);
-    console.log(`   - Date: ${trip.departureDate}`);
-    console.log(`   - Similar approved trips: ${approvedSimilarTrips.length}`);
-    console.log(`   - Can optimize: ${canOptimize ? 'YES ✓' : 'NO ✗'}`);
+    // Only log when optimization IS possible (to reduce noise)
+    if (canOptimize) {
+      console.log(`✓ Trip ${tripId} can be batched with ${approvedSimilarTrips.length - 1} other trip(s)`);
+    }
 
     return canOptimize;
   } catch (error) {

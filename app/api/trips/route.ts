@@ -11,12 +11,21 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const status = searchParams.get('status');
-    
+    const includeTemp = searchParams.get('includeTemp') === 'true';
+    const optimizedGroupId = searchParams.get('optimizedGroupId');
+
+    // If requesting temp trips by group ID, query temp_trips table directly
+    if (includeTemp && optimizedGroupId) {
+      const tempTrips = await fabricService.getTempTripsByGroupId(optimizedGroupId);
+      return NextResponse.json(tempTrips);
+    }
+
     const filters = {
       ...(userId && { userId }),
-      ...(status && { status })
+      ...(status && { status }),
+      ...(optimizedGroupId && { optimizedGroupId })
     };
-    
+
     const trips = await fabricService.getTrips(filters);
     return NextResponse.json(trips);
   } catch (error: any) {

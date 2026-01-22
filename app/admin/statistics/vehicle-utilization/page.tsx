@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Car, TrendingUp, Users, Gauge, Download, Loader2 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { useSession } from "next-auth/react"
-import { formatCurrency, getLocationName } from "@/lib/config"
+import { formatCurrency, getLocationName, getVehiclePassengerCapacity } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
@@ -28,6 +28,7 @@ interface VehicleStats {
 export default function VehicleUtilizationPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [vehicleStats, setVehicleStats] = useState<VehicleStats[]>([])
   const [overallStats, setOverallStats] = useState({
     totalUtilization: 0,
@@ -41,20 +42,31 @@ export default function VehicleUtilizationPage() {
   const [timeRange, setTimeRange] = useState('month')
 
   useEffect(() => {
-    loadVehicleData()
-  }, [timeRange])
+    // Only run when status is not loading
+    if (status !== 'loading') {
+      loadVehicleData()
+    }
+  }, [status, timeRange]) // Removed session from deps to prevent re-render loops
 
   const loadVehicleData = async () => {
     try {
-      setIsLoading(true)
-      const { data: session, status } = useSession()
-      if (status === 'loading') return
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
 
-      const user = session?.user
-      if (!user || user.role !== 'admin') {
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
+        return
+      }
+
+      setIsLoading(true)
 
       const allTrips = await fabricService.getTrips()
       
@@ -75,11 +87,11 @@ export default function VehicleUtilizationPage() {
         return true
       }).filter(t => t.status !== 'cancelled')
 
-      // Vehicle type configurations
+      // Vehicle type configurations - FIXED: Use passenger capacity (excluding driver)
       const vehicleConfigs = {
-        'car-4': { name: '4-Seater Car', capacity: 4, icon: '🚗' },
-        'car-7': { name: '7-Seater Car', capacity: 7, icon: '🚙' },
-        'van-16': { name: '16-Seater Van', capacity: 16, icon: '🚐' }
+        'car-4': { name: '4-Seater Car', totalSeats: 4, passengerCapacity: 3, icon: '🚗' },
+        'car-7': { name: '7-Seater Car', totalSeats: 7, passengerCapacity: 6, icon: '🚙' },
+        'van-16': { name: '16-Seater Van', totalSeats: 16, passengerCapacity: 15, icon: '🚐' }
       }
 
       // Calculate stats for each vehicle type
@@ -92,37 +104,24 @@ export default function VehicleUtilizationPage() {
         const vehicleTrips = filteredTrips.filter(t => t.vehicleType === type)
 
         if (vehicleTrips.length > 0) {
-          // Calculate passengers correctly
-          // Each trip represents 1 person, regardless of optimization status
-          // When trips are optimized and grouped together, they share one vehicle
-          // but each trip row still represents one individual passenger
-          const processedGroups = new Set<string>()
-          let totalPassengers = 0
+          // FIXED: Count actual passengers from num_passengers field
+          // Sum up num_passengers from all trips (default to 1 if not specified)
+          const totalPassengers = vehicleTrips.reduce((sum, trip) => {
+            return sum + (trip.numPassengers || trip.num_passengers || 1)
+          }, 0)
 
-          vehicleTrips.forEach(trip => {
-            if (trip.optimizedGroupId && !processedGroups.has(trip.optimizedGroupId)) {
-              // Count all trips in this optimized group (each trip = 1 person)
-              const groupTrips = filteredTrips.filter(t => t.optimizedGroupId === trip.optimizedGroupId)
-              totalPassengers += groupTrips.length
-              processedGroups.add(trip.optimizedGroupId)
-            } else if (!trip.optimizedGroupId) {
-              // Individual trip = 1 person
-              totalPassengers += 1
-            }
-            // Skip if already counted in a group
-          })
-
-          const totalCapacity = vehicleTrips.length * config.capacity
-          const utilizationRate = (totalPassengers / totalCapacity) * 100
+          // FIXED: Use passenger capacity (excluding driver seat)
+          const totalCapacity = vehicleTrips.length * config.passengerCapacity
+          const utilizationRate = totalCapacity > 0 ? (totalPassengers / totalCapacity) * 100 : 0
           const totalCost = vehicleTrips.reduce((sum, t) => sum + (t.actualCost || t.estimatedCost || 0), 0)
 
           stats.push({
             type: config.name,
-            capacity: config.capacity,
+            capacity: config.passengerCapacity, // FIXED: Use passenger capacity
             tripsCount: vehicleTrips.length,
             totalPassengers,
             utilizationRate,
-            avgPassengersPerTrip: totalPassengers / vehicleTrips.length,
+            avgPassengersPerTrip: vehicleTrips.length > 0 ? totalPassengers / vehicleTrips.length : 0,
             totalCost,
             costPerPassenger: totalPassengers > 0 ? totalCost / totalPassengers : 0
           })

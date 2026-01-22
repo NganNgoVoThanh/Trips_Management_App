@@ -146,3 +146,44 @@ export function formatCurrency(amount: number): string {
     currency: 'VND'
   }).format(amount);
 }
+
+/**
+ * Get passenger capacity for a vehicle type (excluding driver seat)
+ * - Car 4-seater: 1 driver + 3 passengers = 3 passenger capacity
+ * - Car 7-seater: 1 driver + 6 passengers = 6 passenger capacity
+ * - Van 16-seater: 1 driver + 15 passengers = 15 passenger capacity
+ */
+export function getVehiclePassengerCapacity(vehicleType: string): number {
+  // Handle both old format (car-4) and new format (car, van, bus)
+  if (vehicleType === 'car-4' || vehicleType === 'car') {
+    return 3; // 4 seats - 1 driver = 3 passengers
+  }
+  if (vehicleType === 'car-7' || vehicleType === 'van') {
+    return 6; // 7 seats - 1 driver = 6 passengers
+  }
+  if (vehicleType === 'van-16' || vehicleType === 'bus') {
+    return 15; // 16 seats - 1 driver = 15 passengers
+  }
+  if (vehicleType === 'truck') {
+    return 2; // Typical truck: 1 driver + 2 passengers
+  }
+  return 3; // Default to car capacity
+}
+
+/**
+ * Calculate vehicle utilization rate
+ * @param totalPassengers - Total number of passengers across all trips
+ * @param vehicleStats - Object with vehicle types as keys and trip counts as values
+ * @returns Utilization percentage (0-100)
+ */
+export function calculateVehicleUtilization(
+  totalPassengers: number,
+  vehicleStats: Record<string, number>
+): number {
+  const totalCapacity = Object.entries(vehicleStats).reduce((sum, [type, count]) => {
+    const passengerCapacity = getVehiclePassengerCapacity(type);
+    return sum + (passengerCapacity * count);
+  }, 0);
+
+  return totalCapacity > 0 ? Math.min((totalPassengers / totalCapacity) * 100, 100) : 0;
+}

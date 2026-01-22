@@ -16,7 +16,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle } from "lucide-react"
+import { Car, LogOut, Settings, User, BarChart3, Home, Shield, AlertTriangle, MapPin, Building2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -27,6 +27,25 @@ export function AdminHeader() {
   const { toast } = useToast()
   const { data: session } = useSession()
   const user = session?.user
+  const [locationName, setLocationName] = useState<string | null>(null)
+
+  // Determine if user is Location Admin
+  const isLocationAdmin = user?.adminType === 'location_admin' && user?.adminLocationId
+  const isSuperAdmin = user?.adminType === 'super_admin'
+
+  // Fetch location name for Location Admin
+  useEffect(() => {
+    if (isLocationAdmin && user?.adminLocationId) {
+      fetch(`/api/locations?id=${user.adminLocationId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.location?.name) {
+            setLocationName(data.location.name)
+          }
+        })
+        .catch(() => setLocationName(user.adminLocationId || null))
+    }
+  }, [isLocationAdmin, user?.adminLocationId])
 
   const handleLogout = async () => {
     try {
@@ -58,7 +77,8 @@ export function AdminHeader() {
   // Check if route is active
   const isActive = (path: string) => {
     if (path === '/admin/dashboard') {
-      return pathname === '/admin/dashboard' || pathname?.startsWith('/admin/statistics')
+      // Only match exact dashboard path, NOT statistics sub-routes
+      return pathname === '/admin/dashboard'
     }
     return pathname === path || pathname?.startsWith(path)
   }
@@ -188,10 +208,31 @@ export function AdminHeader() {
         
         {/* Admin Menu */}
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border-red-200 text-red-700 font-medium">
-            <Shield className="h-3.5 w-3.5" />
-            Admin
-          </Badge>
+          {/* Admin Type Badge */}
+          {isSuperAdmin ? (
+            <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border-red-200 text-red-700 font-medium">
+              <Shield className="h-3.5 w-3.5" />
+              Super Admin
+            </Badge>
+          ) : isLocationAdmin ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <Badge variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border-blue-200 text-blue-700 font-medium">
+                <Building2 className="h-3.5 w-3.5" />
+                Location Admin
+              </Badge>
+              {locationName && (
+                <Badge variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border-gray-200 text-gray-700">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {locationName}
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <Badge variant="outline" className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border-gray-200 text-gray-700 font-medium">
+              <Shield className="h-3.5 w-3.5" />
+              Admin
+            </Badge>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -217,14 +258,30 @@ export function AdminHeader() {
                 <div className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-600 border-2 border-background sm:hidden" />
               </Button>
             </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{user?.name || 'Administrator'}</p>
                 <p className="text-xs leading-none text-muted-foreground">
                   {user?.email || 'Not logged in'}
                 </p>
-                <Badge className="mt-1 w-fit bg-red-100 text-red-700">Administrator</Badge>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {isSuperAdmin ? (
+                    <Badge className="w-fit bg-red-100 text-red-700">Super Admin</Badge>
+                  ) : isLocationAdmin ? (
+                    <>
+                      <Badge className="w-fit bg-blue-100 text-blue-700">Location Admin</Badge>
+                      {locationName && (
+                        <Badge variant="outline" className="w-fit text-xs">
+                          <MapPin className="mr-1 h-3 w-3" />
+                          {locationName}
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <Badge className="w-fit bg-gray-100 text-gray-700">Admin</Badge>
+                  )}
+                </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

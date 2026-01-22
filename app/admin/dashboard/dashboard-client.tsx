@@ -14,7 +14,7 @@ import { fabricService, Trip } from "@/lib/fabric-client"
 import { joinRequestService } from "@/lib/join-request-client"
 import { aiOptimizer } from "@/lib/ai-optimizer"
 import { emailService } from "@/lib/email-service"
-import { formatCurrency, getLocationName } from "@/lib/config"
+import { formatCurrency, getLocationName, calculateVehicleUtilization } from "@/lib/config"
 import { formatDate, formatTime, formatDateTime, exportToCsv } from "@/lib/utils"
 import {
   Users,
@@ -100,6 +100,11 @@ export function AdminDashboardClient() {
   const [approvalNote, setApprovalNote] = useState("")
   const [errorCount, setErrorCount] = useState(0)
   const [pollingDelay, setPollingDelay] = useState(120000) // Start with 120s for admin
+  const [locationName, setLocationName] = useState<string | null>(null)
+
+  // Determine if user is Location Admin
+  const isLocationAdmin = user?.adminType === 'location_admin' && user?.adminLocationId
+  const adminLocationId = user?.adminLocationId
 
   // Use refs to avoid stale closure issues
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -163,11 +168,39 @@ export function AdminDashboardClient() {
       if (!isMountedRef.current) return
 
       // Load all trips from database with error handling
+      // For Location Admin, use filtered API
       let allTrips: Trip[] = []
       let joinRequestStats = { total: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 }
 
       try {
-        allTrips = await fabricService.getTrips()
+        if (isLocationAdmin && adminLocationId) {
+          // Location Admin: Use filtered API
+          const response = await fetch('/api/admin/location-trips')
+          if (response.ok) {
+            const data = await response.json()
+            allTrips = data.trips || []
+          } else {
+            throw new Error('Failed to fetch location trips')
+          }
+
+          // Fetch location name for display
+          try {
+            const locResponse = await fetch(`/api/locations?id=${adminLocationId}`)
+            if (locResponse.ok) {
+              const locData = await locResponse.json()
+              if (isMountedRef.current) {
+                setLocationName(locData.location?.name || adminLocationId)
+              }
+            }
+          } catch {
+            if (isMountedRef.current) {
+              setLocationName(adminLocationId)
+            }
+          }
+        } else {
+          // Super Admin: Load all trips
+          allTrips = await fabricService.getTrips()
+        }
 
         // Load join requests statistics
         joinRequestStats = await joinRequestService.getJoinRequestStats()
@@ -272,7 +305,7 @@ export function AdminDashboardClient() {
         return sum
       }, 0)
 
-      // Calculate vehicle utilization
+      // Calculate vehicle utilization - FIXED: Count actual passengers, exclude driver seats
       const vehicleStats = allTrips.reduce((acc, trip) => {
         if (trip.vehicleType) {
           acc[trip.vehicleType] = (acc[trip.vehicleType] || 0) + 1
@@ -280,13 +313,13 @@ export function AdminDashboardClient() {
         return acc
       }, {} as Record<string, number>)
 
-      const totalCapacity = Object.entries(vehicleStats).reduce((sum, [type, count]) => {
-        const capacity = type === 'car-4' ? 4 : type === 'car-7' ? 7 : 16
-        return sum + (capacity * count)
+      // Sum up actual passengers from all trips (default to 1 if not specified)
+      const totalPassengers = allTrips.reduce((sum, trip) => {
+        return sum + (trip.numPassengers || trip.num_passengers || 1)
       }, 0)
 
-      const actualPassengers = allTrips.length
-      const vehicleUtilization = totalCapacity > 0 ? (actualPassengers / totalCapacity) * 100 : 0
+      // Use helper function to calculate utilization (automatically excludes driver seats)
+      const vehicleUtilization = calculateVehicleUtilization(totalPassengers, vehicleStats)
 
       if (!isMountedRef.current) return
       setStats({
@@ -296,7 +329,7 @@ export function AdminDashboardClient() {
         optimizationRate: allTrips.length > 0 ? (optimized.length / allTrips.length) * 100 : 0,
         activeEmployees: uniqueEmployees,
         monthlyTrips: monthlyTrips.length,
-        vehicleUtilization: Math.min(vehicleUtilization, 100),
+        vehicleUtilization: vehicleUtilization, // Already capped at 100 in helper function
         averageSavings: optimized.length > 0 ? totalSavings / optimized.length : 0,
         pendingJoinRequests: joinRequestStats.pending,
         // ✅ ADD: Detailed status breakdown
@@ -653,7 +686,11 @@ export function AdminDashboardClient() {
 
         <div className="container flex-1 space-y-4 p-8 pt-6">
           {/* Admin Welcome Section with Logo */}
-          <div className="bg-gradient-to-r from-red-700 to-red-800 rounded-xl p-6 text-white shadow-lg">
+          <div className={`rounded-xl p-6 text-white shadow-lg ${
+            isLocationAdmin
+              ? 'bg-gradient-to-r from-blue-700 to-blue-800'
+              : 'bg-gradient-to-r from-red-700 to-red-800'
+          }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <Image
@@ -664,9 +701,22 @@ export function AdminDashboardClient() {
                   className="object-contain bg-white p-2 rounded"
                 />
                 <div>
-                  <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-                  <p className="text-red-100 mt-1">
-                    Manage and optimize company-wide business trips
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold">
+                      {isLocationAdmin ? 'Location Admin Dashboard' : 'Admin Dashboard'}
+                    </h1>
+                    {isLocationAdmin && locationName && (
+                      <Badge className="bg-white/20 text-white border-white/30">
+                        <MapPin className="mr-1 h-3 w-3" />
+                        {locationName}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className={`mt-1 ${isLocationAdmin ? 'text-blue-100' : 'text-red-100'}`}>
+                    {isLocationAdmin
+                      ? `Managing trips for ${locationName || 'your assigned location'}`
+                      : 'Manage and optimize company-wide business trips'
+                    }
                   </p>
                 </div>
               </div>
@@ -714,7 +764,10 @@ export function AdminDashboardClient() {
             {/* Stats cards */}
             <Card
               className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push('/admin/statistics/total-trips')}
+              onClick={(e) => {
+                e.preventDefault()
+                router.push('/admin/statistics/total-trips')
+              }}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Trips</CardTitle>

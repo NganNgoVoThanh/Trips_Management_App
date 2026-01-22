@@ -31,6 +31,7 @@ interface EmployeeStats {
 export default function ActiveEmployeesPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session, status } = useSession()
   const [isLoading, setIsLoading] = useState(true)
   const [employees, setEmployees] = useState<EmployeeStats[]>([])
   const [stats, setStats] = useState({
@@ -45,19 +46,31 @@ export default function ActiveEmployeesPage() {
   const [sortBy, setSortBy] = useState<'trips' | 'savings' | 'rate'>('trips')
 
   useEffect(() => {
-    loadEmployeeData()
-  }, [])
+    // Only run when status is not loading
+    if (status !== 'loading') {
+      loadEmployeeData()
+    }
+  }, [status]) // Removed session from deps to prevent re-render loops
 
   const loadEmployeeData = async () => {
     try {
-      const { data: session, status } = useSession()
-      if (status === 'loading') return
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
 
-      const user = session?.user
-      if (!user || user.role !== 'admin') {
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
         return
       }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
+        return
+      }
+
+      setIsLoading(true)
 
       const response = await fetch('/api/trips')
       if (!response.ok) {

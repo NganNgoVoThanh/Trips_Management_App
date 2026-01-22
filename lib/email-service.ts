@@ -272,95 +272,256 @@ Intersnack Trips Management Team
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 20px; background-color: #f3f4f6; }
-    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-    .header { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-    .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.95; }
-    .content { padding: 30px; }
-    .greeting { font-size: 16px; color: #374151; margin-bottom: 20px; }
-    .alert-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px; }
-    .alert-box strong { color: #92400e; display: block; margin-bottom: 8px; font-size: 15px; }
-    .alert-box p { margin: 0; color: #78350f; font-size: 14px; line-height: 1.5; }
-    .trip-card { background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 10px; padding: 20px; margin: 20px 0; }
-    .trip-card h3 { margin: 0 0 15px 0; color: #111827; font-size: 16px; border-bottom: 2px solid #dc2626; padding-bottom: 10px; }
-    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
-    .info-row:last-child { border-bottom: none; }
-    .info-label { color: #6b7280; font-size: 14px; font-weight: 500; }
-    .info-value { color: #111827; font-size: 14px; font-weight: 600; text-align: right; }
-    .time-change { background: #fff7ed; border: 2px solid #fb923c; border-radius: 8px; padding: 16px; margin: 15px 0; text-align: center; }
-    .time-change .old-time { color: #9ca3af; text-decoration: line-through; font-size: 18px; margin-bottom: 5px; }
-    .time-change .arrow { color: #dc2626; font-size: 24px; font-weight: bold; margin: 5px 0; }
-    .time-change .new-time { color: #dc2626; font-size: 24px; font-weight: bold; margin-top: 5px; }
-    .time-change .diff { color: #ea580c; font-size: 13px; margin-top: 8px; font-weight: 600; }
-    .savings-box { background: #d1fae5; border: 2px solid #10b981; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center; }
-    .savings-box .amount { color: #065f46; font-size: 22px; font-weight: bold; }
-    .savings-box .label { color: #047857; font-size: 13px; margin-top: 5px; }
-    .footer { background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; }
-    .footer p { margin: 5px 0; color: #6b7280; font-size: 13px; }
-    .action-notice { background: #fee2e2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 20px 0; border-radius: 6px; }
-    .action-notice p { margin: 0; color: #991b1b; font-size: 14px; }
-  </style>
+  <title>Trip Optimization Notification</title>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🚗 Your Trip Has Been Optimized</h1>
-      <p>Important schedule update for your upcoming trip</p>
-    </div>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; -webkit-font-smoothing: antialiased;">
 
-    <div class="content">
-      <p class="greeting">Dear <strong>${userTrips[0].userName || 'Employee'}</strong>,</p>
+  <!-- Main Container -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; max-width: 600px;">
 
-      <div class="alert-box">
-        <strong>⚠️ Trip Schedule Updated</strong>
-        <p>Your trip has been combined with colleagues traveling the same route to save costs. Please review the new departure time below.</p>
-      </div>
+          <!-- Header with Intersnack Branding -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #C41E3A 0%, #8B0000 100%); border-radius: 16px 16px 0 0; padding: 0;">
+              <!-- Top Red Bar -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="padding: 30px 40px; text-align: center;">
+                    <!-- Company Logo Area -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="background-color: white; border-radius: 12px; padding: 12px 24px;">
+                          <span style="color: #C41E3A; font-size: 24px; font-weight: 800; letter-spacing: 1px;">INTERSNACK</span>
+                        </td>
+                      </tr>
+                    </table>
 
-      ${userTrips.map(trip => {
-        const originalTime = trip.originalDepartureTime || trip.departureTime;
-        const timeDiff = getTimeDiff(originalTime, proposedDepartureTime);
+                    <!-- Title -->
+                    <h1 style="color: white; margin: 25px 0 8px 0; font-size: 26px; font-weight: 600; letter-spacing: -0.5px;">
+                      Trip Optimization Approved
+                    </h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 15px; font-weight: 400;">
+                      Your travel schedule has been updated
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-        return `
-        <div class="trip-card">
-          <h3>📍 ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}</h3>
+          <!-- Content Area -->
+          <tr>
+            <td style="background-color: white; padding: 40px;">
 
-          <div class="info-row">
-            <span class="info-label">📅 Date:</span>
-            <span class="info-value">${new Date(trip.departureDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-          </div>
+              <!-- Greeting -->
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                Dear <strong>${userTrips[0].userName || 'Employee'}</strong>,
+              </p>
 
-          <div class="time-change">
-            <div class="old-time">Original: ${originalTime}</div>
-            <div class="arrow">▼</div>
-            <div class="new-time">NEW TIME: ${proposedDepartureTime}</div>
-            <div class="diff">${timeDiff}</div>
-          </div>
+              <!-- Info Banner -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #FFF5F5 0%, #FEE2E2 100%); border-left: 4px solid #C41E3A; border-radius: 0 8px 8px 0; padding: 18px 20px;">
+                    <p style="margin: 0 0 6px 0; color: #C41E3A; font-size: 15px; font-weight: 700;">
+                      Schedule Update Notice
+                    </p>
+                    <p style="margin: 0; color: #7F1D1D; font-size: 14px; line-height: 1.5;">
+                      Your trip has been combined with colleagues traveling the same route for cost optimization. Please review the updated schedule below.
+                    </p>
+                  </td>
+                </tr>
+              </table>
 
-          <div class="info-row">
-            <span class="info-label">🚙 Vehicle:</span>
-            <span class="info-value">${vehicleInfo}</span>
-          </div>
-        </div>
-        `;
-      }).join('')}
+              <!-- Trip Cards -->
+              ${userTrips.map(trip => {
+                const originalTime = trip.originalDepartureTime || trip.departureTime;
+                const timeDiff = getTimeDiff(originalTime, proposedDepartureTime);
 
-      <div class="savings-box">
-        <div class="amount">${formatCurrency(estimatedSavings)}</div>
-        <div class="label">💰 Estimated Company Savings</div>
-      </div>
+                return `
+              <!-- Trip Card -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FAFAFA; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
 
-      <div class="action-notice">
-        <p><strong>⏰ Action Required:</strong> Please adjust your schedule to the new departure time. If this change causes any conflicts, contact the admin team immediately.</p>
-      </div>
-    </div>
+                    <!-- Route Header -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="background-color: #C41E3A; padding: 16px 20px;">
+                          <p style="margin: 0; color: white; font-size: 15px; font-weight: 600;">
+                            ${getLocationName(trip.departureLocation || '')} &nbsp;&rarr;&nbsp; ${getLocationName(trip.destination || '')}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
 
-    <div class="footer">
-      <p><strong>Intersnack Trips Management Team</strong></p>
-      <p>This is an automated notification. Please do not reply to this email.</p>
-    </div>
-  </div>
+                    <!-- Trip Details -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 20px;">
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 120px;">Travel Date</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trip.departureDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 120px;">Vehicle</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${vehicleInfo}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Time Change Box -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 0 20px 20px 20px;">
+                      <tr>
+                        <td style="background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%); border: 2px solid #FECACA; border-radius: 10px; padding: 20px; text-align: center;">
+
+                          <!-- Old Time -->
+                          <p style="margin: 0 0 5px 0; color: #9CA3AF; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                            Original Time
+                          </p>
+                          <p style="margin: 0 0 12px 0; color: #9CA3AF; font-size: 22px; font-weight: 500; text-decoration: line-through;">
+                            ${originalTime}
+                          </p>
+
+                          <!-- Arrow -->
+                          <p style="margin: 0; color: #C41E3A; font-size: 20px;">
+                            &#9660;
+                          </p>
+
+                          <!-- New Time -->
+                          <p style="margin: 12px 0 5px 0; color: #C41E3A; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                            New Departure Time
+                          </p>
+                          <p style="margin: 0; color: #C41E3A; font-size: 32px; font-weight: 800;">
+                            ${proposedDepartureTime}
+                          </p>
+
+                          <!-- Time Difference Badge -->
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 15px auto 0 auto;">
+                            <tr>
+                              <td style="background-color: #C41E3A; color: white; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px;">
+                                ${timeDiff}
+                              </td>
+                            </tr>
+                          </table>
+
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+                `;
+              }).join('')}
+
+              <!-- Savings Box -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border: 2px solid #6EE7B7; border-radius: 12px; padding: 24px; text-align: center;">
+                    <p style="margin: 0 0 5px 0; color: #047857; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                      Estimated Company Savings
+                    </p>
+                    <p style="margin: 0; color: #065F46; font-size: 32px; font-weight: 800;">
+                      ${formatCurrency(estimatedSavings)}
+                    </p>
+                    <p style="margin: 10px 0 0 0; color: #059669; font-size: 13px;">
+                      Thank you for contributing to cost efficiency!
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action Required Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 18px 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 40px; vertical-align: top;">
+                          <span style="display: inline-block; background-color: #C41E3A; color: white; font-size: 18px; width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%;">!</span>
+                        </td>
+                        <td style="vertical-align: top;">
+                          <p style="margin: 0 0 5px 0; color: #991B1B; font-size: 14px; font-weight: 700;">
+                            Action Required
+                          </p>
+                          <p style="margin: 0; color: #7F1D1D; font-size: 14px; line-height: 1.5;">
+                            Please adjust your schedule to the new departure time. If this change causes any conflicts with your plans, contact the admin team immediately.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px;">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 20px;">
+                    <p style="margin: 0; color: #6B7280; font-size: 14px; line-height: 1.6;">
+                      If you have any questions, please don't hesitate to contact the admin team.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1F2937; border-radius: 0 0 16px 16px; padding: 30px 40px; text-align: center;">
+
+              <!-- Company Name -->
+              <p style="margin: 0 0 15px 0; color: #C41E3A; font-size: 18px; font-weight: 700; letter-spacing: 1px;">
+                INTERSNACK
+              </p>
+
+              <!-- Tagline -->
+              <p style="margin: 0 0 20px 0; color: #9CA3AF; font-size: 13px;">
+                Trips Management System
+              </p>
+
+              <!-- Footer Links -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Best regards</span>
+                  </td>
+                  <td style="color: #4B5563;">|</td>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Admin Team</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Disclaimer -->
+              <p style="margin: 20px 0 0 0; color: #6B7280; font-size: 11px; line-height: 1.5;">
+                This is an automated notification from the Trips Management System.<br>
+                Please do not reply directly to this email.
+              </p>
+
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
 </body>
 </html>
       `.trim();

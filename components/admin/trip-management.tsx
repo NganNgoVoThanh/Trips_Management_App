@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { Calendar, Clock, MapPin, Mail, Search, Loader2, Car, User } from "lucide-react"
+import { Calendar, Clock, MapPin, Mail, Search, Loader2, Car, User, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fabricService, Trip } from "@/lib/fabric-client"
@@ -22,7 +23,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function TripManagement() {
+interface TripManagementProps {
+  adminLocationId?: string | null;
+  adminType?: string;
+}
+
+export function TripManagement({ adminLocationId, adminType }: TripManagementProps = {}) {
+  const { data: session } = useSession()
   const { toast } = useToast()
   const [trips, setTrips] = useState<Trip[]>([])
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
@@ -31,10 +38,16 @@ export function TripManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [sendingNotification, setSendingNotification] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
+  const [locationName, setLocationName] = useState<string | null>(null)
+
+  // Determine effective admin type and location from session or props
+  const effectiveAdminType = adminType || session?.user?.adminType
+  const effectiveLocationId = adminLocationId || session?.user?.adminLocationId
+  const isLocationAdmin = effectiveAdminType === 'location_admin' && effectiveLocationId
 
   useEffect(() => {
     loadTrips()
-  }, [])
+  }, [effectiveAdminType, effectiveLocationId])
 
   useEffect(() => {
     filterTrips()
@@ -44,15 +57,46 @@ export function TripManagement() {
     try {
       setIsLoading(true)
 
-      // Load all trips from Fabric/localStorage
-      const allTrips = await fabricService.getTrips()
+      // Use location-filtered API for Location Admin
+      if (isLocationAdmin) {
+        const response = await fetch('/api/admin/location-trips')
+        if (response.ok) {
+          const data = await response.json()
+          const allTrips = data.trips || []
 
-      // Sort by creation date (newest first)
-      allTrips.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+          // Sort by creation date (newest first)
+          allTrips.sort((a: Trip, b: Trip) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
 
-      setTrips(allTrips)
+          setTrips(allTrips)
+
+          // Fetch location name for display
+          if (effectiveLocationId) {
+            try {
+              const locResponse = await fetch(`/api/locations?id=${effectiveLocationId}`)
+              if (locResponse.ok) {
+                const locData = await locResponse.json()
+                setLocationName(locData.location?.name || effectiveLocationId)
+              }
+            } catch {
+              setLocationName(effectiveLocationId)
+            }
+          }
+        } else {
+          throw new Error('Failed to fetch trips')
+        }
+      } else {
+        // Super Admin: Load all trips
+        const allTrips = await fabricService.getTrips()
+
+        // Sort by creation date (newest first)
+        allTrips.sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+
+        setTrips(allTrips)
+      }
     } catch (error) {
       console.error('Error loading trips:', error)
       toast({
@@ -194,10 +238,30 @@ export function TripManagement() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Trip Management</CardTitle>
-        <CardDescription>
-          View and manage all registered trips ({trips.length} total)
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              Trip Management
+              {isLocationAdmin && locationName && (
+                <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700">
+                  <Building2 className="mr-1 h-3 w-3" />
+                  {locationName}
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {isLocationAdmin
+                ? `Trips involving ${locationName || 'your location'} (${trips.length} total)`
+                : `View and manage all registered trips (${trips.length} total)`
+              }
+            </CardDescription>
+          </div>
+          {isLocationAdmin && (
+            <div className="text-xs text-muted-foreground bg-yellow-50 px-2 py-1 rounded">
+              Filtered by your assigned location
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="mb-6 flex flex-col gap-4 md:flex-row">
@@ -441,16 +505,25 @@ export function TripManagement() {
                     {/* Notify button - ONLY for exception cases that need manual notification
                         Normal workflow: Manager approve → Auto email sent
                         This button is for:
-                        - Optimization proposals (status: optimized)
                         - Admin manual overrides (status: approved_solo via Manual Override page)
                         - Auto-approved trips (status: auto_approved)
+
+                        Excluded statuses (already auto-notified):
+                        - pending_approval, pending_urgent: Manager already has approval email
+                        - approved: Manager approval sends auto confirmation
+                        - optimized: Optimization approval sends auto notification
+                        - rejected: Manager rejection sends auto notification
+                        - cancelled: No notification needed
+                        - expired: Expired link sends auto notification
                     */}
                     {!trip.notified &&
                      trip.status !== 'pending_approval' &&
                      trip.status !== 'pending_urgent' &&
                      trip.status !== 'approved' &&  // Normal approved trips already notified by manager
+                     trip.status !== 'optimized' &&  // Optimized trips already notified when admin approves
                      trip.status !== 'rejected' &&  // Rejected trips already notified by manager
-                     trip.status !== 'cancelled' && (
+                     trip.status !== 'cancelled' &&  // Cancelled trips don't need notification
+                     trip.status !== 'expired' && (  // Expired trips already notified via expired-notification flow
                       <Button
                         size="sm"
                         variant="outline"

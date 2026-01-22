@@ -27,13 +27,15 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Admin triggered AI optimization...');
 
     // Step 1: Get ALL trips that can be optimized
-    // Include: 'approved', 'auto_approved', 'approved_solo'
-    // These are trips that have been approved by manager or auto-approved
+    // Include: 'approved', 'auto_approved' ONLY
+    // Note: 'approved_solo' means trip cannot be optimized (solo trip)
     const allTrips = await fabricService.getTrips({ dataType: 'raw' });
 
     // Filter trips that are eligible for optimization
-    // ✅ CRITICAL FIX: Exclude trips that already have optimizedGroupId
-    const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved', 'approved_solo'];
+    // ✅ CRITICAL: Only 'approved' and 'auto_approved' can be optimized
+    // ✅ Exclude 'approved_solo' - these are final solo trips
+    // ✅ Exclude trips that already have optimizedGroupId
+    const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved'];
     const tripsToOptimize = allTrips.filter(trip =>
       eligibleStatuses.includes(trip.status as TripStatus) &&
       !trip.optimizedGroupId // ✅ Don't re-optimize trips already in a group
@@ -75,10 +77,48 @@ export async function POST(request: NextRequest) {
 
     console.log(`💡 AI generated ${proposals.length} optimization proposals`);
 
+    // Step 3: Check for existing proposed groups to avoid duplicates
+    const existingGroups = await fabricService.getOptimizationGroups('proposed');
+    const existingTripSets = new Set(
+      existingGroups.map(g => JSON.parse(JSON.stringify(g.trips)).sort().join(','))
+    );
+
+    // Track trips already assigned in existing groups (to avoid overlapping)
+    const alreadyAssignedTrips = new Set<string>();
+    for (const g of existingGroups) {
+      const tripIds = Array.isArray(g.trips) ? g.trips : JSON.parse(JSON.stringify(g.trips));
+      tripIds.forEach((tid: string) => alreadyAssignedTrips.add(tid));
+    }
+
     // Step 4: Create optimization groups & TEMP trips
     let totalTripsAffected = 0;
+    let skippedDuplicates = 0;
+    let skippedOverlapping = 0;
+
+    // Track newly assigned trips in this session
+    const newlyAssignedTrips = new Set<string>();
 
     for (const proposal of proposals) {
+      const proposalTripIds = proposal.trips.map(t => t.id);
+
+      // Check if this exact set of trips already has a proposed group
+      const tripIdsKey = proposalTripIds.sort().join(',');
+      if (existingTripSets.has(tripIdsKey)) {
+        console.log(`⏭️ Skipping duplicate proposal for trips: ${tripIdsKey}`);
+        skippedDuplicates++;
+        continue;
+      }
+
+      // Check if any trip in this proposal is already assigned (overlapping)
+      const hasOverlap = proposalTripIds.some(tid =>
+        alreadyAssignedTrips.has(tid) || newlyAssignedTrips.has(tid)
+      );
+      if (hasOverlap) {
+        console.log(`⏭️ Skipping overlapping proposal - some trips already in another group`);
+        skippedOverlapping++;
+        continue;
+      }
+
       // Create optimization group
       const group = await fabricService.createOptimizationGroup({
         trips: proposal.trips.map(t => t.id),
@@ -93,18 +133,19 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Created optimization group: ${groupId}`);
 
       // Create TEMP trips for this group
-      // ✅ FIX: Use 'pending_approval' instead of 'draft' (not in ENUM)
+      // ✅ FIX: Use createTempTrip() to insert into temp_trips table
       for (const trip of proposal.trips) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id, createdAt, updatedAt, ...tripData } = trip;
-        await fabricService.createTrip({
+        await fabricService.createTempTrip({
           ...tripData,
-          status: 'pending_approval' as TripStatus, // ✅ Valid ENUM value
+          status: 'draft' as TripStatus, // ✅ Use valid temp_trips ENUM value
           dataType: 'temp',
           optimizedGroupId: groupId,
           departureTime: proposal.proposedDepartureTime,
           vehicleType: proposal.vehicleType,
-          parentTripId: trip.id
+          parentTripId: trip.id,
+          originalDepartureTime: trip.departureTime
         });
       }
 
@@ -116,18 +157,29 @@ export async function POST(request: NextRequest) {
           optimizedGroupId: groupId
         });
         totalTripsAffected++;
+
+        // Track this trip as assigned to prevent overlapping
+        newlyAssignedTrips.add(trip.id);
       }
 
-      console.log(`✓ Created TEMP trips and updated ${proposal.trips.length} RAW trips to 'proposed'`);
+      console.log(`✓ Created TEMP trips and updated ${proposal.trips.length} RAW trips`);
     }
 
-    console.log(`✅ Optimization complete: ${proposals.length} proposals created, ${totalTripsAffected} trips affected`);
+    const actualCreated = proposals.length - skippedDuplicates - skippedOverlapping;
+    const skippedTotal = skippedDuplicates + skippedOverlapping;
+    console.log(`✅ Optimization complete: ${actualCreated} proposals created (${skippedTotal} skipped), ${totalTripsAffected} trips affected`);
 
     return NextResponse.json({
       success: true,
-      proposalsCreated: proposals.length,
+      proposalsCreated: actualCreated,
+      skippedDuplicates,
+      skippedOverlapping,
       tripsAffected: totalTripsAffected,
-      message: `Successfully created ${proposals.length} optimization proposals affecting ${totalTripsAffected} trips`,
+      message: actualCreated > 0
+        ? `Successfully created ${actualCreated} optimization proposals affecting ${totalTripsAffected} trips${skippedTotal > 0 ? ` (${skippedTotal} skipped)` : ''}`
+        : skippedTotal > 0
+          ? `All proposals already exist or overlap. No new proposals created.`
+          : 'No optimization proposals created',
       proposals: proposals.map(p => ({
         id: p.id,
         tripCount: p.trips.length,

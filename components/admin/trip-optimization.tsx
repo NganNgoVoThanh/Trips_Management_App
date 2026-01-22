@@ -2,20 +2,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Users, 
-  RefreshCw, 
-  Check, 
-  X, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  RefreshCw,
+  Check,
+  X,
   Loader2,
-  TrendingDown
+  TrendingDown,
+  Building2
 } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
 import { calculateDistance, getLocationName, formatCurrency, config } from "@/lib/config"
@@ -24,9 +26,12 @@ import { authService } from "@/lib/auth-service"
 
 interface TripOptimizationProps {
   onOptimizationChange?: () => void
+  adminLocationId?: string | null
+  adminType?: string
 }
 
-export function TripOptimization({ onOptimizationChange }: TripOptimizationProps = {}) {
+export function TripOptimization({ onOptimizationChange, adminLocationId, adminType }: TripOptimizationProps = {}) {
+  const { data: session } = useSession()
   const { toast } = useToast()
   const [proposals, setProposals] = useState<OptimizationProposal[]>([])
   const [pendingTrips, setPendingTrips] = useState<Trip[]>([])
@@ -34,36 +39,86 @@ export function TripOptimization({ onOptimizationChange }: TripOptimizationProps
   const [isLoading, setIsLoading] = useState(true)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [locationName, setLocationName] = useState<string | null>(null)
+
+  // Determine effective admin type and location from session or props
+  const effectiveAdminType = adminType || session?.user?.adminType
+  const effectiveLocationId = adminLocationId || session?.user?.adminLocationId
+  const isLocationAdmin = effectiveAdminType === 'location_admin' && effectiveLocationId
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [effectiveAdminType, effectiveLocationId])
 
   const loadData = async () => {
     try {
       setIsLoading(true)
 
-      // Load approved trips ready for optimization
-      // Include: 'approved', 'auto_approved', 'approved_solo'
-      const allTrips = await fabricService.getTrips({ includeTemp: false })
-      const eligibleStatuses = ['approved', 'auto_approved', 'approved_solo']
-      const trips = allTrips.filter(t => eligibleStatuses.includes(t.status))
+      let trips: Trip[] = []
 
-      console.log(`📊 Found ${trips.length} trips eligible for optimization (statuses: ${trips.map(t => t.status).join(', ')})`)
+      // For Location Admin, use filtered API
+      if (isLocationAdmin && effectiveLocationId) {
+        const response = await fetch('/api/admin/location-trips?status=approved')
+        if (response.ok) {
+          const data = await response.json()
+          // Filter for trips eligible for optimization
+          const eligibleStatuses = ['approved', 'auto_approved', 'manager_approved']
+          trips = (data.trips || []).filter((t: Trip) =>
+            eligibleStatuses.includes(t.status) && !t.optimizedGroupId
+          )
+        }
+
+        // Fetch location name
+        try {
+          const locResponse = await fetch(`/api/locations?id=${effectiveLocationId}`)
+          if (locResponse.ok) {
+            const locData = await locResponse.json()
+            setLocationName(locData.location?.name || effectiveLocationId)
+          }
+        } catch {
+          setLocationName(effectiveLocationId)
+        }
+      } else {
+        // Super Admin: Load all trips
+        const allTrips = await fabricService.getTrips({ includeTemp: false })
+        const eligibleStatuses = ['approved', 'auto_approved', 'manager_approved']
+        trips = allTrips.filter(t => eligibleStatuses.includes(t.status) && !t.optimizedGroupId)
+      }
+
+      console.log(`📊 Found ${trips.length} trips eligible for optimization`)
       setPendingTrips(trips)
-      
-      // Load existing proposals
-      const groups = await fabricService.getOptimizationGroups('proposed')
-      
+
+      // Load existing proposals (Super Admin sees all, Location Admin sees filtered)
+      let groups = await fabricService.getOptimizationGroups('proposed')
+
+      // For Location Admin, filter groups to only those involving their location
+      if (isLocationAdmin && effectiveLocationId) {
+        const filteredGroups = []
+        for (const group of groups) {
+          const groupTempTrips = await fabricService.getTempTripsByGroupId(group.id)
+          // Check if any trip in this group involves the admin's location
+          const locationMatches = groupTempTrips.some(trip =>
+            trip.departureLocation === effectiveLocationId ||
+            trip.departureLocation === locationName ||
+            trip.destination === effectiveLocationId ||
+            trip.destination === locationName
+          )
+          if (locationMatches) {
+            filteredGroups.push(group)
+          }
+        }
+        groups = filteredGroups
+      }
+
       const existingProposals: OptimizationProposal[] = []
       for (const group of groups) {
         const groupTempTrips = await fabricService.getTempTripsByGroupId(group.id)
-        
+
         if (groupTempTrips.length > 0) {
           const totalDistance = groupTempTrips[0].departureLocation && groupTempTrips[0].destination
             ? calculateDistance(groupTempTrips[0].departureLocation, groupTempTrips[0].destination)
             : 0
-          
+
           existingProposals.push({
             id: group.id,
             trips: groupTempTrips,
@@ -76,7 +131,7 @@ export function TripOptimization({ onOptimizationChange }: TripOptimizationProps
           })
         }
       }
-      
+
       setProposals(existingProposals)
     } catch (error) {
       console.error('Error loading data:', error)
@@ -292,9 +347,20 @@ export function TripOptimization({ onOptimizationChange }: TripOptimizationProps
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Trip Optimization</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Trip Optimization</CardTitle>
+            {isLocationAdmin && locationName && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                <Building2 className="mr-1 h-3 w-3" />
+                {locationName}
+              </Badge>
+            )}
+          </div>
           <CardDescription>
-            AI-powered trip combination for cost savings
+            {isLocationAdmin
+              ? `AI-powered trip optimization for ${locationName || 'your location'}`
+              : 'AI-powered trip combination for cost savings'
+            }
           </CardDescription>
         </div>
         <Button onClick={runOptimization} disabled={isOptimizing}>

@@ -205,6 +205,31 @@ export const authOptions: NextAuthOptions = {
           token.picture = avatarUrl;
         }
 
+        // ✅ CHECK FOR PENDING ADMIN ASSIGNMENT (NEW FEATURE)
+        // This enables pre-assignment of admin roles before user's first login
+        try {
+          const { getPendingAdminAssignment, activatePendingAssignment } = await import('@/lib/admin-service');
+
+          const pendingAssignment = await getPendingAdminAssignment(normalizedEmail);
+
+          if (pendingAssignment && !pendingAssignment.activated) {
+            console.log(`🔔 Pending admin assignment found for ${normalizedEmail}`);
+
+            // Activate the pending assignment
+            const activationResult = await activatePendingAssignment(databaseUserId, normalizedEmail);
+
+            if (activationResult.success) {
+              token.role = 'admin';
+              token.adminType = activationResult.adminType as any;
+              token.adminLocationId = activationResult.locationId || undefined;
+
+              console.log(`✅ Activated pending admin assignment for ${normalizedEmail}: ${activationResult.adminType}`);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to check/activate pending admin assignment:', error);
+        }
+
         // ✅ Load admin_type and admin_location_id from database
         // This enables Super Admin and Location Admin functionality
         try {
