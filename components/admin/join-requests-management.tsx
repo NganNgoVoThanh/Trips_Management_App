@@ -52,7 +52,8 @@ export function JoinRequestsManagement() {
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve')
   const [adminNotes, setAdminNotes] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string>('pending')
+  // ✅ FIX: Default to 'all' so admin sees all requests (not just pending)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,

@@ -8,9 +8,12 @@ export const revalidate = 0;
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ FIX: Await params in Next.js 15 (matches reject/cancel routes)
+    const { id } = await context.params;
+
     const user = await getServerUser(request);
 
     if (!user) {
@@ -27,7 +30,7 @@ export async function POST(
       );
     }
 
-    const requestId = params.id;
+    const requestId = id;
     const body = await request.json();
     const { adminNotes } = body;
 
