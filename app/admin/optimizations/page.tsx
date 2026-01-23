@@ -1,4 +1,4 @@
-// app/admin/ptimizations/page.tsx
+// app/admin/optimizations/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,46 +9,82 @@ import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Zap, TrendingDown, Users, Calendar, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { fabricService, OptimizationGroup, Trip } from "@/lib/fabric-client"
 import { formatCurrency, getLocationName } from "@/lib/config"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { useSession } from "next-auth/react"
 
 export default function OptimizationsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const { data: session, status } = useSession()
   const [optimizations, setOptimizations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingGroupId, setProcessingGroupId] = useState<string | null>(null)
 
+  // Get groupId from query params for filtering
+  const filterGroupId = searchParams.get('groupId')
+
   useEffect(() => {
     if (status !== 'loading') {
       loadOptimizations()
     }
-  }, [status, session])
+  }, [status, session, filterGroupId])
 
   const loadOptimizations = async () => {
     try {
-      if (!session?.user || session.user.role !== 'admin') {
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
+
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
+        return
+      }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
         return
       }
 
       const groups = await fabricService.getOptimizationGroups()
       const allTrips = await fabricService.getTrips()
-      
-      // Map groups to detailed optimization data
-      const optimizationData = groups.map(group => {
+
+      // Get all optimized trips (status = 'optimized')
+      const optimizedTrips = allTrips.filter(t => t.status === 'optimized' && t.dataType !== 'temp')
+
+      // Group optimized trips by their optimizedGroupId
+      const tripsByGroupId = new Map<string, Trip[]>()
+      optimizedTrips.forEach(trip => {
+        if (trip.optimizedGroupId) {
+          if (!tripsByGroupId.has(trip.optimizedGroupId)) {
+            tripsByGroupId.set(trip.optimizedGroupId, [])
+          }
+          tripsByGroupId.get(trip.optimizedGroupId)!.push(trip)
+        }
+      })
+
+      // Create optimization data from both sources:
+      // 1. From optimization_groups table
+      // 2. From trips with status='optimized' grouped by optimizedGroupId
+
+      const optimizationData: any[] = []
+      const processedGroupIds = new Set<string>()
+
+      // First, process groups from optimization_groups table
+      groups.forEach(group => {
         const trips = allTrips.filter(t => group.trips.includes(t.id))
         const totalSavings = trips.reduce((sum, t) => {
-          if (t.estimatedCost) {
-            const actualCost = t.actualCost || (t.estimatedCost * 0.75)
-            return sum + (t.estimatedCost - actualCost)
+          if (t.estimatedCost && t.actualCost) {
+            const savings = t.estimatedCost - t.actualCost
+            return sum + (savings > 0 ? savings : 0)
           }
           return sum
         }, 0)
 
-        return {
+        optimizationData.push({
           ...group,
           tripDetails: trips,
           totalSavings,
@@ -56,17 +92,57 @@ export default function OptimizationsPage() {
             `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` :
             'N/A',
           date: trips.length > 0 ?
-            new Date(trips[0].departureDate).toLocaleDateString('vi-VN', {
+            new Date(trips[0].departureDate).toLocaleDateString('en-US', {
               year: 'numeric',
               month: '2-digit',
               day: '2-digit'
-            }).split('/').reverse().join('-') // Format: YYYY-MM-DD
-            : 'N/A'
+            }) : 'N/A',
+          source: 'optimization_groups'
+        })
+        processedGroupIds.add(group.id)
+      })
+
+      // Then, add any optimized trip groups not in optimization_groups table
+      tripsByGroupId.forEach((trips, groupId) => {
+        if (!processedGroupIds.has(groupId)) {
+          const sortedTrips = trips.sort((a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )
+          const latestTrip = sortedTrips[0]
+
+          const totalSavings = trips.reduce((sum, t) => {
+            if (t.estimatedCost && t.actualCost) {
+              const savings = t.estimatedCost - t.actualCost
+              return sum + (savings > 0 ? savings : 0)
+            }
+            return sum
+          }, 0)
+
+          optimizationData.push({
+            id: groupId,
+            trips: trips.map(t => t.id),
+            tripDetails: trips,
+            totalSavings,
+            route: `${getLocationName(latestTrip.departureLocation)} → ${getLocationName(latestTrip.destination)}`,
+            date: new Date(latestTrip.departureDate).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }),
+            vehicleType: latestTrip.vehicleType || 'car-7',
+            proposedDepartureTime: latestTrip.departureTime,
+            status: 'approved', // These are already optimized trips
+            createdAt: latestTrip.updatedAt,
+            source: 'trips'
+          })
         }
       })
 
-      // Filter out optimizations with 0 savings
-      const filteredOptimizations = optimizationData.filter(opt => opt.totalSavings > 0)
+      // Filter by groupId if provided in query params
+      let filteredOptimizations = optimizationData
+      if (filterGroupId) {
+        filteredOptimizations = optimizationData.filter(opt => opt.id === filterGroupId)
+      }
 
       // Sort by most recent
       filteredOptimizations.sort((a, b) =>

@@ -61,17 +61,14 @@ export async function POST(request: NextRequest) {
     if (proposals.length === 0) {
       console.log('⚠️ AI found no optimization opportunities');
 
-      // Mark trips as solo (cannot be optimized)
-      for (const trip of tripsToOptimize) {
-        await fabricService.updateTrip(trip.id, {
-          status: 'approved_solo' as TripStatus
-        });
-      }
+      // ✅ FIX: Don't auto-approve trips as 'approved_solo'
+      // Just because AI can't find opportunities now doesn't mean trips can't be optimized later
+      // Let admin decide whether to keep them as individual trips or try again
 
       return NextResponse.json({
-        message: 'No optimization opportunities found',
+        message: 'No optimization opportunities found. Trips remain in their current status.',
         tripsProcessed: tripsToOptimize.length,
-        note: 'Trips have been marked as individual trips'
+        note: 'You can try running optimization again later when more trips are available, or manually mark them as individual trips if needed.'
       });
     }
 
@@ -132,35 +129,36 @@ export async function POST(request: NextRequest) {
 
       console.log(`📦 Created optimization group: ${groupId}`);
 
-      // Create TEMP trips for this group
-      // ✅ FIX: Use createTempTrip() to insert into temp_trips table
-      for (const trip of proposal.trips) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id, createdAt, updatedAt, ...tripData } = trip;
-        await fabricService.createTempTrip({
-          ...tripData,
-          status: 'draft' as TripStatus, // ✅ Use valid temp_trips ENUM value
-          dataType: 'temp',
-          optimizedGroupId: groupId,
-          departureTime: proposal.proposedDepartureTime,
-          vehicleType: proposal.vehicleType,
-          parentTripId: trip.id,
-          originalDepartureTime: trip.departureTime
-        });
-      }
+      // Create TEMP trips for this group - BATCH OPERATIONS
+      // ✅ PERFORMANCE: Use Promise.all() instead of sequential loops
+      await Promise.all(
+        proposal.trips.map(async (trip) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id, createdAt, updatedAt, ...tripData } = trip;
+          return fabricService.createTempTrip({
+            ...tripData,
+            status: 'draft' as TripStatus,
+            dataType: 'temp',
+            optimizedGroupId: groupId,
+            departureTime: proposal.proposedDepartureTime,
+            vehicleType: proposal.vehicleType,
+            parentTripId: trip.id,
+            originalDepartureTime: trip.departureTime
+          });
+        })
+      );
 
       // Update original RAW trips - keep as 'approved' but add groupId
-      // ✅ FIX: Don't change to 'proposed' (not in ENUM), keep original status
-      for (const trip of proposal.trips) {
-        await fabricService.updateTrip(trip.id, {
-          // Keep original approved status, just link to optimization group
-          optimizedGroupId: groupId
-        });
-        totalTripsAffected++;
-
-        // Track this trip as assigned to prevent overlapping
-        newlyAssignedTrips.add(trip.id);
-      }
+      // ✅ PERFORMANCE: Use Promise.all() for batch updates
+      await Promise.all(
+        proposal.trips.map(async (trip) => {
+          newlyAssignedTrips.add(trip.id);
+          totalTripsAffected++;
+          return fabricService.updateTrip(trip.id, {
+            optimizedGroupId: groupId
+          });
+        })
+      );
 
       console.log(`✓ Created TEMP trips and updated ${proposal.trips.length} RAW trips`);
     }

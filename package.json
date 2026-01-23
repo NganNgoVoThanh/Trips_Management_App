@@ -8,6 +8,7 @@
     "build:production": "cross-env NODE_ENV=production next build",
     "start": "next start",
     "start:production": "cross-env NODE_ENV=production next start -p 50001",
+    "performance:apply": "node scripts/apply-indexes.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop trips-management-system",
     "pm2:restart": "pm2 restart trips-management-system",

@@ -202,7 +202,8 @@ export async function POST(request: NextRequest) {
           purpose: tripData.purpose,
           vehicleType: tripData.vehicleType,
           estimatedCost: tripData.estimatedCost,
-          passengerCount: tripData.vehicleType === 'car-4' ? 4 : tripData.vehicleType === 'car-7' ? 7 : tripData.vehicleType === 'van-16' ? 16 : undefined,
+          // ✅ FIX: Use passenger capacity (excluding driver)
+          passengerCount: tripData.vehicleType === 'car-4' ? 3 : tripData.vehicleType === 'car-7' ? 6 : tripData.vehicleType === 'van-16' ? 15 : undefined,
         },
         userDetails: {
           department: user.department || undefined,

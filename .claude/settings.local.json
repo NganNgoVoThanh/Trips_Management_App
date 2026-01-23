@@ -130,7 +130,8 @@
       "Bash(echo:*)",
       "Bash(copy .env.local .env)",
       "Bash(test:*)",
-      "Bash(Select-Object -First 100)"
+      "Bash(Select-Object -First 100)",
+      "Bash(powershell -Command \"Get-Process | Where-Object {$_ProcessName -like ''*node*'' -or $_ProcessName -like ''*next*''} | Select-Object Id, ProcessName, Path | Format-Table\")"
     ],
     "deny": [],
     "ask": []

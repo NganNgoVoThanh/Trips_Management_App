@@ -35,6 +35,8 @@ export function TripManagement({ adminLocationId, adminType }: TripManagementPro
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [departureFilter, setDepartureFilter] = useState("all")
+  const [destinationFilter, setDestinationFilter] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
   const [sendingNotification, setSendingNotification] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
@@ -51,7 +53,7 @@ export function TripManagement({ adminLocationId, adminType }: TripManagementPro
 
   useEffect(() => {
     filterTrips()
-  }, [trips, searchTerm, statusFilter])
+  }, [trips, searchTerm, statusFilter, departureFilter, destinationFilter])
 
   const loadTrips = async () => {
     try {
@@ -133,6 +135,16 @@ export function TripManagement({ adminLocationId, adminType }: TripManagementPro
         // Filter by exact status match
         filtered = filtered.filter(t => t.status === statusFilter)
       }
+    }
+
+    // Departure location filter
+    if (departureFilter !== "all") {
+      filtered = filtered.filter(t => t.departureLocation === departureFilter)
+    }
+
+    // Destination location filter
+    if (destinationFilter !== "all") {
+      filtered = filtered.filter(t => t.destination === destinationFilter)
     }
 
     setFilteredTrips(filtered)
@@ -264,8 +276,9 @@ export function TripManagement({ adminLocationId, adminType }: TripManagementPro
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-6 flex flex-col gap-4 md:flex-row">
-          <div className="relative flex-1">
+        <div className="mb-6 space-y-4">
+          {/* Row 1: Search */}
+          <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               placeholder="Search by name, email, or location..."
@@ -274,44 +287,77 @@ export function TripManagement({ adminLocationId, adminType }: TripManagementPro
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Trips ({trips.length})</SelectItem>
-              <SelectItem value="pending_approval">
-                Pending Approval ({trips.filter(t => t.status === 'pending_approval').length})
-              </SelectItem>
-              <SelectItem value="pending_urgent">
-                Pending (Urgent) ({trips.filter(t => t.status === 'pending_urgent').length})
-              </SelectItem>
-              <SelectItem value="auto_approved">
-                Auto-Approved ({trips.filter(t => t.status === 'auto_approved').length})
-              </SelectItem>
-              <SelectItem value="approved">
-                Approved ({trips.filter(t => t.status === 'approved').length})
-              </SelectItem>
-              <SelectItem value="approved_solo">
-                Approved (Solo) ({trips.filter(t => t.status === 'approved_solo').length})
-              </SelectItem>
-              <SelectItem value="optimized">
-                Optimized ({trips.filter(t => t.status === 'optimized').length})
-              </SelectItem>
-              <SelectItem value="rejected">
-                Rejected ({trips.filter(t => t.status === 'rejected').length})
-              </SelectItem>
-              <SelectItem value="cancelled">
-                Cancelled ({trips.filter(t => t.status === 'cancelled').length})
-              </SelectItem>
-              <SelectItem value="expired">
-                Expired ({trips.filter(t => t.status === 'expired').length})
-              </SelectItem>
-              <SelectItem value="not-notified">
-                Not Notified ({trips.filter(t => !t.notified && t.status !== 'cancelled').length})
-              </SelectItem>
-            </SelectContent>
-          </Select>
+
+          {/* Row 2: Filters */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status ({trips.length})</SelectItem>
+                <SelectItem value="pending_approval">
+                  Pending Approval ({trips.filter(t => t.status === 'pending_approval').length})
+                </SelectItem>
+                <SelectItem value="pending_urgent">
+                  Pending (Urgent) ({trips.filter(t => t.status === 'pending_urgent').length})
+                </SelectItem>
+                <SelectItem value="auto_approved">
+                  Auto-Approved ({trips.filter(t => t.status === 'auto_approved').length})
+                </SelectItem>
+                <SelectItem value="approved">
+                  Approved ({trips.filter(t => t.status === 'approved').length})
+                </SelectItem>
+                <SelectItem value="approved_solo">
+                  Approved (Solo) ({trips.filter(t => t.status === 'approved_solo').length})
+                </SelectItem>
+                <SelectItem value="optimized">
+                  Optimized ({trips.filter(t => t.status === 'optimized').length})
+                </SelectItem>
+                <SelectItem value="rejected">
+                  Rejected ({trips.filter(t => t.status === 'rejected').length})
+                </SelectItem>
+                <SelectItem value="cancelled">
+                  Cancelled ({trips.filter(t => t.status === 'cancelled').length})
+                </SelectItem>
+                <SelectItem value="expired">
+                  Expired ({trips.filter(t => t.status === 'expired').length})
+                </SelectItem>
+                <SelectItem value="not-notified">
+                  Not Notified ({trips.filter(t => !t.notified && t.status !== 'cancelled').length})
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Departure Location Filter */}
+            <Select value={departureFilter} onValueChange={setDepartureFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="From location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departures</SelectItem>
+                <SelectItem value="HCM Office">HCM Office</SelectItem>
+                <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
+                <SelectItem value="Long An Factory">Long An Factory</SelectItem>
+                <SelectItem value="Tay Ninh Factory">Tay Ninh Factory</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Destination Location Filter */}
+            <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="To location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Destinations</SelectItem>
+                <SelectItem value="HCM Office">HCM Office</SelectItem>
+                <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
+                <SelectItem value="Long An Factory">Long An Factory</SelectItem>
+                <SelectItem value="Tay Ninh Factory">Tay Ninh Factory</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {filteredTrips.length === 0 ? (

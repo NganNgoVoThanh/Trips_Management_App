@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -53,13 +53,48 @@ export function AvailableTrips() {
       loadUserJoinRequests()
       loadUserTrips()
     }
-  }, [session])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]) // Only re-run when user ID changes
 
-  useEffect(() => {
-    filterTrips()
+  // ✅ PERFORMANCE: Use useMemo for client-side filtering instead of useEffect
+  const filteredTripsData = useMemo(() => {
+    let filtered = [...trips]
+
+    // Search filter
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase()
+      filtered = filtered.filter(trip =>
+        getLocationName(trip.departureLocation).toLowerCase().includes(lowerSearch) ||
+        getLocationName(trip.destination).toLowerCase().includes(lowerSearch)
+      )
+    }
+
+    // Location filter
+    if (locationFilter !== 'all') {
+      filtered = filtered.filter(trip =>
+        trip.departureLocation === locationFilter || trip.destination === locationFilter
+      )
+    }
+
+    // Date filter
+    if (dateFilter) {
+      filtered = filtered.filter(trip => trip.departureDate === dateFilter)
+    }
+
+    // Sort by departure date
+    filtered.sort((a, b) =>
+      new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime()
+    )
+
+    return filtered
   }, [trips, searchTerm, locationFilter, dateFilter])
 
-  const loadAvailableTrips = async () => {
+  // Update filteredTrips when filteredTripsData changes
+  useEffect(() => {
+    setFilteredTrips(filteredTripsData)
+  }, [filteredTripsData])
+
+  const loadAvailableTrips = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -105,11 +140,10 @@ export function AvailableTrips() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [session?.user])
 
-  const loadUserJoinRequests = async () => {
+  const loadUserJoinRequests = useCallback(async () => {
     try {
-      // ✅ Use NextAuth session
       const user = session?.user
       if (user) {
         const requests = await joinRequestService.getJoinRequests({
@@ -120,11 +154,10 @@ export function AvailableTrips() {
     } catch (error) {
       console.error('Error loading join requests:', error)
     }
-  }
+  }, [session?.user])
 
-  const loadUserTrips = async () => {
+  const loadUserTrips = useCallback(async () => {
     try {
-      // ✅ Use NextAuth session
       const user = session?.user
       if (user) {
         const trips = await fabricService.getTrips({ userId: user.id })
@@ -133,7 +166,7 @@ export function AvailableTrips() {
     } catch (error) {
       console.error('Error loading user trips:', error)
     }
-  }
+  }, [session?.user])
 
   const groupTrips = async (trips: Trip[]): Promise<Trip[]> => {
     const groups = new Map<string, Trip[]>()
@@ -163,7 +196,9 @@ export function AvailableTrips() {
       // - Original participants who submitted trips
       // - Users who joined via approved join requests (they now have trips in DB)
       const totalPassengers = groupTrips.length
-      const availableSeats = vehicle.capacity - totalPassengers
+      // ✅ FIX: Passenger capacity excludes driver seat
+      const passengerCapacity = vehicle.capacity - 1
+      const availableSeats = passengerCapacity - totalPassengers
 
       // Only show trips with available seats
       if (availableSeats > 0) {
@@ -175,7 +210,7 @@ export function AvailableTrips() {
           userId: '',
           // Add custom properties for display
           availableSeats,
-          totalSeats: vehicle.capacity,
+          totalSeats: passengerCapacity, // ✅ FIX: Show passenger capacity, not total capacity
           groupSize: totalPassengers, // Updated to include join requests
           participants: groupTrips // Keep list of original participants
         } as any)
@@ -364,38 +399,9 @@ export function AvailableTrips() {
     }
   }
 
-  const filterTrips = () => {
-    let filtered = [...trips]
-    
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(trip => 
-        getLocationName(trip.departureLocation).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        getLocationName(trip.destination).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-    
-    // Location filter
-    if (locationFilter !== 'all') {
-      filtered = filtered.filter(trip => 
-        trip.departureLocation === locationFilter || trip.destination === locationFilter
-      )
-    }
-    
-    // Date filter
-    if (dateFilter) {
-      filtered = filtered.filter(trip => trip.departureDate === dateFilter)
-    }
-    
-    // Sort by departure date
-    filtered.sort((a, b) => 
-      new Date(a.departureDate).getTime() - new Date(b.departureDate).getTime()
-    )
-    
-    setFilteredTrips(filtered)
-  }
+  // ✅ Removed filterTrips() - replaced with useMemo above for better performance
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
       weekday: 'short',
@@ -403,13 +409,13 @@ export function AvailableTrips() {
       month: "short",
       year: "numeric",
     })
-  }
+  }, [])
 
-  const getNextWeekDate = () => {
+  const getNextWeekDate = useCallback(() => {
     const date = new Date()
     date.setDate(date.getDate() + 7)
     return date.toISOString().split('T')[0]
-  }
+  }, [])
 
   if (isLoading) {
     return (

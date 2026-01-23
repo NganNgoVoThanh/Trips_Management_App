@@ -257,6 +257,24 @@ CREATE TABLE IF NOT EXISTS approval_audit_log (
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Add user_agent column if it doesn't exist (for existing databases)
+SET @col_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+  AND table_name = 'approval_audit_log'
+  AND column_name = 'user_agent'
+);
+
+SET @add_col_query = IF(@col_exists = 0,
+  'ALTER TABLE approval_audit_log ADD COLUMN user_agent TEXT AFTER ip_address',
+  'SELECT "user_agent column already exists"'
+);
+
+PREPARE stmt FROM @add_col_query;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- ============================================
 -- 9. ADMIN OVERRIDE LOG TABLE
 -- ============================================

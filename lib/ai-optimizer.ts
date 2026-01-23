@@ -125,14 +125,15 @@ class AIOptimizer {
       return null;
     }
 
-    // Select appropriate vehicle
+    // Select appropriate vehicle based on passenger capacity (excluding driver)
+    // Car 4-seater: 3 passengers, Car 7-seater: 6 passengers, Van 16-seater: 15 passengers
     const totalPassengers = validTrips.length;
     let vehicleType = 'car-4';
-    if (totalPassengers > 4 && totalPassengers <= 7) {
+    if (totalPassengers > 3 && totalPassengers <= 6) {
       vehicleType = 'car-7';
-    } else if (totalPassengers > 7 && totalPassengers <= 16) {
+    } else if (totalPassengers > 6 && totalPassengers <= 15) {
       vehicleType = 'van-16';
-    } else if (totalPassengers > 16) {
+    } else if (totalPassengers > 15) {
       // Too many passengers for a single vehicle
       return null;
     }
@@ -194,15 +195,16 @@ Analyze these business trips and suggest optimal groupings to minimize costs:
 Trips:
 ${JSON.stringify(tripsData, null, 2)}
 
-Available vehicles:
-- 4-seater car: 8,000 VND/km
-- 7-seater car: 10,000 VND/km  
-- 16-seater van: 15,000 VND/km
+Available vehicles (passenger capacity EXCLUDES driver):
+- car-4 (4-seater car): Max 3 passengers, 8,000 VND/km
+- car-7 (7-seater car): Max 6 passengers, 10,000 VND/km
+- van-16 (16-seater van): Max 15 passengers, 15,000 VND/km
 
 Constraints:
 - Maximum wait time: ${config.optimization.maxWaitTime} minutes
 - Maximum detour: ${config.optimization.maxDetour} km
 - Minimum savings: ${config.optimization.minSavingsPercentage}%
+- Each trip = 1 passenger
 
 Please suggest trip combinations that would result in cost savings.
 

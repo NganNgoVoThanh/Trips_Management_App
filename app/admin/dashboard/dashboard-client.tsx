@@ -667,6 +667,13 @@ export function AdminDashboardClient() {
     router.push('/admin/join-requests')
   }
 
+  const handleViewOptimizationDetail = (opt: any) => {
+    // Navigate directly to the optimization detail page
+    // The detail page now handles both cases (from optimization_groups table or from trips)
+    console.log('Navigating to optimization detail:', opt.groupId)
+    router.push(`/admin/optimizations/${opt.groupId}`)
+  }
+
   if (isLoading && stats.totalTrips === 0) {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
@@ -759,15 +766,11 @@ export function AdminDashboardClient() {
             </div>
           </div>
 
-          {/* Key Metrics - 2 rows with Join Requests */}
+          {/* Key Metrics - 8 cards in 2 rows */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Stats cards */}
             <Card
               className="border-l-4 border-l-red-600 hover:shadow-md transition-shadow cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault()
-                router.push('/admin/statistics/total-trips')
-              }}
+              onClick={() => router.push('/admin/statistics/total-trips')}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
@@ -775,11 +778,9 @@ export function AdminDashboardClient() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.totalTrips}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <TrendingUp className="mr-1 h-3 w-3 text-green-500" />
-                  <span className="text-green-600">+12%</span>
-                  <span className="ml-1">from last month</span>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  All trips in system
+                </p>
               </CardContent>
             </Card>
 
@@ -894,134 +895,82 @@ export function AdminDashboardClient() {
             </Card>
           </div>
 
-          {/* Quick Overview - System Overview for Admin */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* Actionable Summary Card */}
-            <Card className="lg:col-span-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Activity className="h-5 w-5 text-blue-600" />
-                  System Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {/* Needs Action */}
-                  <div
-                    className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 cursor-pointer hover:shadow-md transition-all"
-                    onClick={handleViewAllPending}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-amber-700 uppercase tracking-wide">Needs Action</span>
-                      {(stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent) > 0 && (
-                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                      )}
-                    </div>
-                    <p className="text-3xl font-bold text-amber-700">
-                      {stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent}
-                    </p>
-                    <p className="text-xs text-amber-600 mt-1">
-                      {stats.statusBreakdown.pending_urgent > 0 && (
-                        <span className="text-orange-600 font-medium">{stats.statusBreakdown.pending_urgent} urgent</span>
-                      )}
-                    </p>
+          {/* System Overview - Status Breakdown */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Activity className="h-5 w-5 text-blue-600" />
+                System Overview
+              </CardTitle>
+              <CardDescription>Trip status breakdown across the system</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Needs Action */}
+                <div
+                  className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 cursor-pointer hover:shadow-md transition-all"
+                  onClick={handleViewAllPending}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Needs Action</span>
+                    {(stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent) > 0 && (
+                      <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    )}
                   </div>
-
-                  {/* Approved */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-green-700 uppercase tracking-wide">Approved</span>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    </div>
-                    <p className="text-3xl font-bold text-green-700">
-                      {stats.statusBreakdown.approved + stats.statusBreakdown.auto_approved + stats.statusBreakdown.approved_solo}
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">Ready to optimize</p>
-                  </div>
-
-                  {/* Optimized */}
-                  <div
-                    className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 cursor-pointer hover:shadow-md transition-all"
-                    onClick={handleViewAllOptimizations}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">Optimized</span>
-                      <Zap className="h-4 w-4 text-blue-500" />
-                    </div>
-                    <p className="text-3xl font-bold text-blue-700">{stats.statusBreakdown.optimized}</p>
-                    <p className="text-xs text-blue-600 mt-1">Trips combined</p>
-                  </div>
-
-                  {/* Closed */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Closed</span>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-600">
-                      {stats.statusBreakdown.rejected + stats.statusBreakdown.cancelled + stats.statusBreakdown.expired}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Rejected / Cancelled / Expired</p>
-                  </div>
+                  <p className="text-3xl font-bold text-amber-700">
+                    {stats.statusBreakdown.pending_approval + stats.statusBreakdown.pending_urgent}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    {stats.statusBreakdown.pending_urgent > 0 ? (
+                      <span className="font-medium">{stats.statusBreakdown.pending_urgent} urgent</span>
+                    ) : (
+                      'Awaiting review'
+                    )}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Action Alert Card */}
-            <Card className={`${(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) ? 'border-amber-300 bg-amber-50/50' : 'border-green-300 bg-green-50/50'}`}>
-              <CardContent className="pt-6">
-                {(stats.pendingApprovals > 0 || stats.pendingJoinRequests > 0) ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-full bg-amber-100">
-                        <AlertCircle className="h-5 w-5 text-amber-600" />
-                      </div>
-                      <h3 className="font-semibold text-amber-800">Action Required</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {stats.pendingApprovals > 0 && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between bg-white hover:bg-amber-50 border-amber-200"
-                          onClick={handleViewAllPending}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-amber-600" />
-                            <span>{stats.pendingApprovals} trips pending</span>
-                          </span>
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {stats.pendingJoinRequests > 0 && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between bg-white hover:bg-purple-50 border-purple-200"
-                          onClick={handleViewAllJoinRequests}
-                        >
-                          <span className="flex items-center gap-2">
-                            <UserPlus className="h-4 w-4 text-purple-600" />
-                            <span>{stats.pendingJoinRequests} join requests</span>
-                          </span>
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                {/* Approved */}
+                <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Approved</span>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-4 text-center">
-                    <div className="p-3 rounded-full bg-green-100 mb-3">
-                      <CheckCircle className="h-8 w-8 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold text-green-800">All Caught Up!</h3>
-                    <p className="text-sm text-green-600 mt-1">No pending actions</p>
+                  <p className="text-3xl font-bold text-green-700">
+                    {stats.statusBreakdown.approved + stats.statusBreakdown.auto_approved + stats.statusBreakdown.approved_solo}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">Ready to optimize</p>
+                </div>
+
+                {/* Optimized */}
+                <div
+                  className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 cursor-pointer hover:shadow-md transition-all"
+                  onClick={handleViewAllOptimizations}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Optimized</span>
+                    <Zap className="h-4 w-4 text-blue-500" />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  <p className="text-3xl font-bold text-blue-700">{stats.statusBreakdown.optimized}</p>
+                  <p className="text-xs text-blue-600 mt-1">Trips combined</p>
+                </div>
+
+                {/* Closed */}
+                <div className="p-4 rounded-lg bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Closed</span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-600">
+                    {stats.statusBreakdown.rejected + stats.statusBreakdown.cancelled + stats.statusBreakdown.expired}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Rejected / Cancelled / Expired</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Recent Activities - 2 columns */}
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Pending Actions - Compact View */}
+            {/* Pending Trips Card */}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -1036,7 +985,7 @@ export function AdminDashboardClient() {
                       className="text-xs text-red-600 hover:text-red-700 h-7"
                       onClick={handleViewAllPending}
                     >
-                      View All
+                      View All ({stats.pendingApprovals})
                       <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
                   )}
@@ -1045,7 +994,7 @@ export function AdminDashboardClient() {
               <CardContent>
                 {pendingActions.length > 0 ? (
                   <div className="space-y-2">
-                    {pendingActions.slice(0, 4).map((action) => (
+                    {pendingActions.slice(0, 5).map((action) => (
                       <div
                         key={action.id}
                         className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
@@ -1078,16 +1027,17 @@ export function AdminDashboardClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
-                    <p className="text-sm font-medium text-gray-600">No pending trips</p>
-                    <p className="text-xs text-gray-400">All trips have been processed</p>
+                  <div className="flex items-center justify-center py-6 text-center">
+                    <div className="flex items-center gap-3 text-gray-500">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-sm">No pending trips - all processed</span>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Recent Optimizations - Compact View */}
+            {/* Recent Optimizations Card */}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -1111,11 +1061,11 @@ export function AdminDashboardClient() {
               <CardContent>
                 {recentOptimizations.length > 0 ? (
                   <div className="space-y-2">
-                    {recentOptimizations.slice(0, 4).map((opt) => (
+                    {recentOptimizations.slice(0, 5).map((opt) => (
                       <div
                         key={opt.id}
                         className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100 cursor-pointer hover:bg-blue-100 transition-all"
-                        onClick={() => router.push(`/admin/optimizations/${opt.groupId}`)}
+                        onClick={() => handleViewOptimizationDetail(opt)}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="p-1.5 rounded-full bg-blue-100">
@@ -1139,17 +1089,19 @@ export function AdminDashboardClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Activity className="h-10 w-10 text-gray-300 mb-2" />
-                    <p className="text-sm font-medium text-gray-600">No recent optimizations</p>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-red-600 mt-1 h-auto p-0"
-                      onClick={handleRunOptimization}
-                    >
-                      Run optimization now
-                    </Button>
+                  <div className="flex items-center justify-center py-6 text-center">
+                    <div className="flex flex-col items-center gap-2 text-gray-500">
+                      <Activity className="h-5 w-5 text-gray-400" />
+                      <span className="text-sm">No optimizations yet</span>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="text-red-600 h-auto p-0 text-xs"
+                        onClick={handleRunOptimization}
+                      >
+                        Run optimization now
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

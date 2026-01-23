@@ -74,12 +74,11 @@ export async function POST(request: NextRequest) {
     // Approve the optimization (backend handles TEMP → FINAL conversion)
     await fabricService.approveOptimization(groupId);
     
-    // Get updated trips for email notification
-    const finalTrips = await Promise.all(
-      group.trips.map(tripId => fabricService.getTripById(tripId))
-    );
+    // Get updated trips for email notification - BATCH FETCH
+    // ✅ PERFORMANCE: Use batch getTripsByIds instead of Promise.all(getTripById)
+    const finalTrips = await fabricService.getTripsByIds(group.trips);
     
-    const validTrips = finalTrips.filter(t => t !== null);
+    const validTrips = finalTrips; // Already filtered by getTripsByIds
     
     // Send notification emails to affected users
     if (validTrips.length > 0 && emailService.isServiceConfigured()) {

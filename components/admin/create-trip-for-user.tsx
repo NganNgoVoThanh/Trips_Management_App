@@ -549,7 +549,7 @@ export function CreateTripForUser() {
                 <SelectContent>
                   {Object.entries(config.vehicles).map(([key, vehicle]) => (
                     <SelectItem key={key} value={key}>
-                      {vehicle.name} (Max {vehicle.capacity} passengers)
+                      {vehicle.name} (Max {vehicle.capacity - 1} passengers)
                     </SelectItem>
                   ))}
                 </SelectContent>

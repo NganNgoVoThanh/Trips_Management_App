@@ -67,32 +67,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`⛔ Admin rejecting optimization group ${groupId} with ${tempCount} temp trips`);
 
-    // Reject the optimization (backend handles TEMP deletion, RAW preservation)
+    // Reject the optimization (backend handles TEMP deletion, RAW preservation, and status update)
     await fabricService.rejectOptimization(groupId);
 
-    // Update RAW trips back to 'approved_solo' status
-    // (fabricService.rejectOptimization should handle this, but let's be explicit)
+    // Get the reverted RAW trips for notification emails
     const rawTrips = await fabricService.getTrips({
-      optimizedGroupId: groupId,
+      status: 'approved_solo' as TripStatus,
       dataType: 'raw'
     });
 
-    for (const trip of rawTrips) {
-      await fabricService.updateTrip(trip.id, {
-        status: 'approved_solo' as TripStatus,
-        optimizedGroupId: undefined
-      });
-    }
+    // Filter trips that were part of this group (recently updated)
+    const recentlyUpdated = rawTrips.filter(trip => {
+      const updatedAt = new Date(trip.updatedAt).getTime();
+      const now = Date.now();
+      return (now - updatedAt) < 60000; // Updated within last 60 seconds
+    });
 
-    console.log(`✓ Reverted ${rawTrips.length} trips to 'approved_solo' status`);
+    console.log(`✓ Reverted ${recentlyUpdated.length} trips to 'approved_solo' status`);
 
     // Send notification emails to affected users about rejection
-    if (rawTrips.length > 0 && emailService.isServiceConfigured()) {
+    if (recentlyUpdated.length > 0 && emailService.isServiceConfigured()) {
       try {
-        const userEmails = [...new Set(rawTrips.map(t => t.userEmail).filter(Boolean))];
+        const userEmails = [...new Set(recentlyUpdated.map(t => t.userEmail).filter(Boolean))];
 
         for (const email of userEmails) {
-          const userTrips = rawTrips.filter(t => t.userEmail === email);
+          const userTrips = recentlyUpdated.filter(t => t.userEmail === email);
 
           await emailService.sendEmail({
             to: email,
@@ -157,13 +156,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       groupId,
-      message: `Optimization rejected. ${tempCount} temporary records deleted, ${rawTrips.length} original trips reverted to individual status`,
+      message: `Optimization rejected. ${tempCount} temporary records deleted, ${recentlyUpdated.length} original trips reverted to individual status`,
       tempDataDeleted: tempCount,
-      rawTripsReverted: rawTrips.length,
+      rawTripsReverted: recentlyUpdated.length,
       newStatus: 'approved_solo',
       rejectedBy: user.email,
       rejectedAt: new Date().toISOString(),
-      notificationsSent: rawTrips.length > 0 && emailService.isServiceConfigured()
+      notificationsSent: recentlyUpdated.length > 0 && emailService.isServiceConfigured()
     });
     
   } catch (error: any) {

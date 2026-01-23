@@ -148,20 +148,25 @@ export default function TotalSavingsPage() {
       const vehicleTypes = ['car-4', 'car-7', 'van-16']
       const vehicleSavings = vehicleTypes.map(type => {
         const vehicleTrips = optimizedTrips.filter(t => t.vehicleType === type)
+
+        // ✅ FIX: Only count savings if we have both estimated and actual cost
         const savings = vehicleTrips.reduce((sum, trip) => {
-          if (trip.estimatedCost) {
-            const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-            return sum + (trip.estimatedCost - actualCost)
+          if (trip.estimatedCost && trip.actualCost) {
+            const savingsAmount = trip.estimatedCost - trip.actualCost
+            return sum + (savingsAmount > 0 ? savingsAmount : 0)
           }
           return sum
         }, 0)
-        
+
+        // Only count trips that have actual cost recorded
+        const tripsWithActualCost = vehicleTrips.filter(t => t.estimatedCost && t.actualCost).length
+
         return {
-          type: type === 'car-4' ? '4-Seater Car' : 
+          type: type === 'car-4' ? '4-Seater Car' :
                 type === 'car-7' ? '7-Seater Car' : '16-Seater Van',
           savings,
-          trips: vehicleTrips.length,
-          avgSavingsPerTrip: vehicleTrips.length > 0 ? savings / vehicleTrips.length : 0
+          trips: tripsWithActualCost, // Only count trips with actual savings
+          avgSavingsPerTrip: tripsWithActualCost > 0 ? savings / tripsWithActualCost : 0
         }
       }).filter(v => v.trips > 0)
 
@@ -169,10 +174,13 @@ export default function TotalSavingsPage() {
       const routeSavings: { [key: string]: number } = {}
       optimizedTrips.forEach(trip => {
         const route = `${getLocationName(trip.departureLocation)} → ${getLocationName(trip.destination)}`
-        if (trip.estimatedCost) {
-          const actualCost = trip.actualCost || (trip.estimatedCost * 0.75)
-          const savings = trip.estimatedCost - actualCost
-          routeSavings[route] = (routeSavings[route] || 0) + savings
+
+        // ✅ FIX: Only count savings if we have both estimated and actual cost
+        if (trip.estimatedCost && trip.actualCost) {
+          const savings = trip.estimatedCost - trip.actualCost
+          if (savings > 0) {
+            routeSavings[route] = (routeSavings[route] || 0) + savings
+          }
         }
       })
 

@@ -361,7 +361,7 @@ export function ManagementDashboard() {
                       <div>
                         <h4 className="font-medium">{vehicle.name}</h4>
                         <p className="text-sm text-gray-500">
-                          Capacity: {vehicle.capacity} passengers
+                          Capacity: {vehicle.capacity - 1} passengers (excl. driver)
                         </p>
                       </div>
                       <div className="text-right">

@@ -42,7 +42,8 @@ export default function AllTripsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [locationFilter, setLocationFilter] = useState("all")
+  const [departureFilter, setDepartureFilter] = useState("all")
+  const [destinationFilter, setDestinationFilter] = useState("all")
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -62,7 +63,7 @@ export default function AllTripsPage() {
   useEffect(() => {
     filterTrips()
     calculateStats()
-  }, [trips, searchTerm, statusFilter, locationFilter])
+  }, [trips, searchTerm, statusFilter, departureFilter, destinationFilter])
 
   const loadTrips = async () => {
     try {
@@ -90,7 +91,7 @@ export default function AllTripsPage() {
     const pending = trips.filter(t => t.status === 'pending_approval' || t.status === 'pending_urgent').length
     const confirmed = trips.filter(t => t.status === 'approved_solo' || t.status === 'approved' || t.status === 'auto_approved').length
     const optimized = trips.filter(t => t.status === 'optimized').length
-    const cancelled = trips.filter(t => t.status === 'cancelled').length
+    const cancelled = trips.filter(t => t.status === 'cancelled' || t.status === 'rejected').length
 
     // Find most visited location
     const destinations = trips.map(t => t.destination)
@@ -128,11 +129,14 @@ export default function AllTripsPage() {
       filtered = filtered.filter(trip => trip.status === statusFilter)
     }
 
-    if (locationFilter !== 'all') {
-      filtered = filtered.filter(trip => 
-        trip.departureLocation === locationFilter || 
-        trip.destination === locationFilter
-      )
+    // Departure location filter
+    if (departureFilter !== 'all') {
+      filtered = filtered.filter(trip => trip.departureLocation === departureFilter)
+    }
+
+    // Destination location filter
+    if (destinationFilter !== 'all') {
+      filtered = filtered.filter(trip => trip.destination === destinationFilter)
     }
 
     // Sort by date (newest first)
@@ -238,7 +242,7 @@ export default function AllTripsPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Cancelled</CardTitle>
+              <CardTitle className="text-sm">Cancelled/Rejected</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
@@ -318,7 +322,8 @@ export default function AllTripsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-4">
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -328,35 +333,56 @@ export default function AllTripsPage() {
                   className="pl-9"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending_approval">Pending Approval</SelectItem>
-                  <SelectItem value="pending_urgent">Pending (Urgent)</SelectItem>
-                  <SelectItem value="auto_approved">Auto-Approved</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="approved_solo">Approved (Solo)</SelectItem>
-                  <SelectItem value="optimized">Optimized</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  <SelectItem value="HCM Office">HCM Office</SelectItem>
-                  <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
-                  <SelectItem value="Long An Factory">Long An Factory</SelectItem>
-                  <SelectItem value="Tay Ninh Factory">Tay Ninh Factory</SelectItem>
-                </SelectContent>
-              </Select>
+
+              {/* Filters Row */}
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Status Filter */}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                    <SelectItem value="pending_urgent">Pending (Urgent)</SelectItem>
+                    <SelectItem value="auto_approved">Auto-Approved</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="approved_solo">Approved (Solo)</SelectItem>
+                    <SelectItem value="optimized">Optimized</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Departure Location Filter */}
+                <Select value={departureFilter} onValueChange={setDepartureFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="From location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departures</SelectItem>
+                    <SelectItem value="HCM Office">HCM Office</SelectItem>
+                    <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
+                    <SelectItem value="Long An Factory">Long An Factory</SelectItem>
+                    <SelectItem value="Tay Ninh Factory">Tay Ninh Factory</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Destination Location Filter */}
+                <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="To location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Destinations</SelectItem>
+                    <SelectItem value="HCM Office">HCM Office</SelectItem>
+                    <SelectItem value="Phan Thiet Factory">Phan Thiet Factory</SelectItem>
+                    <SelectItem value="Long An Factory">Long An Factory</SelectItem>
+                    <SelectItem value="Tay Ninh Factory">Tay Ninh Factory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -22,49 +22,132 @@ export default function OptimizationDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (params.id && status !== 'loading') {
+    // Wait for session to finish loading
+    if (status === 'loading') return
+
+    // Only redirect if authenticated but NOT admin (user shouldn't be here)
+    if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
+      router.push('/dashboard')
+      return
+    }
+
+    // If unauthenticated, let Next.js handle redirect via middleware
+    if (status === 'unauthenticated') {
+      return
+    }
+
+    if (params.id) {
       loadOptimizationDetail(params.id as string)
     }
   }, [params.id, status, session])
 
   const loadOptimizationDetail = async (groupId: string) => {
     try {
-      if (!session?.user || session.user.role !== 'admin') {
-        router.push('/dashboard')
-        return
-      }
+      console.log('Loading optimization detail for groupId:', groupId)
 
       const groups = await fabricService.getOptimizationGroups()
       const allTrips = await fabricService.getTrips()
-      
-      const group = groups.find(g => g.id === groupId)
-      if (!group) {
-        toast({
-          title: "Not Found",
-          description: "Optimization group not found",
-          variant: "destructive"
-        })
-        router.push('/admin/optimizations')
-        return
-      }
 
-      const trips = allTrips.filter(t => group.trips.includes(t.id))
-      const totalSavings = trips.reduce((sum, t) => {
-        if (t.estimatedCost) {
-          const actualCost = t.actualCost || (t.estimatedCost * 0.75)
-          return sum + (t.estimatedCost - actualCost)
+      console.log('Found groups:', groups.length, 'Found trips:', allTrips.length)
+
+      // First, try to find in optimization_groups table
+      const group = groups.find(g => g.id === groupId)
+      console.log('Found matching group in optimization_groups:', !!group)
+
+      if (group) {
+        // Found in optimization_groups table
+        console.log('Group trips array:', group.trips)
+        const trips = allTrips.filter(t => group.trips.includes(t.id))
+        console.log('Filtered trips count:', trips.length)
+
+        const totalSavings = trips.reduce((sum, t) => {
+          if (t.estimatedCost && t.actualCost) {
+            const savings = t.estimatedCost - t.actualCost
+            return sum + (savings > 0 ? savings : 0)
+          }
+          return sum
+        }, 0)
+
+        setOptimization({
+          ...group,
+          tripDetails: trips,
+          totalSavings,
+          route: trips.length > 0 ?
+            `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` :
+            'N/A'
+        })
+      } else {
+        // Not in optimization_groups, try to find trips with this optimizedGroupId
+        console.log('Searching trips by optimizedGroupId:', groupId)
+        const trips = allTrips.filter(t =>
+          t.optimizedGroupId === groupId &&
+          t.status === 'optimized' &&
+          t.dataType !== 'temp'
+        )
+        console.log('Found trips with optimizedGroupId:', trips.length)
+
+        // Also try finding trips where optimizedGroupId matches (case insensitive or partial)
+        if (trips.length === 0) {
+          // Try more flexible matching
+          const flexibleTrips = allTrips.filter(t =>
+            t.optimizedGroupId &&
+            (t.optimizedGroupId === groupId ||
+             t.optimizedGroupId.includes(groupId) ||
+             groupId.includes(t.optimizedGroupId)) &&
+            t.status === 'optimized'
+          )
+          console.log('Flexible match trips:', flexibleTrips.length)
+
+          if (flexibleTrips.length === 0) {
+            // Debug: log all optimized trips and their groupIds
+            const allOptimized = allTrips.filter(t => t.status === 'optimized')
+            console.log('All optimized trips:', allOptimized.map(t => ({
+              id: t.id,
+              optimizedGroupId: t.optimizedGroupId,
+              status: t.status
+            })))
+
+            toast({
+              title: "Not Found",
+              description: `Optimization group ${groupId} not found`,
+              variant: "destructive"
+            })
+            router.push('/admin/optimizations')
+            return
+          }
+
+          // Use flexible matches
+          trips.push(...flexibleTrips)
         }
-        return sum
-      }, 0)
-      
-      setOptimization({
-        ...group,
-        tripDetails: trips,
-        totalSavings,
-        route: trips.length > 0 ? 
-          `${getLocationName(trips[0].departureLocation)} → ${getLocationName(trips[0].destination)}` : 
-          'N/A'
-      })
+
+        // Sort trips by updatedAt
+        trips.sort((a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        const latestTrip = trips[0]
+
+        const totalSavings = trips.reduce((sum, t) => {
+          if (t.estimatedCost && t.actualCost) {
+            const savings = t.estimatedCost - t.actualCost
+            return sum + (savings > 0 ? savings : 0)
+          }
+          return sum
+        }, 0)
+
+        console.log('Setting optimization with trips:', trips.length)
+        setOptimization({
+          id: groupId,
+          trips: trips.map(t => t.id),
+          tripDetails: trips,
+          totalSavings,
+          route: `${getLocationName(latestTrip.departureLocation)} → ${getLocationName(latestTrip.destination)}`,
+          vehicleType: latestTrip.vehicleType || 'car-7',
+          proposedDepartureTime: latestTrip.departureTime,
+          status: 'approved',
+          createdAt: latestTrip.createdAt,
+          approvedAt: latestTrip.updatedAt
+        })
+      }
     } catch (error) {
       console.error('Error loading optimization detail:', error)
       toast({

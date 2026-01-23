@@ -31,8 +31,19 @@ export default function ApprovalsPage() {
 
   const loadPendingTrips = async () => {
     try {
-      if (!session?.user || session.user.role !== 'admin') {
+      // Wait for session to finish loading
+      if (status === 'loading') {
+        return
+      }
+
+      // Only redirect if authenticated but NOT admin (user shouldn't be here)
+      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
         router.push('/dashboard')
+        return
+      }
+
+      // If unauthenticated, let Next.js handle redirect via middleware
+      if (status === 'unauthenticated') {
         return
       }
 

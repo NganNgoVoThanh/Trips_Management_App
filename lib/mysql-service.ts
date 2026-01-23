@@ -1,6 +1,7 @@
 // lib/mysql-service.ts
 import { config } from './config';
 import { TripStatus } from './trip-status-config';
+import { cacheService, CacheKeys, invalidateCache } from './cache-service';
 
 // Lazy import mysql2 only on server side
 let pool: any = null;
@@ -421,6 +422,8 @@ class MySQLService {
     departureLocation?: string;
     destination?: string;
     departureDate?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<Trip[]> {
     if (!this.ensureServerSide('getTrips')) return [];
 
@@ -467,9 +470,15 @@ class MySQLService {
       if (conditions.length > 0) {
         query += ' WHERE ' + conditions.join(' AND ');
       }
-      
+
       query += ' ORDER BY created_at DESC';
-      
+
+      // Add pagination (default 100 items, max 1000)
+      const limit = Math.min(filters?.limit || 100, 1000);
+      const offset = filters?.offset || 0;
+      query += ' LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+
       const [rows] = await connection.query(query, params) as any[];
       let allTrips = Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
 
@@ -477,7 +486,8 @@ class MySQLService {
       if (filters?.includeTemp) {
         try {
           const [tempRows] = await connection.query(
-            'SELECT * FROM temp_trips ORDER BY created_at DESC'
+            'SELECT * FROM temp_trips ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [limit, offset]
           ) as any[];
           if (Array.isArray(tempRows)) {
             allTrips = [...allTrips, ...tempRows.map(r => this.toCamelCase(r) as Trip)];
@@ -569,48 +579,64 @@ async approveOptimization(groupId: string): Promise<void> {
     ) as any[];
 
     if (Array.isArray(tempRows)) {
-      for (const tempTrip of tempRows) {
-        const camelTrip = this.toCamelCase(tempTrip);
+      // ✅ FIX: Calculate shared vehicle cost - split among all trips in group
+      const numberOfTrips = tempRows.length;
 
-        if (camelTrip.parentTripId) {
-          // ✅ CRITICAL FIX: Get original departure_time before updating
-          const [originalRows] = await connection.query(
-            'SELECT departure_time FROM trips WHERE id = ?',
-            [camelTrip.parentTripId]
-          ) as any[];
+      // Calculate full vehicle cost (use first trip's route and vehicle type)
+      if (numberOfTrips > 0) {
+        const firstTrip = this.toCamelCase(tempRows[0]);
+        const { calculateDistance, calculateCost } = require('./config');
+        const distance = calculateDistance(firstTrip.departureLocation, firstTrip.destination);
+        const fullVehicleCost = calculateCost(distance, firstTrip.vehicleType);
 
-          const originalTime = Array.isArray(originalRows) && originalRows.length > 0
-            ? (originalRows[0] as any).departure_time
-            : camelTrip.departureTime;
+        // Split cost among all trips
+        const actualCostPerTrip = fullVehicleCost / numberOfTrips;
 
-          // Update parent trip with optimized data from TEMP
-          await connection.query(
-            `UPDATE trips SET
-              data_type = ?,
-              status = ?,
-              departure_time = ?,
-              vehicle_type = ?,
-              actual_cost = ?,
-              optimized_group_id = ?,
-              original_departure_time = ?,
-              notified = ?,
-              updated_at = ?
-            WHERE id = ?`,
-            [
-              'final',
-              'optimized',
-              camelTrip.departureTime, // ← Use optimized time from TEMP
-              camelTrip.vehicleType, // ← Use optimized vehicle from TEMP
-              camelTrip.actualCost,
-              camelTrip.optimizedGroupId,
-              originalTime, // ← Save original time
-              true, // ← Mark as notified (email sent automatically on approve)
-              mysqlNow,
-              camelTrip.parentTripId
-            ]
-          );
+        console.log(`💰 Full vehicle cost: ${fullVehicleCost}, Split among ${numberOfTrips} trips: ${actualCostPerTrip} per trip`);
 
-          console.log(`✅ Trip ${camelTrip.parentTripId} optimized: ${originalTime} → ${camelTrip.departureTime}`);
+        for (const tempTrip of tempRows) {
+          const camelTrip = this.toCamelCase(tempTrip);
+
+          if (camelTrip.parentTripId) {
+            // ✅ CRITICAL FIX: Get original departure_time before updating
+            const [originalRows] = await connection.query(
+              'SELECT departure_time FROM trips WHERE id = ?',
+              [camelTrip.parentTripId]
+            ) as any[];
+
+            const originalTime = Array.isArray(originalRows) && originalRows.length > 0
+              ? (originalRows[0] as any).departure_time
+              : camelTrip.departureTime;
+
+            // Update parent trip with optimized data from TEMP
+            await connection.query(
+              `UPDATE trips SET
+                data_type = ?,
+                status = ?,
+                departure_time = ?,
+                vehicle_type = ?,
+                actual_cost = ?,
+                optimized_group_id = ?,
+                original_departure_time = ?,
+                notified = ?,
+                updated_at = ?
+              WHERE id = ?`,
+              [
+                'final',
+                'optimized',
+                camelTrip.departureTime, // ← Use optimized time from TEMP
+                camelTrip.vehicleType, // ← Use optimized vehicle from TEMP
+                actualCostPerTrip, // ✅ FIX: Split vehicle cost among all trips in group
+                camelTrip.optimizedGroupId,
+                originalTime, // ← Save original time
+                true, // ← Mark as notified (email sent automatically on approve)
+                mysqlNow,
+                camelTrip.parentTripId
+              ]
+            );
+
+            console.log(`✅ Trip ${camelTrip.parentTripId} optimized: ${originalTime} → ${camelTrip.departureTime}, actualCost: ${actualCostPerTrip} (shared with ${numberOfTrips} trips)`);
+          }
         }
       }
     }
@@ -664,11 +690,11 @@ async rejectOptimization(groupId: string): Promise<void> {
     if (Array.isArray(groupRows) && groupRows.length > 0) {
       const group = groupRows[0] as any;
       const tripIds = JSON.parse(group.trips);
-      
+
       if (Array.isArray(tripIds) && tripIds.length > 0) {
         await connection.query(
-          'UPDATE trips SET status = ?, updated_at = ? WHERE id IN (?)',
-          ['pending', mysqlNow, tripIds] // ✅ Dùng MySQL format
+          'UPDATE trips SET status = ?, optimized_group_id = NULL, updated_at = ? WHERE id IN (?)',
+          ['approved_solo', mysqlNow, tripIds] // ✅ Set to approved_solo and clear optimized_group_id
         );
       }
     }
@@ -697,6 +723,63 @@ async rejectOptimization(groupId: string): Promise<void> {
       return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
     } catch (err) {
       console.warn('âš ï¸ Error fetching temp trips:', err);
+      return [];
+    }
+  }
+
+  // Batch get temp trips by multiple group IDs - PERFORMANCE OPTIMIZATION
+  async getTempTripsByGroupIds(groupIds: string[]): Promise<Map<string, Trip[]>> {
+    if (!this.ensureServerSide('getTempTripsByGroupIds')) return new Map();
+    if (!groupIds || groupIds.length === 0) return new Map();
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      const [rows] = await connection.query(
+        'SELECT * FROM temp_trips WHERE optimized_group_id IN (?)',
+        [groupIds]
+      ) as any[];
+      connection.release();
+
+      // Group trips by optimized_group_id
+      const groupedTrips = new Map<string, Trip[]>();
+      if (Array.isArray(rows)) {
+        rows.forEach((row: any) => {
+          const trip = this.toCamelCase(row) as Trip;
+          const groupId = trip.optimizedGroupId;
+          if (groupId) {
+            if (!groupedTrips.has(groupId)) {
+              groupedTrips.set(groupId, []);
+            }
+            groupedTrips.get(groupId)!.push(trip);
+          }
+        });
+      }
+
+      return groupedTrips;
+    } catch (err) {
+      console.warn('⚠️ Error batch fetching temp trips:', err);
+      return new Map();
+    }
+  }
+
+  // Batch get trips by multiple IDs - PERFORMANCE OPTIMIZATION
+  async getTripsByIds(ids: string[]): Promise<Trip[]> {
+    if (!this.ensureServerSide('getTripsByIds')) return [];
+    if (!ids || ids.length === 0) return [];
+
+    try {
+      const poolInstance = await getPool();
+      const connection = await poolInstance.getConnection();
+      const [rows] = await connection.query(
+        'SELECT * FROM trips WHERE id IN (?)',
+        [ids]
+      ) as any[];
+      connection.release();
+
+      return Array.isArray(rows) ? rows.map(r => this.toCamelCase(r) as Trip) : [];
+    } catch (err) {
+      console.warn('⚠️ Error batch fetching trips:', err);
       return [];
     }
   }
@@ -1220,13 +1303,19 @@ async rejectOptimization(groupId: string): Promise<void> {
       const poolInstance = await getPool();
       const connection = await poolInstance.getConnection();
 
-      // Get the location name from location ID (e.g., 'PHAN-THIET-FACTORY' -> 'Phan Thiet Factory')
-      const [locRows] = await connection.query(
-        'SELECT name FROM locations WHERE id = ? LIMIT 1',
-        [adminLocationId]
-      ) as any[];
+      // ✅ PERFORMANCE: Cache location name to avoid repeated DB queries
+      const cacheKey = CacheKeys.locationName(adminLocationId);
+      let locationName = cacheService.get<string>(cacheKey);
 
-      const locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+      if (!locationName) {
+        const [locRows] = await connection.query(
+          'SELECT name FROM locations WHERE id = ? LIMIT 1',
+          [adminLocationId]
+        ) as any[];
+        locationName = locRows.length > 0 ? locRows[0].name : adminLocationId;
+        // Cache for 1 hour (locations rarely change)
+        cacheService.set(cacheKey, locationName, 60 * 60 * 1000);
+      }
 
       let query = `
         SELECT * FROM trips

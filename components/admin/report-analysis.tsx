@@ -205,8 +205,9 @@ export function ReportAnalysis() {
           const stat = vehicleStats.get(trip.vehicleType)
           stat.count++
           const vehicle = config.vehicles[trip.vehicleType as keyof typeof config.vehicles]
-          stat.capacity += vehicle.capacity
-          stat.occupied += 1 // Simplified - should count actual passengers
+          // ✅ FIX: Use passenger capacity (excluding driver)
+          stat.capacity += (vehicle.capacity - 1)
+          stat.occupied += 1 // Each trip = 1 passenger
           const estimated = trip.estimatedCost || 0
           const actual = trip.actualCost || estimated
           stat.savings += (estimated - actual)
