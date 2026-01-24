@@ -67,10 +67,14 @@ interface ExpiredTrip {
   expired_notified_at?: string
   hours_old: number
   is_past_departure: boolean | number
+  is_urgent?: boolean | number
+  hours_until_departure?: number
 }
 
 interface Statistics {
-  total_expired: number
+  total_trips: number
+  urgent_count: number
+  expired_count: number
   notified_count: number
   pending_notification_count: number
   past_departure_count: number
@@ -152,7 +156,9 @@ export default function ManualOverridePage() {
 
       setTrips(data.trips || [])
       setStatistics(data.statistics || {
-        total_expired: 0,
+        total_trips: 0,
+        urgent_count: 0,
+        expired_count: 0,
         notified_count: 0,
         pending_notification_count: 0,
         past_departure_count: 0
@@ -359,6 +365,10 @@ export default function ManualOverridePage() {
     return trip.is_past_departure === true || trip.is_past_departure === 1
   }
 
+  const isUrgentTrip = (trip: ExpiredTrip) => {
+    return trip.is_urgent === true || trip.is_urgent === 1 || trip.status === 'pending_urgent'
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -410,34 +420,34 @@ export default function ManualOverridePage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expired</CardTitle>
-                <Clock className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
+                <Clock className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{statistics.total_expired}</div>
-                <p className="text-xs text-muted-foreground">Trips pending &gt;48h</p>
+                <div className="text-2xl font-bold">{statistics.total_trips}</div>
+                <p className="text-xs text-muted-foreground">Need approval</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-l-4 border-l-red-500">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Notified</CardTitle>
-                <Mail className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statistics.notified_count}</div>
-                <p className="text-xs text-muted-foreground">Emails already sent</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Notification</CardTitle>
+                <CardTitle className="text-sm font-medium text-red-700">Urgent Trips</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{statistics.pending_notification_count}</div>
-                <p className="text-xs text-muted-foreground">Awaiting notification</p>
+                <div className="text-2xl font-bold text-red-600">{statistics.urgent_count}</div>
+                <p className="text-xs text-muted-foreground">Departure &lt;24h</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-orange-500">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-orange-700">Expired Approvals</CardTitle>
+                <Mail className="h-4 w-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{statistics.expired_count}</div>
+                <p className="text-xs text-muted-foreground">Pending &gt;48h</p>
               </CardContent>
             </Card>
 
@@ -448,7 +458,7 @@ export default function ManualOverridePage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{statistics.past_departure_count}</div>
-                <p className="text-xs text-muted-foreground">Departure date passed</p>
+                <p className="text-xs text-muted-foreground">Need force approval</p>
               </CardContent>
             </Card>
           </div>
@@ -483,7 +493,11 @@ export default function ManualOverridePage() {
                   <Card
                     key={trip.id}
                     className={`hover:shadow-md transition-shadow ${
-                      isPastDeparture(trip) ? 'border-l-4 border-l-gray-400' : ''
+                      isUrgentTrip(trip)
+                        ? 'border-l-4 border-l-red-500'
+                        : isPastDeparture(trip)
+                        ? 'border-l-4 border-l-gray-400'
+                        : ''
                     }`}
                   >
                     <CardContent className="p-6">
@@ -494,6 +508,15 @@ export default function ManualOverridePage() {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="font-medium text-lg">{trip.user_name}</h3>
+                                {isUrgentTrip(trip) && (
+                                  <Badge className="bg-red-600 text-white animate-pulse">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    URGENT
+                                    {trip.hours_until_departure !== undefined && trip.hours_until_departure > 0 && (
+                                      <span className="ml-1">({trip.hours_until_departure}h left)</span>
+                                    )}
+                                  </Badge>
+                                )}
                                 {trip.expired_notification_sent ? (
                                   <Badge className="bg-blue-100 text-blue-700">
                                     <Mail className="h-3 w-3 mr-1" />
@@ -525,6 +548,21 @@ export default function ManualOverridePage() {
                               {trip.hours_old}h expired
                             </Badge>
                           </div>
+
+                          {/* Warning for urgent trip */}
+                          {isUrgentTrip(trip) && !isPastDeparture(trip) && (
+                            <Alert variant="destructive" className="bg-red-50 border-red-300">
+                              <AlertTriangle className="h-4 w-4 text-red-600" />
+                              <AlertTitle className="text-red-800">Urgent Trip - Immediate Action Required</AlertTitle>
+                              <AlertDescription className="text-red-700">
+                                Departure is scheduled in less than 24 hours ({formatDate(trip.departure_date)} at {formatTime(trip.departure_time)}).
+                                {trip.hours_until_departure !== undefined && trip.hours_until_departure > 0 && (
+                                  <span className="font-semibold"> Only {trip.hours_until_departure} hours remaining!</span>
+                                )}
+                                {' '}Please process this approval immediately.
+                              </AlertDescription>
+                            </Alert>
+                          )}
 
                           {/* Warning for past departure */}
                           {isPastDeparture(trip) && (

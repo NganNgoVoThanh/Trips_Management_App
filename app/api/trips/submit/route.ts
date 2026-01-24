@@ -11,6 +11,7 @@ import {
   sendUrgentAlertToAdmin,
   ApprovalEmailData,
 } from '@/lib/email-approval-service';
+import { sendUrgentTripNotificationToAdmins } from '@/lib/urgent-trip-notification';
 import { logApprovalAction } from '@/lib/audit-log-service';
 import { TripStatus } from '@/lib/trip-status-config';
 
@@ -221,8 +222,25 @@ export async function POST(request: NextRequest) {
         console.warn(`⚠️ Failed to send approval email for trip ${trip.id}`);
       }
 
-      // If urgent, alert admin
+      // If urgent, send notification to admins
       if (isUrgent) {
+        // Send notification using new service (supports multiple admins + location filtering)
+        await sendUrgentTripNotificationToAdmins({
+          tripId: trip.id,
+          userName: emailData.userName,
+          userEmail: emailData.userEmail,
+          departureLocation: emailData.tripDetails.departureLocation,
+          destination: emailData.tripDetails.destination,
+          departureDate: emailData.tripDetails.departureDate,
+          departureTime: emailData.tripDetails.departureTime,
+          returnDate: emailData.tripDetails.returnDate,
+          returnTime: emailData.tripDetails.returnTime,
+          purpose: emailData.tripDetails.purpose,
+          estimatedCost: emailData.tripDetails.estimatedCost,
+          hoursUntilDeparture: Math.floor(hoursUntilDeparture),
+        });
+
+        // Also send using old method for backwards compatibility (can remove later)
         await sendUrgentAlertToAdmin(emailData);
       }
     }

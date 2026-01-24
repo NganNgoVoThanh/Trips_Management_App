@@ -28,6 +28,8 @@ export function AdminHeader() {
   const { data: session } = useSession()
   const user = session?.user
   const [locationName, setLocationName] = useState<string | null>(null)
+  const [overrideBadgeCount, setOverrideBadgeCount] = useState<number>(0)
+  const [urgentCount, setUrgentCount] = useState<number>(0)
 
   // Determine if user is Location Admin
   const isLocationAdmin = user?.adminType === 'location_admin' && user?.adminLocationId
@@ -46,6 +48,32 @@ export function AdminHeader() {
         .catch(() => setLocationName(user.adminLocationId || null))
     }
   }, [isLocationAdmin, user?.adminLocationId])
+
+  // Fetch manual override badge count
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return
+
+    const fetchBadgeCount = async () => {
+      try {
+        const res = await fetch('/api/admin/manual-override/badge-count')
+        if (res.ok) {
+          const data = await res.json()
+          setOverrideBadgeCount(data.count || 0)
+          setUrgentCount(data.urgentCount || 0)
+        }
+      } catch (error) {
+        console.error('Failed to fetch badge count:', error)
+      }
+    }
+
+    // Fetch immediately
+    fetchBadgeCount()
+
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchBadgeCount, 60000)
+
+    return () => clearInterval(interval)
+  }, [user])
 
   const handleLogout = async () => {
     try {
@@ -162,9 +190,21 @@ export function AdminHeader() {
                   : "text-gray-700 hover:text-red-600 hover:bg-gray-50"
               )}
             >
-              <Link href="/admin/manual-override">
+              <Link href="/admin/manual-override" className="flex items-center">
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Override
+                {overrideBadgeCount > 0 && (
+                  <Badge
+                    className={cn(
+                      "ml-2 h-5 min-w-5 px-1.5 text-xs font-bold",
+                      urgentCount > 0
+                        ? "bg-red-600 text-white animate-pulse"
+                        : "bg-orange-600 text-white"
+                    )}
+                  >
+                    {overrideBadgeCount}
+                  </Badge>
+                )}
               </Link>
             </Button>
 

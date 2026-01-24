@@ -79,8 +79,9 @@ export async function GET(request: NextRequest) {
       locationParams = [adminLocationId, locationName, adminLocationId, locationName];
     }
 
-    // Get trips with pending manager approval that are >48h old
+    // Get trips with pending manager approval that are >48h old OR urgent (<24h to departure)
     // These are trips waiting for manager approval that have exceeded the 48-hour window
+    // OR trips that are urgent and need immediate attention
     // Only include trips that are still in pending_approval or pending_urgent status
     const [trips] = await connection.query(`
       SELECT
@@ -103,6 +104,7 @@ export async function GET(request: NextRequest) {
         t.manager_approval_token,
         t.expired_notification_sent,
         t.expired_notified_at,
+        t.is_urgent,
         u.manager_email,
         u.manager_name,
         u.status as user_status,
@@ -111,28 +113,41 @@ export async function GET(request: NextRequest) {
           WHEN t.departure_date < CURDATE() THEN TRUE
           WHEN t.departure_date = CURDATE() AND t.departure_time < CURTIME() THEN TRUE
           ELSE FALSE
-        END as is_past_departure
+        END as is_past_departure,
+        TIMESTAMPDIFF(HOUR, NOW(), CONCAT(t.departure_date, ' ', t.departure_time)) as hours_until_departure
       FROM trips t
       LEFT JOIN users u ON t.user_id = u.id
       WHERE t.manager_approval_status = 'pending'
         AND t.status IN ('pending_approval', 'pending_urgent')
-        AND TIMESTAMPDIFF(HOUR, t.created_at, NOW()) > 48
+        AND (
+          TIMESTAMPDIFF(HOUR, t.created_at, NOW()) > 48
+          OR t.is_urgent = 1
+          OR t.status = 'pending_urgent'
+        )
         ${locationFilter}
-      ORDER BY t.departure_date ASC, t.departure_time ASC
+      ORDER BY
+        CASE WHEN t.is_urgent = 1 OR t.status = 'pending_urgent' THEN 0 ELSE 1 END,
+        t.departure_date ASC,
+        t.departure_time ASC
     `, locationParams) as any[];
 
     // Get statistics (filtered by location for Location Admin)
     const statsQuery = `
       SELECT
-        COUNT(*) as total_expired,
+        COUNT(*) as total_trips,
+        SUM(CASE WHEN is_urgent = 1 OR status = 'pending_urgent' THEN 1 ELSE 0 END) as urgent_count,
+        SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) > 48 AND (is_urgent = 0 OR is_urgent IS NULL) AND status != 'pending_urgent' THEN 1 ELSE 0 END) as expired_count,
         SUM(CASE WHEN expired_notification_sent = TRUE THEN 1 ELSE 0 END) as notified_count,
         SUM(CASE WHEN expired_notification_sent = FALSE OR expired_notification_sent IS NULL THEN 1 ELSE 0 END) as pending_notification_count,
-        SUM(CASE WHEN departure_date < CURDATE() THEN 1 ELSE 0 END) as past_departure_count,
-        SUM(CASE WHEN status = 'pending_urgent' THEN 1 ELSE 0 END) as urgent_count
+        SUM(CASE WHEN departure_date < CURDATE() THEN 1 ELSE 0 END) as past_departure_count
       FROM trips
       WHERE manager_approval_status = 'pending'
         AND status IN ('pending_approval', 'pending_urgent')
-        AND TIMESTAMPDIFF(HOUR, created_at, NOW()) > 48
+        AND (
+          TIMESTAMPDIFF(HOUR, created_at, NOW()) > 48
+          OR is_urgent = 1
+          OR status = 'pending_urgent'
+        )
         ${isLocationAdmin && adminLocationId ? `AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)` : ''}
     `;
     const [stats] = await connection.query(statsQuery, locationParams) as any[];
@@ -160,7 +175,9 @@ export async function GET(request: NextRequest) {
       success: true,
       trips: trips || [],
       statistics: stats[0] || {
-        total_expired: 0,
+        total_trips: 0,
+        urgent_count: 0,
+        expired_count: 0,
         notified_count: 0,
         pending_notification_count: 0,
         past_departure_count: 0
@@ -341,14 +358,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 3. Check if trip meets the 48-hour threshold
+      // 3. Check if trip meets the 48-hour threshold OR is urgent
       const hoursOld = Math.floor((Date.now() - new Date(trip.created_at).getTime()) / (1000 * 60 * 60));
-      if (hoursOld < 48 && !forceOverride) {
+      const isUrgent = trip.is_urgent === 1 || trip.status === 'pending_urgent';
+
+      if (hoursOld < 48 && !isUrgent && !forceOverride) {
         await connection.rollback();
         return NextResponse.json(
           {
             error: 'Trip not eligible for override',
-            details: `This trip is only ${hoursOld} hours old. Manual override is only allowed for trips older than 48 hours.`,
+            details: `This trip is only ${hoursOld} hours old. Manual override is only allowed for trips older than 48 hours or urgent trips.`,
             hoursOld: hoursOld
           },
           { status: 400 }
