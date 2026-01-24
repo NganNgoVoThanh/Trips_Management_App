@@ -24,31 +24,32 @@ export default function ApprovalsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status !== 'loading') {
-      loadPendingTrips()
+    // Only load data when session is ready
+    if (status === 'loading') {
+      // Session still loading, do nothing
+      return
     }
-  }, [status])
+
+    if (status === 'unauthenticated' || !session?.user || session.user.role !== 'admin') {
+      // Not authenticated or not admin, redirect
+      console.log('❌ Not admin, redirecting to dashboard');
+      router.push('/dashboard')
+      return
+    }
+
+    // Session loaded and user is admin, load data
+    loadPendingTrips()
+  }, [session, status, router]) // Add proper dependencies
 
   const loadPendingTrips = async () => {
     try {
-      // Wait for session to finish loading
-      if (status === 'loading') {
-        return
-      }
+      // Session already checked in useEffect, safe to proceed
+      if (!session?.user) return
 
-      // Only redirect if authenticated but NOT admin (user shouldn't be here)
-      if (status === 'authenticated' && session?.user && session.user.role !== 'admin') {
-        router.push('/dashboard')
-        return
-      }
-
-      // If unauthenticated, let Next.js handle redirect via middleware
-      if (status === 'unauthenticated') {
-        return
-      }
+      console.log('✅ Loading pending trips for admin:', session.user.email);
 
       // Check if user is Location Admin
-      const isLocationAdmin = session?.user?.adminType === 'location_admin' && session?.user?.adminLocationId
+      const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId
 
       let allTrips: Trip[] = []
 

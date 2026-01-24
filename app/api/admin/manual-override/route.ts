@@ -79,10 +79,9 @@ export async function GET(request: NextRequest) {
       locationParams = [adminLocationId, locationName, adminLocationId, locationName];
     }
 
-    // Get trips with pending manager approval that are >48h old OR urgent (<24h to departure)
-    // These are trips waiting for manager approval that have exceeded the 48-hour window
-    // OR trips that are urgent and need immediate attention
-    // Only include trips that are still in pending_approval or pending_urgent status
+    // Get ALL trips with pending manager approval
+    // Admin can override ANY pending trip, not just expired/urgent ones
+    // This allows admin to handle special cases (e.g., manager verbally approved but didn't click email)
     const [trips] = await connection.query(`
       SELECT
         t.id,
@@ -119,14 +118,11 @@ export async function GET(request: NextRequest) {
       LEFT JOIN users u ON t.user_id = u.id
       WHERE t.manager_approval_status = 'pending'
         AND t.status IN ('pending_approval', 'pending_urgent')
-        AND (
-          TIMESTAMPDIFF(HOUR, t.created_at, NOW()) > 48
-          OR t.is_urgent = 1
-          OR t.status = 'pending_urgent'
-        )
         ${locationFilter}
       ORDER BY
-        CASE WHEN t.is_urgent = 1 OR t.status = 'pending_urgent' THEN 0 ELSE 1 END,
+        CASE WHEN t.is_urgent = 1 OR t.status = 'pending_urgent' THEN 0
+             WHEN TIMESTAMPDIFF(HOUR, t.created_at, NOW()) > 48 THEN 1
+             ELSE 2 END,
         t.departure_date ASC,
         t.departure_time ASC
     `, locationParams) as any[];
@@ -143,11 +139,6 @@ export async function GET(request: NextRequest) {
       FROM trips
       WHERE manager_approval_status = 'pending'
         AND status IN ('pending_approval', 'pending_urgent')
-        AND (
-          TIMESTAMPDIFF(HOUR, created_at, NOW()) > 48
-          OR is_urgent = 1
-          OR status = 'pending_urgent'
-        )
         ${isLocationAdmin && adminLocationId ? `AND (departure_location = ? OR departure_location = ? OR destination = ? OR destination = ?)` : ''}
     `;
     const [stats] = await connection.query(statsQuery, locationParams) as any[];
@@ -358,21 +349,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 3. Check if trip meets the 48-hour threshold OR is urgent
+      // 3. Admin can override ANY pending trip (removed 48h requirement)
+      // This allows admin to handle special cases like:
+      // - Manager verbally approved but didn't click email
+      // - Urgent situations requiring immediate approval
+      // - System errors or technical issues
       const hoursOld = Math.floor((Date.now() - new Date(trip.created_at).getTime()) / (1000 * 60 * 60));
       const isUrgent = trip.is_urgent === 1 || trip.status === 'pending_urgent';
 
-      if (hoursOld < 48 && !isUrgent && !forceOverride) {
-        await connection.rollback();
-        return NextResponse.json(
-          {
-            error: 'Trip not eligible for override',
-            details: `This trip is only ${hoursOld} hours old. Manual override is only allowed for trips older than 48 hours or urgent trips.`,
-            hoursOld: hoursOld
-          },
-          { status: 400 }
-        );
-      }
+      console.log(`✅ Processing override for trip ${tripId}: ${hoursOld}h old, urgent: ${isUrgent}`);
 
       // 4. Check if departure date has already passed (warning, allow force)
       if (trip.is_past_departure && action === 'approve' && !forceOverride) {

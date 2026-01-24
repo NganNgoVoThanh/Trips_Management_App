@@ -39,7 +39,8 @@ import {
   Eye,
   Send,
   FileText,
-  UserPlus
+  UserPlus,
+  AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -114,6 +115,20 @@ export function AdminDashboardClient() {
     // Set mounted flag
     isMountedRef.current = true
 
+    // Only load data when session is ready
+    if (status === 'loading') {
+      // Session still loading, do nothing yet
+      return
+    }
+
+    if (status === 'unauthenticated' || !user || user.role !== 'admin') {
+      // Not authenticated or not admin, redirect
+      console.log('❌ Not admin or unauthenticated, redirecting to /dashboard');
+      router.push('/dashboard')
+      return
+    }
+
+    // Session loaded and user is admin, start loading data
     loadAdminDashboard()
 
     // Visibility change handler - pause polling when tab is not visible
@@ -148,23 +163,19 @@ export function AdminDashboardClient() {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [pollingDelay])
+  }, [pollingDelay, status, user, router])
 
   const loadAdminDashboard = async () => {
     try {
       // Check if component is still mounted
       if (!isMountedRef.current) return
 
+      // Session already checked in useEffect, safe to proceed
+      if (!user) return // Just a safety check, shouldn't happen
+
       setIsLoading(true)
 
-      // Check session from NextAuth
-      if (!user || user.role !== 'admin') {
-        console.log('❌ Not admin or no session, redirecting to /dashboard');
-        router.push('/dashboard')
-        return
-      }
-
-      console.log('✅ Admin verified:', user.email, user.role);
+      console.log('✅ Loading admin dashboard for:', user.email, user.role);
       if (!isMountedRef.current) return
 
       // Load all trips from database with error handling
@@ -595,65 +606,13 @@ export function AdminDashboardClient() {
     setShowTripDialog(true)
   }
 
-  const handleApproveTrip = async () => {
-    if (!selectedTrip) return
-
-    try {
-      await fabricService.updateTrip(selectedTrip.id, {
-        status: 'approved',
-        notified: true
-      })
-
-      await emailService.sendApprovalNotification(selectedTrip)
-
-      toast({
-        title: "Trip Approved",
-        description: `Trip for ${selectedTrip.userName} has been approved`,
-      })
-
-      setShowTripDialog(false)
-      setSelectedTrip(null)
-      setApprovalNote("")
-      await loadAdminDashboard()
-
-    } catch (error) {
-      toast({
-        title: "Approval Failed",
-        description: "Failed to approve trip",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleRejectTrip = async () => {
-    if (!selectedTrip) return
-
-    try {
-      await fabricService.updateTrip(selectedTrip.id, {
-        status: 'cancelled',
-        notified: true
-      })
-
-      await emailService.sendCancellationNotification(selectedTrip)
-
-      toast({
-        title: "Trip Rejected",
-        description: `Trip for ${selectedTrip.userName} has been rejected`,
-      })
-
-      setShowTripDialog(false)
-      setSelectedTrip(null)
-      setApprovalNote("")
-      await loadAdminDashboard()
-
-    } catch (error) {
-      toast({
-        title: "Rejection Failed",
-        description: "Failed to reject trip",
-        variant: "destructive"
-      })
-    }
-  }
+  // ❌ REMOVED: Admin should NOT approve/reject from dashboard
+  // Admin should only approve/reject via Manual Override page for proper audit trail
+  // This ensures:
+  // - Proper status: 'approved_solo' instead of 'approved' (different from manager approval)
+  // - Required reason/notes for audit
+  // - Full logging in admin_override_log table
+  // - Clear distinction between manager approval (green) and admin override (white)
 
   const handleViewAllOptimizations = () => {
     router.push('/admin/optimizations')
@@ -1239,18 +1198,20 @@ export function AdminDashboardClient() {
             )}
             <DialogFooter>
               <Button
-                variant="destructive"
-                onClick={handleRejectTrip}
+                variant="outline"
+                onClick={() => setShowTripDialog(false)}
               >
-                Reject
+                Close
               </Button>
-              <Button
-                onClick={handleApproveTrip}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Approve Trip
-              </Button>
+              {selectedTrip && (selectedTrip.status === 'pending_approval' || selectedTrip.status === 'pending_urgent') && (
+                <Button
+                  onClick={() => router.push('/admin/manual-override')}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Go to Manual Override
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

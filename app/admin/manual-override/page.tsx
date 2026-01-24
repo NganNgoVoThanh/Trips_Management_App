@@ -132,21 +132,28 @@ export default function ManualOverridePage() {
   } | null>(null)
 
   useEffect(() => {
+    // Only load data when session is ready
+    if (status === 'loading') {
+      // Session still loading, do nothing
+      return
+    }
+
+    if (status === 'unauthenticated' || !session?.user || session.user.role !== 'admin') {
+      // Not authenticated or not admin, redirect
+      console.log('❌ Not admin, redirecting to dashboard');
+      router.push('/dashboard')
+      return
+    }
+
+    // Session loaded and user is admin, load data
     loadData()
-  }, [])
+  }, [session, status, router]) // Add dependencies
 
   const loadData = async () => {
     try {
       setIsLoading(true)
 
-      // Check NextAuth session
-      if (!session?.user || session.user.role !== 'admin') {
-        console.log('❌ Not admin, redirecting');
-        router.push('/dashboard')
-        return
-      }
-
-      console.log('✅ Admin verified for Override page');
+      console.log('✅ Admin verified for Override page, loading data...');
       const response = await fetch('/api/admin/manual-override')
       const data = await response.json()
 

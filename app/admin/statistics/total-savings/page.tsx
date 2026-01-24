@@ -310,7 +310,7 @@ export default function TotalSavingsPage() {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <PiggyBank className="h-6 w-6 text-green-600" />
-                Total Savings Analysis (Coming Soon)
+                Total Savings Analysis
               </h1>
               <p className="text-gray-500">Comprehensive view of cost savings through optimization</p>
             </div>
