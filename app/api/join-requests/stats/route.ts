@@ -17,8 +17,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get join request statistics
-    const stats = await joinRequestService.getJoinRequestStats();
+    // Check if user is Location Admin - add location filter
+    const filters: any = {};
+    if (user.adminType === 'location_admin' && user.adminLocationId) {
+      filters.locationId = user.adminLocationId;
+    }
+
+    // Get join request statistics (with location filter if needed)
+    const stats = await joinRequestService.getJoinRequestStats(filters);
 
     return NextResponse.json(stats, { status: 200 });
     

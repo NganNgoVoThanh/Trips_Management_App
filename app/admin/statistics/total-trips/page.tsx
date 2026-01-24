@@ -71,7 +71,24 @@ export default function TotalTripsPage() {
         return
       }
 
-      const allTrips = await fabricService.getTrips()
+      // Check if user is Location Admin
+      const isLocationAdmin = session?.user?.adminType === 'location_admin' && session?.user?.adminLocationId
+
+      let allTrips: Trip[] = []
+
+      if (isLocationAdmin) {
+        // Location Admin: Fetch filtered trips via API
+        const response = await fetch('/api/admin/location-trips')
+        if (response.ok) {
+          const data = await response.json()
+          allTrips = data.trips || []
+        } else {
+          throw new Error('Failed to fetch location trips')
+        }
+      } else {
+        // Super Admin: Fetch all trips
+        allTrips = await fabricService.getTrips()
+      }
       
       // Calculate statistics
       const now = new Date()

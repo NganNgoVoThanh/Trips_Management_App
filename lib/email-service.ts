@@ -548,14 +548,15 @@ Intersnack Trips Management Team
     estimatedSavings: number
   ): Promise<void> {
     const adminEmails = config.adminEmails || [];
-    
+
     if (adminEmails.length === 0) {
       console.warn('No admin emails configured');
       return;
     }
 
     const subject = `Trip Optimization Approved - ${trips.length} Trips Combined`;
-    
+    const vehicleInfo = config.vehicles[vehicleType as keyof typeof config.vehicles]?.name || vehicleType;
+
     const tripList = trips.map(trip => {
       return `• ${trip.userName} (${trip.userEmail}): ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}`;
     }).join('\n');
@@ -567,7 +568,7 @@ Trip Optimization Summary
 Number of Trips Combined: ${trips.length}
 Departure Date: ${new Date(trips[0].departureDate).toLocaleDateString()}
 New Departure Time: ${proposedDepartureTime}
-Vehicle Type: ${config.vehicles[vehicleType as keyof typeof config.vehicles]?.name || vehicleType}
+Vehicle Type: ${vehicleInfo}
 Estimated Savings: ${formatCurrency(estimatedSavings)}
 
 Affected Employees:
@@ -579,10 +580,248 @@ All affected employees have been notified via email.
 Intersnack Trips Management System
     `.trim();
 
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Optimization Summary</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; -webkit-font-smoothing: antialiased;">
+
+  <!-- Main Container -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; max-width: 600px;">
+
+          <!-- Header with Intersnack Branding -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #C41E3A 0%, #8B0000 100%); border-radius: 16px 16px 0 0; padding: 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="padding: 30px 40px; text-align: center;">
+                    <!-- Company Logo Area -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="background-color: white; border-radius: 12px; padding: 12px 24px;">
+                          <span style="color: #C41E3A; font-size: 24px; font-weight: 800; letter-spacing: 1px;">INTERSNACK</span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Title -->
+                    <h1 style="color: white; margin: 25px 0 8px 0; font-size: 26px; font-weight: 600; letter-spacing: -0.5px;">
+                      Trip Optimization Approved
+                    </h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 15px; font-weight: 400;">
+                      ${trips.length} Trips Successfully Combined
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Content Area -->
+          <tr>
+            <td style="background-color: white; padding: 40px;">
+
+              <!-- Summary Stats -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <!-- Trips Combined -->
+                  <td style="width: 48%; background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%); border-radius: 12px; padding: 20px; text-align: center; vertical-align: top;">
+                    <p style="margin: 0 0 5px 0; color: #991B1B; font-size: 36px; font-weight: 800;">
+                      ${trips.length}
+                    </p>
+                    <p style="margin: 0; color: #C41E3A; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Trips Combined
+                    </p>
+                  </td>
+                  <td style="width: 4%;"></td>
+                  <!-- Savings -->
+                  <td style="width: 48%; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-radius: 12px; padding: 20px; text-align: center; vertical-align: top;">
+                    <p style="margin: 0 0 5px 0; color: #065F46; font-size: 28px; font-weight: 800;">
+                      ${formatCurrency(estimatedSavings)}
+                    </p>
+                    <p style="margin: 0; color: #047857; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Estimated Savings
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Trip Details Card -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FAFAFA; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+
+                    <!-- Card Header -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="background-color: #C41E3A; padding: 14px 20px;">
+                          <p style="margin: 0; color: white; font-size: 15px; font-weight: 600;">
+                            Optimization Details
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Details -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 20px;">
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 140px;">Departure Date</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trips[0].departureDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 140px;">Departure Time</td>
+                              <td style="color: #C41E3A; font-size: 14px; font-weight: 700; text-align: right;">${proposedDepartureTime}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 140px;">Vehicle</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${vehicleInfo}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Employees List -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FAFAFA; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+
+                    <!-- Card Header -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="background-color: #374151; padding: 14px 20px;">
+                          <p style="margin: 0; color: white; font-size: 15px; font-weight: 600;">
+                            Affected Employees (${trips.length})
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Employee List -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 15px 20px;">
+                      ${trips.map((trip, index) => `
+                      <tr>
+                        <td style="padding: 12px 0; ${index < trips.length - 1 ? 'border-bottom: 1px solid #E5E7EB;' : ''}">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="width: 36px; vertical-align: top;">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #C41E3A 0%, #991B1B 100%); border-radius: 50%; color: white; font-size: 14px; font-weight: 600; text-align: center; line-height: 32px;">
+                                  ${(trip.userName || 'U').charAt(0).toUpperCase()}
+                                </div>
+                              </td>
+                              <td style="vertical-align: middle; padding-left: 10px;">
+                                <p style="margin: 0 0 2px 0; color: #1F2937; font-size: 14px; font-weight: 600;">
+                                  ${trip.userName || 'Unknown'}
+                                </p>
+                                <p style="margin: 0; color: #6B7280; font-size: 12px;">
+                                  ${trip.userEmail}
+                                </p>
+                              </td>
+                              <td style="vertical-align: middle; text-align: right;">
+                                <p style="margin: 0; color: #6B7280; font-size: 12px;">
+                                  ${getLocationName(trip.departureLocation || '')} &rarr; ${getLocationName(trip.destination || '')}
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      `).join('')}
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Success Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #ECFDF5 0%, #D1FAE5 100%); border-left: 4px solid #10B981; border-radius: 0 8px 8px 0; padding: 18px 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 30px; vertical-align: top;">
+                          <span style="color: #10B981; font-size: 20px;">&#10003;</span>
+                        </td>
+                        <td style="vertical-align: top;">
+                          <p style="margin: 0; color: #065F46; font-size: 14px; line-height: 1.5;">
+                            <strong>All affected employees have been notified</strong> via email about their updated trip schedules.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1F2937; border-radius: 0 0 16px 16px; padding: 30px 40px; text-align: center;">
+
+              <!-- Company Name -->
+              <p style="margin: 0 0 15px 0; color: #C41E3A; font-size: 18px; font-weight: 700; letter-spacing: 1px;">
+                INTERSNACK
+              </p>
+
+              <!-- Tagline -->
+              <p style="margin: 0 0 20px 0; color: #9CA3AF; font-size: 13px;">
+                Trips Management System - Admin Notification
+              </p>
+
+              <!-- Disclaimer -->
+              <p style="margin: 0; color: #6B7280; font-size: 11px; line-height: 1.5;">
+                This is an automated notification from the Trips Management System.<br>
+                Please do not reply directly to this email.
+              </p>
+
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+    `.trim();
+
     await this.sendEmail({
       to: adminEmails,
       subject,
-      body
+      body,
+      html,
+      category: 'notification'
     });
   }
 
@@ -595,8 +834,9 @@ Intersnack Trips Management System
       return;
     }
 
-    const subject = 'Trip Cancellation Notice';
-    const body = `
+    // Send notification to user
+    const userSubject = 'Trip Cancellation Notice';
+    const userBody = `
 Dear ${trip.userName || 'Employee'},
 
 Your trip scheduled for ${new Date(trip.departureDate).toLocaleDateString()} from ${getLocationName(trip.departureLocation || '')} to ${getLocationName(trip.destination || '')} has been cancelled.
@@ -609,9 +849,40 @@ Intersnack Trips Management Team
 
     await this.sendEmail({
       to: [trip.userEmail],
-      subject,
-      body
+      subject: userSubject,
+      body: userBody
     });
+
+    // Send notification to admin
+    const adminEmail = 'ngan.ngo@intersnack.com.vn'; // Default admin email
+    const adminSubject = `Trip Cancelled by User - ${trip.userName}`;
+    const adminBody = `
+Trip Cancellation Alert
+
+User ${trip.userName} (${trip.userEmail}) has cancelled their approved trip:
+
+Trip Details:
+- Date: ${new Date(trip.departureDate).toLocaleDateString()}
+- Route: ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}
+- Vehicle: ${trip.vehicleType}
+- Status: ${trip.status}
+- Trip ID: ${trip.id}
+
+Please review and take necessary actions.
+
+Trips Management System
+    `.trim();
+
+    try {
+      await this.sendEmail({
+        to: [adminEmail],
+        subject: adminSubject,
+        body: adminBody
+      });
+    } catch (error) {
+      console.error('Failed to send admin notification for trip cancellation:', error);
+      // Don't throw - user notification already sent
+    }
   }
 
   /**
@@ -762,115 +1033,274 @@ Trips Management System
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Approval Request</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
-  <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; -webkit-font-smoothing: antialiased;">
 
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 24px;">Trip Approval Request</h1>
-      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Action Required</p>
-    </div>
+  <!-- Main Container -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; max-width: 600px;">
 
-    <!-- Content -->
-    <div style="padding: 30px;">
-      <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-        Dear <strong>${managerName}</strong>,
-      </p>
+          <!-- Header with Intersnack Branding -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #C41E3A 0%, #8B0000 100%); border-radius: 16px 16px 0 0; padding: 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="padding: 30px 40px; text-align: center;">
+                    <!-- Company Logo Area -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="background-color: white; border-radius: 12px; padding: 12px 24px;">
+                          <span style="color: #C41E3A; font-size: 24px; font-weight: 800; letter-spacing: 1px;">INTERSNACK</span>
+                        </td>
+                      </tr>
+                    </table>
 
-      <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
-        <strong>${trip.userName}</strong> has joined an existing trip and requires your approval.
-      </p>
+                    <!-- Title -->
+                    <h1 style="color: white; margin: 25px 0 8px 0; font-size: 26px; font-weight: 600; letter-spacing: -0.5px;">
+                      Trip Approval Required
+                    </h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 15px; font-weight: 400;">
+                      Trip Created for ${trip.userName}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #856404; font-size: 14px;">
-          <strong>📌 Note:</strong> This trip was created when ${trip.userName} joined another employee's trip through the join request system.
-        </p>
-      </div>
+          <!-- Content Area -->
+          <tr>
+            <td style="background-color: white; padding: 40px;">
 
-      <!-- Trip Details -->
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
-          Trip Details
-        </h3>
+              <!-- Greeting -->
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                Dear <strong>${managerName}</strong>,
+              </p>
 
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px; width: 40%;"><strong>Employee:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userName}</td>
+              <!-- Action Required Banner -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #FEF2F2 0%, #FEE2E2 100%); border-left: 4px solid #C41E3A; border-radius: 0 8px 8px 0; padding: 18px 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 40px; vertical-align: top;">
+                          <span style="display: inline-block; background-color: #C41E3A; color: white; font-size: 18px; width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%; font-weight: bold;">!</span>
+                        </td>
+                        <td style="vertical-align: top;">
+                          <p style="margin: 0 0 6px 0; color: #C41E3A; font-size: 15px; font-weight: 700;">
+                            Action Required
+                          </p>
+                          <p style="margin: 0; color: #7F1D1D; font-size: 14px; line-height: 1.5;">
+                            <strong>${trip.userName}</strong> has joined an existing optimized trip and requires your approval.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Info Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 20px;">
+                <tr>
+                  <td style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 0 8px 8px 0; padding: 15px 20px;">
+                    <p style="margin: 0; color: #92400E; font-size: 14px; line-height: 1.5;">
+                      <strong>ℹ️ Note:</strong> This trip was created when ${trip.userName} joined another employee's trip through the join request system.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Trip Details Card -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FAFAFA; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+
+                    <!-- Card Header -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="background-color: #C41E3A; padding: 16px 20px;">
+                          <p style="margin: 0; color: white; font-size: 16px; font-weight: 600;">
+                            Trip Details
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Details -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 20px;">
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Employee</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${trip.userName}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Email</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${trip.userEmail}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Route</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Departure</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trip.departureDate).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at ${trip.departureTime}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; ${trip.vehicleType ? 'border-bottom: 1px solid #E5E7EB;' : ''}">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Return</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trip.returnDate).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at ${trip.returnTime}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ${trip.vehicleType ? `
+                      <tr>
+                        <td style="padding: 10px 0; ${trip.estimatedCost ? 'border-bottom: 1px solid #E5E7EB;' : ''}">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Vehicle</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                      ${trip.estimatedCost ? `
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Estimated Cost</td>
+                              <td style="color: #C41E3A; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(trip.estimatedCost)}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action Buttons -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px;">
+                <tr>
+                  <td style="text-align: center;">
+                    <p style="color: #1F2937; font-size: 16px; font-weight: 600; margin: 0 0 20px 0;">
+                      Please review and take action:
+                    </p>
+
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <!-- Approve Button -->
+                        <td style="padding: 0 10px;">
+                          <a href="${approvalUrl}" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);">
+                            ✓ Approve Trip
+                          </a>
+                        </td>
+                        <!-- Reject Button -->
+                        <td style="padding: 0 10px;">
+                          <a href="${rejectUrl}" style="display: inline-block; background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">
+                            ✗ Reject Trip
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Expiry Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%); border-left: 4px solid #F59E0B; border-radius: 0 8px 8px 0; padding: 15px 20px;">
+                    <p style="margin: 0; color: #92400E; font-size: 13px; line-height: 1.5;">
+                      <strong>⏰ Important:</strong> This approval link will expire in 48 hours. Please take action as soon as possible.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
           </tr>
+
+          <!-- Footer -->
           <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Email:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userEmail}</td>
+            <td style="background-color: #1F2937; border-radius: 0 0 16px 16px; padding: 30px 40px; text-align: center;">
+
+              <!-- Company Name -->
+              <p style="margin: 0 0 15px 0; color: #C41E3A; font-size: 18px; font-weight: 700; letter-spacing: 1px;">
+                INTERSNACK
+              </p>
+
+              <!-- Tagline -->
+              <p style="margin: 0 0 20px 0; color: #9CA3AF; font-size: 13px;">
+                Trips Management System
+              </p>
+
+              <!-- Footer Links -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Best regards</span>
+                  </td>
+                  <td style="color: #4B5563;">|</td>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Admin Team</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Disclaimer -->
+              <p style="margin: 20px 0 0 0; color: #6B7280; font-size: 11px; line-height: 1.5;">
+                This is an automated notification from the Trips Management System.<br>
+                Please do not reply directly to this email.
+              </p>
+
+            </td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>From:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.departureLocation || '')}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>To:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.destination || '')}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Departure:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Return:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</td>
-          </tr>
-          ${trip.vehicleType ? `
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Vehicle:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
-          </tr>
-          ` : ''}
-          ${trip.estimatedCost ? `
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Estimated Cost:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: bold;">${formatCurrency(trip.estimatedCost)}</td>
-          </tr>
-          ` : ''}
+
         </table>
-      </div>
+      </td>
+    </tr>
+  </table>
 
-      <!-- Action Buttons -->
-      <div style="text-align: center; margin: 30px 0;">
-        <p style="color: #333; font-size: 16px; font-weight: bold; margin: 0 0 20px 0;">
-          Please review and take action:
-        </p>
-
-        <a href="${approvalUrl}"
-           style="display: inline-block; background: #28a745; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 8px 10px 8px; font-size: 16px;">
-          ✅ Approve Trip
-        </a>
-
-        <a href="${rejectUrl}"
-           style="display: inline-block; background: #dc3545; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 8px 10px 8px; font-size: 16px;">
-          ❌ Reject Trip
-        </a>
-      </div>
-
-      <!-- Expiry Notice -->
-      <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #e65100; font-size: 13px;">
-          ⏰ <strong>Important:</strong> This approval link will expire in 48 hours.
-        </p>
-      </div>
-
-      <p style="color: #999; font-size: 12px; margin: 30px 0 0 0; line-height: 1.6;">
-        Best regards,<br>
-        <strong>Trips Management System</strong>
-      </p>
-    </div>
-
-    <!-- Footer -->
-    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
-      <p style="color: #6c757d; font-size: 12px; margin: 0;">
-        This is an automated message from Trips Management System. Please do not reply to this email.
-      </p>
-    </div>
-  </div>
 </body>
 </html>
 `;
@@ -931,112 +1361,275 @@ Trips Management System
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Join Notification</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
-  <div style="max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; -webkit-font-smoothing: antialiased;">
 
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 24px;">ℹ️ Trip Join Notification</h1>
-      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">For Your Information - No Action Required</p>
-    </div>
+  <!-- Main Container -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; max-width: 600px;">
 
-    <!-- Content -->
-    <div style="padding: 30px;">
-      <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-        Dear <strong>${managerName}</strong>,
-      </p>
+          <!-- Header with Intersnack Branding -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); border-radius: 16px 16px 0 0; padding: 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="padding: 30px 40px; text-align: center;">
+                    <!-- Company Logo Area -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="background-color: white; border-radius: 12px; padding: 12px 24px;">
+                          <span style="color: #C41E3A; font-size: 24px; font-weight: 800; letter-spacing: 1px;">INTERSNACK</span>
+                        </td>
+                      </tr>
+                    </table>
 
-      <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
-        This is an informational notice. <strong>No action is required from you.</strong>
-      </p>
+                    <!-- Title -->
+                    <h1 style="color: white; margin: 25px 0 8px 0; font-size: 26px; font-weight: 600; letter-spacing: -0.5px;">
+                      Trip Join Notification
+                    </h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 15px; font-weight: 400;">
+                      For Your Information - No Action Required
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-      <div style="background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #065f46; font-size: 14px;">
-          <strong>✅ Auto-Confirmed:</strong> ${trip.userName} has joined an already-optimized trip that was previously approved.
-        </p>
-      </div>
+          <!-- Content Area -->
+          <tr>
+            <td style="background-color: white; padding: 40px;">
 
-      <!-- Trip Details -->
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #333; margin: 0 0 15px 0; font-size: 18px; border-bottom: 2px solid #10b981; padding-bottom: 10px;">
-          Trip Details
-        </h3>
+              <!-- Greeting -->
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                Dear <strong>${managerName}</strong>,
+              </p>
 
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px; width: 40%;"><strong>Employee:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userName}</td>
+              <!-- FYI Banner -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="background: linear-gradient(90deg, #ECFDF5 0%, #D1FAE5 100%); border-left: 4px solid #10B981; border-radius: 0 8px 8px 0; padding: 18px 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 40px; vertical-align: top;">
+                          <span style="display: inline-block; background-color: #10B981; color: white; font-size: 18px; width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%; font-weight: bold;">ℹ</span>
+                        </td>
+                        <td style="vertical-align: top;">
+                          <p style="margin: 0 0 6px 0; color: #047857; font-size: 15px; font-weight: 700;">
+                            For Your Information
+                          </p>
+                          <p style="margin: 0; color: #065F46; font-size: 14px; line-height: 1.5;">
+                            <strong>No action is required from you.</strong> This is an informational notice about ${trip.userName}'s trip.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Auto-Confirmed Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 20px;">
+                <tr>
+                  <td style="background-color: #D1FAE5; border-left: 4px solid #10B981; border-radius: 0 8px 8px 0; padding: 15px 20px;">
+                    <p style="margin: 0; color: #065F46; font-size: 14px; line-height: 1.5;">
+                      <strong>✓ Auto-Confirmed:</strong> ${trip.userName} has joined an already-optimized trip that was previously approved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Trip Details Card -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FAFAFA; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+
+                    <!-- Card Header -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="background-color: #10B981; padding: 16px 20px;">
+                          <p style="margin: 0; color: white; font-size: 16px; font-weight: 600;">
+                            Trip Details
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Details -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="padding: 20px;">
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Employee</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${trip.userName}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Email</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${trip.userEmail}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Route</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${getLocationName(trip.departureLocation || '')} → ${getLocationName(trip.destination || '')}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Departure</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trip.departureDate).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at ${trip.departureTime}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; ${trip.vehicleType ? 'border-bottom: 1px solid #E5E7EB;' : ''}">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Return</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">
+                                ${new Date(trip.returnDate).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at ${trip.returnTime}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ${trip.vehicleType ? `
+                      <tr>
+                        <td style="padding: 10px 0; ${trip.estimatedCost ? 'border-bottom: 1px solid #E5E7EB;' : 'border-bottom: 1px solid #E5E7EB;'}">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Vehicle</td>
+                              <td style="color: #1F2937; font-size: 14px; font-weight: 600; text-align: right;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                      ${trip.estimatedCost ? `
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #E5E7EB;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Estimated Cost</td>
+                              <td style="color: #C41E3A; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(trip.estimatedCost)}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                            <tr>
+                              <td style="color: #6B7280; font-size: 14px; font-weight: 500; width: 40%;">Status</td>
+                              <td style="text-align: right;">
+                                <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px;">✓ Confirmed</span>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Why No Approval Notice -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 0 8px 8px 0; padding: 15px 20px;">
+                    <p style="margin: 0 0 5px 0; color: #92400E; font-size: 14px; font-weight: 700;">
+                      ℹ️ Why no approval needed?
+                    </p>
+                    <p style="margin: 0; color: #92400E; font-size: 14px; line-height: 1.5;">
+                      This trip was already approved and optimized with other employees traveling the same route. Your team member has been added to this shared trip for cost efficiency.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- No Action Required Box -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 25px;">
+                <tr>
+                  <td style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border: 2px solid #6EE7B7; border-radius: 12px; padding: 24px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: #065F46; font-size: 20px; font-weight: 700;">
+                      ✓ No Action Required
+                    </p>
+                    <p style="margin: 0; color: #047857; font-size: 14px;">
+                      This email is for your information only.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
           </tr>
+
+          <!-- Footer -->
           <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Email:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${trip.userEmail}</td>
+            <td style="background-color: #1F2937; border-radius: 0 0 16px 16px; padding: 30px 40px; text-align: center;">
+
+              <!-- Company Name -->
+              <p style="margin: 0 0 15px 0; color: #C41E3A; font-size: 18px; font-weight: 700; letter-spacing: 1px;">
+                INTERSNACK
+              </p>
+
+              <!-- Tagline -->
+              <p style="margin: 0 0 20px 0; color: #9CA3AF; font-size: 13px;">
+                Trips Management System
+              </p>
+
+              <!-- Footer Links -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Best regards</span>
+                  </td>
+                  <td style="color: #4B5563;">|</td>
+                  <td style="padding: 0 15px;">
+                    <span style="color: #6B7280; font-size: 12px;">Admin Team</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Disclaimer -->
+              <p style="margin: 20px 0 0 0; color: #6B7280; font-size: 11px; line-height: 1.5;">
+                This is an automated notification from the Trips Management System.<br>
+                Please do not reply directly to this email.
+              </p>
+
+            </td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>From:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.departureLocation || '')}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>To:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${getLocationName(trip.destination || '')}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Departure:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.departureDate).toLocaleDateString()} at ${trip.departureTime}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Return:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${new Date(trip.returnDate).toLocaleDateString()} at ${trip.returnTime}</td>
-          </tr>
-          ${trip.vehicleType ? `
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Vehicle:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px;">${config.vehicles[trip.vehicleType as keyof typeof config.vehicles]?.name || trip.vehicleType}</td>
-          </tr>
-          ` : ''}
-          ${trip.estimatedCost ? `
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Estimated Cost:</strong></td>
-            <td style="padding: 8px 0; color: #333; font-size: 14px; font-weight: bold;">${formatCurrency(trip.estimatedCost)}</td>
-          </tr>
-          ` : ''}
-          <tr>
-            <td style="padding: 8px 0; color: #666; font-size: 14px;"><strong>Status:</strong></td>
-            <td style="padding: 8px 0; color: #10b981; font-size: 14px; font-weight: bold;">✅ Confirmed</td>
-          </tr>
+
         </table>
-      </div>
+      </td>
+    </tr>
+  </table>
 
-      <!-- Info Notice -->
-      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
-          <strong>ℹ️ Why no approval needed?</strong><br>
-          This trip was already approved and optimized with other employees traveling the same route. Your team member has been added to this shared trip for cost efficiency.
-        </p>
-      </div>
-
-      <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f0fdf4; border-radius: 8px;">
-        <p style="color: #065f46; font-size: 16px; font-weight: bold; margin: 0;">
-          ✅ No Action Required
-        </p>
-        <p style="color: #047857; font-size: 14px; margin: 10px 0 0 0;">
-          This email is for your information only.
-        </p>
-      </div>
-
-      <p style="color: #999; font-size: 12px; margin: 30px 0 0 0; line-height: 1.6;">
-        Best regards,<br>
-        <strong>Trips Management System</strong>
-      </p>
-    </div>
-
-    <!-- Footer -->
-    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
-      <p style="color: #6c757d; font-size: 12px; margin: 0;">
-        This is an automated message from Trips Management System. Please do not reply to this email.
-      </p>
-    </div>
-  </div>
 </body>
 </html>
 `;

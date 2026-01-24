@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
     if (requesterId) filters.requesterId = requesterId;
     if (status) filters.status = status;
 
+    // Check if user is Location Admin - add location filter
+    if (user.adminType === 'location_admin' && user.adminLocationId) {
+      filters.locationId = user.adminLocationId;
+    }
+
     // Fetch join requests
     const requests = await joinRequestService.getJoinRequests(filters);
 

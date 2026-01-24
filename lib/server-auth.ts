@@ -12,6 +12,8 @@ export interface ServerUser {
   role: 'admin' | 'user';
   department?: string;
   employeeId?: string;
+  adminType?: 'super_admin' | 'location_admin';
+  adminLocationId?: string;
 }
 
 /**
@@ -35,7 +37,9 @@ export async function getServerUser(request?: NextRequest): Promise<ServerUser |
       name: session.user.name || '',
       role: session.user.role || 'user',
       department: session.user.department,
-      employeeId: session.user.employeeId
+      employeeId: session.user.employeeId,
+      adminType: session.user.adminType,
+      adminLocationId: session.user.adminLocationId
     } as ServerUser;
 
   } catch (error) {

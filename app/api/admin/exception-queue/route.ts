@@ -31,6 +31,19 @@ export async function GET(request: NextRequest) {
 
     const connection = await getConnection();
 
+    // Check if user is Location Admin
+    const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId;
+    const adminLocationId = session.user.adminLocationId;
+
+    // Build WHERE clause based on admin type
+    let locationFilter = '';
+    const queryParams: any[] = [];
+
+    if (isLocationAdmin && adminLocationId) {
+      locationFilter = `AND (t.departure_location = ? OR t.destination = ?)`;
+      queryParams.push(adminLocationId, adminLocationId);
+    }
+
     // Get trips requiring exception handling
     const [trips] = await connection.query<any[]>(
       `SELECT
@@ -70,6 +83,7 @@ export async function GET(request: NextRequest) {
           -- No manager trips
           (t.manager_approval_status IS NULL AND t.auto_approved = 0)
         )
+        ${locationFilter}
       ORDER BY
         CASE
           WHEN t.is_urgent = 1 THEN 1
@@ -78,7 +92,8 @@ export async function GET(request: NextRequest) {
           ELSE 4
         END,
         t.created_at DESC
-      LIMIT 100`
+      LIMIT 100`,
+      queryParams
     );
 
     // Categorize exceptions

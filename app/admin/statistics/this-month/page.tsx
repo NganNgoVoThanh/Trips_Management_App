@@ -72,11 +72,16 @@ export default function ThisMonthPage() {
 
       setIsLoading(true)
 
-      const response = await fetch('/api/trips')
+      // Check if user is Location Admin
+      const isLocationAdmin = session?.user?.adminType === 'location_admin' && session?.user?.adminLocationId
+
+      const apiUrl = isLocationAdmin ? '/api/admin/location-trips' : '/api/trips'
+      const response = await fetch(apiUrl)
       if (!response.ok) {
         throw new Error('Failed to load trips')
       }
-      const allTrips = await response.json()
+      const result = await response.json()
+      const allTrips = isLocationAdmin ? result.trips : result
       const now = new Date()
       const currentMonth = now.getMonth()
       const currentYear = now.getFullYear()

@@ -68,9 +68,26 @@ export default function TotalSavingsPage() {
 
       setIsLoading(true)
 
-      const allTrips = await fabricService.getTrips()
+      // Check if user is Location Admin
+      const isLocationAdmin = session?.user?.adminType === 'location_admin' && session?.user?.adminLocationId
+
+      let allTrips: Trip[] = []
+
+      if (isLocationAdmin) {
+        // Location Admin: Fetch filtered trips via API
+        const response = await fetch('/api/admin/location-trips')
+        if (response.ok) {
+          const data = await response.json()
+          allTrips = data.trips || []
+        } else {
+          throw new Error('Failed to fetch location trips')
+        }
+      } else {
+        // Super Admin: Fetch all trips
+        allTrips = await fabricService.getTrips()
+      }
       const optimizedTrips = allTrips.filter(t => t.status === 'optimized')
-      
+
       // ✅ FIX: Calculate total savings using actual costs only
       const totalSavings = optimizedTrips.reduce((sum, trip) => {
         // Only count savings if we have both estimated and actual cost
@@ -88,7 +105,7 @@ export default function TotalSavingsPage() {
         const tripYear = new Date(t.departureDate).getFullYear()
         return tripYear === currentYear
       })
-      
+
       // ✅ FIX: Calculate YTD savings using actual costs only
       const ytdSavings = ytdTrips.reduce((sum, trip) => {
         // Only count savings if we have both estimated and actual cost
@@ -113,7 +130,7 @@ export default function TotalSavingsPage() {
       optimizedTrips.forEach(trip => {
         const date = new Date(trip.departureDate)
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        
+
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
             month: monthKey,
@@ -122,7 +139,7 @@ export default function TotalSavingsPage() {
             avgSavingsPerTrip: 0
           }
         }
-        
+
         // ✅ FIX: Only count if we have both estimated and actual cost
         if (trip.estimatedCost && trip.actualCost) {
           const savings = trip.estimatedCost - trip.actualCost
@@ -135,8 +152,8 @@ export default function TotalSavingsPage() {
 
       // Calculate average savings per trip
       Object.values(monthlyData).forEach(month => {
-        month.avgSavingsPerTrip = month.tripsOptimized > 0 
-          ? month.savings / month.tripsOptimized 
+        month.avgSavingsPerTrip = month.tripsOptimized > 0
+          ? month.savings / month.tripsOptimized
           : 0
       })
 
@@ -163,7 +180,7 @@ export default function TotalSavingsPage() {
 
         return {
           type: type === 'car-4' ? '4-Seater Car' :
-                type === 'car-7' ? '7-Seater Car' : '16-Seater Van',
+            type === 'car-7' ? '7-Seater Car' : '16-Seater Van',
           savings,
           trips: tripsWithActualCost, // Only count trips with actual savings
           avgSavingsPerTrip: tripsWithActualCost > 0 ? savings / tripsWithActualCost : 0
@@ -192,8 +209,8 @@ export default function TotalSavingsPage() {
       const savingsRate = totalEstimatedCost > 0 ? (totalSavings / totalEstimatedCost) * 100 : 0
 
       const avgSavingsPerTrip = optimizedTrips.length > 0 ? totalSavings / optimizedTrips.length : 0
-      const monthlyAverage = monthlyBreakdownArray.length > 0 
-        ? totalSavings / monthlyBreakdownArray.length 
+      const monthlyAverage = monthlyBreakdownArray.length > 0
+        ? totalSavings / monthlyBreakdownArray.length
         : 0
 
       setStats({
@@ -255,7 +272,7 @@ export default function TotalSavingsPage() {
         formatCurrency(v.avgSavingsPerTrip)
       ])
     ].map(row => row.join(',')).join('\n')
-    
+
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -282,8 +299,8 @@ export default function TotalSavingsPage() {
       <div className="container mx-auto p-6 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => router.push('/admin/dashboard')}
             >
@@ -293,7 +310,7 @@ export default function TotalSavingsPage() {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <PiggyBank className="h-6 w-6 text-green-600" />
-                Total Savings Analysis
+                Total Savings Analysis (Coming Soon)
               </h1>
               <p className="text-gray-500">Comprehensive view of cost savings through optimization</p>
             </div>
@@ -367,8 +384,8 @@ export default function TotalSavingsPage() {
                   <p className="text-sm text-blue-700 mt-1">
                     By optimizing confirmed trips, you could save an additional <strong>{formatCurrency(stats.potentialSavings)}</strong>
                   </p>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="mt-3 bg-blue-600 hover:bg-blue-700"
                     onClick={() => router.push('/admin/dashboard')}
                   >
@@ -435,9 +452,9 @@ export default function TotalSavingsPage() {
                         <p>Avg: {formatCurrency(vehicle.avgSavingsPerTrip)}</p>
                       </div>
                     </div>
-                    <Progress 
-                      value={(vehicle.savings / stats.totalSavings) * 100} 
-                      className="h-2 mt-2" 
+                    <Progress
+                      value={(vehicle.savings / stats.totalSavings) * 100}
+                      className="h-2 mt-2"
                     />
                   </div>
                 ))}

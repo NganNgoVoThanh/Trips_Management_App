@@ -31,7 +31,7 @@ export const config = {
   locations: {
     'HCM Office': {
       id: 'HCM Office',
-      name: 'Ho Chi Minh Office',
+      name: 'HCM Office',
       address: '76 Le Lai Street, Ben Thanh Ward, District 1, Ho Chi Minh City, Vietnam',
       coordinates: { lat: 10.7688, lng: 106.6781 },
       type: 'office'
@@ -108,15 +108,33 @@ export const config = {
 
 // Helper functions
 
+// Mapping between database IDs (normalized) and display names
+const LOCATION_ID_TO_NAME_MAP: Record<string, string> = {
+  'hcm-office': 'HCM Office',
+  'phan-thiet-factory': 'Phan Thiet Factory',
+  'long-an-factory': 'Long An Factory',
+  'tay-ninh-factory': 'Tay Ninh Factory',
+};
+
 export function getLocationName(locationId: string): string {
+  // First check if it's a normalized ID from database (lowercase with dashes)
+  if (LOCATION_ID_TO_NAME_MAP[locationId]) {
+    return LOCATION_ID_TO_NAME_MAP[locationId];
+  }
+
+  // Otherwise check if it's already a proper location name
   const location = config.locations[locationId as keyof typeof config.locations];
   return location ? location.name : locationId;
 }
 
 export function calculateDistance(from: string, to: string): number {
-  const fromLoc = config.locations[from as keyof typeof config.locations];
-  const toLoc = config.locations[to as keyof typeof config.locations];
-  
+  // Convert normalized IDs to display names if needed
+  const fromName = LOCATION_ID_TO_NAME_MAP[from] || from;
+  const toName = LOCATION_ID_TO_NAME_MAP[to] || to;
+
+  const fromLoc = config.locations[fromName as keyof typeof config.locations];
+  const toLoc = config.locations[toName as keyof typeof config.locations];
+
   if (!fromLoc || !toLoc) return 0;
   
   // Haversine formula for distance calculation

@@ -57,9 +57,8 @@ export async function GET(
       `SELECT
         id, email, name, role, department, employee_id,
         office_location, pickup_address, pickup_notes,
-        phone, emergency_contact, emergency_phone,
-        preferred_vehicle, preferred_departure_time,
-        profile_visibility, share_statistics, location_tracking,
+        phone, manager_email, manager_name,
+        admin_type, admin_location_id,
         is_active, last_login, created_at, updated_at
        FROM users
        WHERE id = ?`,
@@ -204,9 +203,8 @@ export async function PUT(
       `SELECT
         id, email, name, role, department, employee_id,
         office_location, pickup_address, pickup_notes,
-        phone, emergency_contact, emergency_phone,
-        preferred_vehicle, preferred_departure_time,
-        profile_visibility, share_statistics, location_tracking,
+        phone, manager_email, manager_name,
+        admin_type, admin_location_id,
         is_active, last_login, created_at, updated_at
        FROM users
        WHERE id = ?`,

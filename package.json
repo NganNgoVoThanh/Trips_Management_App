@@ -28,7 +28,8 @@
     "add-vehicle": "node scripts/add-vehicle.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "toggle-admin": "node scripts/toggle-admin-type.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.895.0",

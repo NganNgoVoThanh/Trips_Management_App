@@ -84,8 +84,10 @@ export default function ManagementDashboard() {
 
   useEffect(() => {
     checkUserRole()
-    loadDashboardData()
-  }, [])
+    if (session) {
+      loadDashboardData()
+    }
+  }, [session])
 
   useEffect(() => {
     filterTripsData()
@@ -102,7 +104,26 @@ export default function ManagementDashboard() {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true)
-      const allTrips = await fabricService.getTrips()
+
+      // Check if user is Location Admin
+      const isLocationAdmin = session?.user?.adminType === 'location_admin' && session?.user?.adminLocationId
+
+      let allTrips: Trip[] = []
+
+      if (isLocationAdmin) {
+        // Location Admin: Fetch filtered trips via API
+        const response = await fetch('/api/admin/location-trips')
+        if (response.ok) {
+          const data = await response.json()
+          allTrips = data.trips || []
+        } else {
+          throw new Error('Failed to fetch location trips')
+        }
+      } else {
+        // Super Admin: Fetch all trips
+        allTrips = await fabricService.getTrips()
+      }
+
       setTrips(allTrips)
       calculateStats(allTrips)
     } catch (error) {

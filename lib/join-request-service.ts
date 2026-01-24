@@ -582,6 +582,7 @@ class JoinRequestService {
     tripId?: string;
     requesterId?: string;
     status?: string;
+    locationId?: string;
   }): Promise<JoinRequest[]> {
     try {
       if (this.ensureServerSide('getJoinRequests')) {
@@ -621,7 +622,12 @@ class JoinRequestService {
     }
   }
 
-  async getJoinRequestStats(): Promise<{
+  async getJoinRequestStats(filters?: {
+    tripId?: string;
+    requesterId?: string;
+    status?: string;
+    locationId?: string;
+  }): Promise<{
     total: number;
     pending: number;
     approved: number;
@@ -629,7 +635,7 @@ class JoinRequestService {
     cancelled: number;
   }> {
     try {
-      const requests = await this.getJoinRequests();
+      const requests = await this.getJoinRequests(filters);
       return {
         total: requests.length,
         pending: requests.filter(r => r.status === 'pending').length,
@@ -688,6 +694,7 @@ class JoinRequestService {
     tripId?: string;
     requesterId?: string;
     status?: string;
+    locationId?: string;
   }): Promise<JoinRequest[]> {
     if (!this.ensureServerSide('getJoinRequestsMySQL')) {
       return this.getJoinRequestsLocalFiltered(filters);
@@ -696,25 +703,40 @@ class JoinRequestService {
     try {
       const poolInstance = await getPool();
       const connection = await poolInstance.getConnection();
-      
-      let query = 'SELECT * FROM join_requests WHERE 1=1';
+
+      let query = 'SELECT jr.* FROM join_requests jr';
       const params: any[] = [];
-      
+
+      // Join with trips table if location filtering is needed
+      if (filters?.locationId) {
+        query += ' INNER JOIN trips t ON jr.trip_id = t.id';
+      }
+
+      query += ' WHERE 1=1';
+
       if (filters?.tripId) {
-        query += ' AND trip_id = ?';
+        query += ' AND jr.trip_id = ?';
         params.push(filters.tripId);
       }
       if (filters?.requesterId) {
-        query += ' AND requester_id = ?';
+        query += ' AND jr.requester_id = ?';
         params.push(filters.requesterId);
       }
       if (filters?.status) {
-        query += ' AND status = ?';
+        query += ' AND jr.status = ?';
         params.push(filters.status);
       }
-      
-      query += ' ORDER BY created_at DESC';
-      
+      if (filters?.locationId) {
+        // Handle both slug format (long-an-factory) and display name format (Long An Factory)
+        const locationSlug = filters.locationId;
+        const locationDisplayName = getLocationName(filters.locationId);
+
+        query += ' AND (t.departure_location IN (?, ?) OR t.destination IN (?, ?))';
+        params.push(locationSlug, locationDisplayName, locationSlug, locationDisplayName);
+      }
+
+      query += ' ORDER BY jr.created_at DESC';
+
       const [rows] = await connection.query(query, params);
       connection.release();
       

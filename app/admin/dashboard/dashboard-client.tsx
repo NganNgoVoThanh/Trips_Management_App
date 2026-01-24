@@ -693,11 +693,7 @@ export function AdminDashboardClient() {
 
         <div className="container flex-1 space-y-4 p-8 pt-6">
           {/* Admin Welcome Section with Logo */}
-          <div className={`rounded-xl p-6 text-white shadow-lg ${
-            isLocationAdmin
-              ? 'bg-gradient-to-r from-blue-700 to-blue-800'
-              : 'bg-gradient-to-r from-red-700 to-red-800'
-          }`}>
+          <div className="rounded-xl p-6 text-white shadow-lg bg-gradient-to-r from-red-700 to-red-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <Image
@@ -719,7 +715,7 @@ export function AdminDashboardClient() {
                       </Badge>
                     )}
                   </div>
-                  <p className={`mt-1 ${isLocationAdmin ? 'text-blue-100' : 'text-red-100'}`}>
+                  <p className="mt-1 text-red-100">
                     {isLocationAdmin
                       ? `Managing trips for ${locationName || 'your assigned location'}`
                       : 'Manage and optimize company-wide business trips'
