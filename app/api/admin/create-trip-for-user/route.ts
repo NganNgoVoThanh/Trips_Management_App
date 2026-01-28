@@ -58,6 +58,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // ✅ LOCATION ADMIN VALIDATION: Location Admin can only create trips from/to their assigned location
+    const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId;
+
+    if (isLocationAdmin) {
+      const adminLocationId = session.user.adminLocationId;
+
+      // At least departure OR destination must match admin's location
+      if (departureLocation !== adminLocationId && destination !== adminLocationId) {
+        return NextResponse.json({
+          error: 'Forbidden - Location Admin can only create trips from/to their assigned location',
+          message: `You can only create trips where departure or destination is your assigned location (ID: ${adminLocationId}).`,
+          adminLocationId: adminLocationId
+        }, { status: 403 });
+      }
+    }
+
     const connection = await getConnection();
 
     // ✅ DUPLICATE PREVENTION: Check if duplicate trip exists

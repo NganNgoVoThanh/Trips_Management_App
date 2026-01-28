@@ -3,7 +3,10 @@
     "allow": [
       "Bash(powershell -Command \"cd ''c:\\\\Users\\\\ngan.ngo\\\\trips-management-system-final''; npm run build 2>&1 | Select-Object -First 150\")",
       "Bash(node -e:*)",
-      "Bash(node scripts/debug-location-filter.js:*)"
+      "Bash(node scripts/debug-location-filter.js:*)",
+      "Bash(grep:*)",
+      "Bash(git checkout:*)",
+      "Bash(ls:*)"
     ]
   }
 }

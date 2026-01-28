@@ -41,6 +41,20 @@ export async function GET(request: NextRequest) {
 
     const connection = await getConnection();
 
+    // ✅ LOCATION ADMIN FILTER: Get location name if Location Admin
+    const isLocationAdmin = session.user.adminType === 'location_admin' && session.user.adminLocationId;
+    let locationName = session.user.adminLocationId;
+
+    if (isLocationAdmin && session.user.adminLocationId) {
+      const [locRows] = await connection.query(
+        'SELECT name FROM locations WHERE id = ? LIMIT 1',
+        [session.user.adminLocationId]
+      ) as any[];
+      if (locRows.length > 0) {
+        locationName = locRows[0].name;
+      }
+    }
+
     // Build query
     let query = `
       SELECT
@@ -74,6 +88,12 @@ export async function GET(request: NextRequest) {
     `;
 
     const params: any[] = [];
+
+    // ✅ LOCATION ADMIN FILTER: Filter by location for Location Admin
+    if (isLocationAdmin && session.user.adminLocationId) {
+      query += ' AND (t.departure_location = ? OR t.departure_location = ? OR t.destination = ? OR t.destination = ?)';
+      params.push(session.user.adminLocationId, locationName, session.user.adminLocationId, locationName);
+    }
 
     if (startDate) {
       query += ' AND t.departure_date >= ?';

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 50001",
     "build": "next build",
     "build:production": "cross-env NODE_ENV=production next build",
     "start": "next start",
@@ -24,12 +24,16 @@
     "sync-azure": "node scripts/sync-azure-users-cron.js",
     "test-smtp": "node scripts/test-smtp.js",
     "test-o365": "node scripts/test-o365-smtp.js",
+    "test-db": "node test-db-connection.js",
     "vehicles": "node scripts/manage-vehicles.js",
     "add-vehicle": "node scripts/add-vehicle.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "seed": "node scripts/seed.js",
-    "toggle-admin": "node scripts/toggle-admin-type.js"
+    "toggle-admin": "node scripts/toggle-admin-type.js",
+    "db:check": "node check-database-records.js",
+    "db:reset": "node scripts/reset-database-for-testing.js --with-backup",
+    "db:reset:keep-admin": "node scripts/reset-database-for-testing.js --with-backup --keep-admin"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.895.0",

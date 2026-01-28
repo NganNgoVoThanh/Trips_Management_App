@@ -31,6 +31,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
 
+    // ✅ LOCATION ADMIN RESTRICTION: Vehicles management is Super Admin only
+    // Vehicles can move between locations, so this is system-wide management
+    if (session.user.adminType === 'location_admin') {
+      return NextResponse.json({
+        error: 'Forbidden - Vehicles management is Super Admin only',
+        message: 'Location Admins do not have access to vehicle management. Please contact a Super Admin.'
+      }, { status: 403 });
+    }
+
     // Ensure vehicles table exists
     await ensureVehiclesTable();
 
@@ -63,6 +72,14 @@ export async function POST(request: NextRequest) {
 
     if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
+    }
+
+    // ✅ LOCATION ADMIN RESTRICTION: Vehicles management is Super Admin only
+    if (session.user.adminType === 'location_admin') {
+      return NextResponse.json({
+        error: 'Forbidden - Vehicles management is Super Admin only',
+        message: 'Location Admins cannot create vehicles. Please contact a Super Admin.'
+      }, { status: 403 });
     }
 
     // Ensure vehicles table exists

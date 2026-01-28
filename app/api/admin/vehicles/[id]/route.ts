@@ -32,6 +32,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
     }
 
+    // ✅ LOCATION ADMIN RESTRICTION: Vehicles management is Super Admin only
+    if (session.user.adminType === 'location_admin') {
+      return NextResponse.json({
+        error: 'Forbidden - Vehicles management is Super Admin only',
+        message: 'Location Admins cannot update vehicles. Please contact a Super Admin.'
+      }, { status: 403 });
+    }
+
     const vehicleId = params.id;
     const body = await request.json();
 
@@ -140,6 +148,14 @@ export async function DELETE(
 
     if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden - Admin only' }, { status: 403 });
+    }
+
+    // ✅ LOCATION ADMIN RESTRICTION: Vehicles management is Super Admin only
+    if (session.user.adminType === 'location_admin') {
+      return NextResponse.json({
+        error: 'Forbidden - Vehicles management is Super Admin only',
+        message: 'Location Admins cannot delete vehicles. Please contact a Super Admin.'
+      }, { status: 403 });
     }
 
     const vehicleId = params.id;

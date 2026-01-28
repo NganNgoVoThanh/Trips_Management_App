@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
                role = ?,
                admin_type = ?,
                admin_location_id = ?,
-               admin_assigned_at = ${isAdmin ? 'NOW()' : 'NULL'},
-               admin_assigned_by = ${isAdmin ? "'system-auto'" : 'NULL'},
+               admin_assigned_at = ?,
+               admin_assigned_by = ?,
                updated_at = NOW()
            WHERE email = ?`,
           [
@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
             isAdmin ? 'admin' : 'user',
             adminType,
             adminLocationId,
+            isAdmin ? new Date() : null,
+            isAdmin ? 'system-auto' : null,
             userEmail
           ]
         );
@@ -154,8 +156,8 @@ export async function POST(request: NextRequest) {
                role = ?,
                admin_type = ?,
                admin_location_id = ?,
-               admin_assigned_at = ${isAdmin ? 'NOW()' : 'NULL'},
-               admin_assigned_by = ${isAdmin ? "'system-auto'" : 'NULL'},
+               admin_assigned_at = ?,
+               admin_assigned_by = ?,
                updated_at = NOW()
            WHERE email = ?`,
           [
@@ -168,6 +170,8 @@ export async function POST(request: NextRequest) {
             isAdmin ? 'admin' : 'user',
             adminType,
             adminLocationId,
+            isAdmin ? new Date() : null,
+            isAdmin ? 'system-auto' : null,
             userEmail
           ]
         );
