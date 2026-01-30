@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { getUserByEmail } from '@/lib/user-service';
+import { getUserByEmail, createOrUpdateUserOnLogin } from '@/lib/user-service';
 import { validateEmailDomain, sendManagerConfirmationEmail } from '@/lib/manager-verification-service';
 import { getAdminConfig, getLocationId } from '@/lib/admin-config';
 import { invalidateAdminCache } from '@/lib/admin-service';
@@ -64,9 +64,40 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const user = await getUserByEmail(userEmail);
+      let user = await getUserByEmail(userEmail);
+
+      // Auto-create user if not exists (fixes issue where user login didn't create DB record)
       if (!user) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        console.log(`⚠️ User ${userEmail} not found in database, auto-creating...`);
+
+        try {
+          await createOrUpdateUserOnLogin({
+            azureId: session.user.id || `azure-${Date.now()}`,
+            email: userEmail,
+            name: userName,
+            employeeId: session.user.employeeId || employee_id || `EMP${Date.now().toString(36).toUpperCase()}`,
+            role: isAdmin ? 'admin' : 'user',
+            department: department || session.user.department || null,
+            officeLocation: office_location || null,
+            jobTitle: session.user.jobTitle || null,
+          });
+
+          // Fetch user again after creation
+          user = await getUserByEmail(userEmail);
+
+          if (!user) {
+            console.error(`❌ Failed to create user ${userEmail} in database`);
+            return NextResponse.json({ error: 'Failed to create user record' }, { status: 500 });
+          }
+
+          console.log(`✅ Auto-created user ${userEmail} in database`);
+        } catch (createError: any) {
+          console.error(`❌ Error auto-creating user ${userEmail}:`, createError.message);
+          return NextResponse.json({
+            error: 'Failed to create user record',
+            details: createError.message
+          }, { status: 500 });
+        }
       }
 
       let pendingManagerConfirmation = false;

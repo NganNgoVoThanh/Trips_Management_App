@@ -24,36 +24,57 @@ function generateToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// Fallback allowed domains (same as client-side validation)
+const FALLBACK_ALLOWED_DOMAINS = [
+  'intersnack.com.vn',
+  'intersnack.com.sg',
+  'intersnack.co.in',
+];
+
 /**
  * Validate email domain against whitelist
+ * Falls back to hardcoded domains if database table doesn't exist
  */
 export async function validateEmailDomain(email: string): Promise<boolean> {
   if (typeof window !== 'undefined') {
     throw new Error('validateEmailDomain can only be called on server side');
   }
 
-  const mysql = await import('mysql2/promise');
-  const connection = await mysql.default.createConnection({
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-  });
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
 
+  // Try database first, fallback to hardcoded domains
   try {
-    const domain = email.split('@')[1];
-    if (!domain) return false;
+    const mysql = await import('mysql2/promise');
+    const connection = await mysql.default.createConnection({
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    });
 
-    const [rows] = await connection.query(
-      'SELECT COUNT(*) as count FROM allowed_email_domains WHERE domain = ? AND active = TRUE',
-      [domain]
-    );
+    try {
+      const [rows] = await connection.query(
+        'SELECT COUNT(*) as count FROM allowed_email_domains WHERE domain = ? AND active = TRUE',
+        [domain]
+      );
 
-    const result = rows as any[];
-    return result[0].count > 0;
-  } finally {
-    await connection.end();
+      const result = rows as any[];
+      return result[0].count > 0;
+    } finally {
+      await connection.end();
+    }
+  } catch (error: any) {
+    // If table doesn't exist (ER_NO_SUCH_TABLE), use fallback domains
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      console.warn('⚠️ Table allowed_email_domains not found, using fallback domains');
+      return FALLBACK_ALLOWED_DOMAINS.includes(domain);
+    }
+
+    // For other DB errors, also fallback to hardcoded domains to not block users
+    console.error('⚠️ Error validating email domain, using fallback:', error.message);
+    return FALLBACK_ALLOWED_DOMAINS.includes(domain);
   }
 }
 
@@ -84,12 +105,12 @@ export async function sendManagerConfirmationEmail(data: ManagerConfirmationData
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
     // Store confirmation token
-    // Note: Table has additional required columns: user_email, pending_manager_email, confirmation_token
+    // Schema: id, user_id, user_email, user_name, pending_manager_email, pending_manager_name, confirmation_token, expires_at
     await connection.query(
       `INSERT INTO manager_confirmations
-       (id, user_id, user_email, manager_email, pending_manager_email, token, confirmation_token, type, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [confirmationId, data.userId, data.userEmail, data.managerEmail, data.managerEmail, token, token, data.type, expiresAt]
+       (id, user_id, user_email, user_name, pending_manager_email, pending_manager_name, confirmation_token, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [confirmationId, data.userId, data.userEmail, data.userName, data.managerEmail, null, token, expiresAt]
     );
 
     // Generate confirmation URLs
@@ -950,10 +971,10 @@ export async function processManagerConfirmation(token: string, action: 'confirm
   try {
     // Find confirmation token
     const [rows] = await connection.query(
-      `SELECT mc.*, u.email as user_email, u.name as user_name
+      `SELECT mc.*, mc.pending_manager_email as manager_email, u.email as user_email_from_user, u.name as user_name_from_user
        FROM manager_confirmations mc
        JOIN users u ON CAST(mc.user_id AS CHAR) = CAST(u.id AS CHAR)
-       WHERE mc.token = ? AND mc.confirmed = FALSE`,
+       WHERE mc.confirmation_token = ? AND mc.confirmed = FALSE`,
       [token]
     );
 

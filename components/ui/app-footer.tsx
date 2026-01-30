@@ -39,7 +39,7 @@ export function AppFooter() {
             {/* Version */}
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-red-600" />
-              <span>Version <strong className="text-gray-900 font-mono">02.07</strong></span>
+              <span>Version <strong className="text-gray-900 font-mono">02.08</strong></span>
             </div>
           </div>
 
