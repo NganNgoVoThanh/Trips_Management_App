@@ -104,7 +104,7 @@ export async function sendExpiredLinkNotificationToUser(data: ExpiredNotificatio
       <p>Admin will review and process your request as soon as possible.</p>
 
       <div class="footer">
-        <p>Best regards,<br/>Intersnack Trips Management Team</p>
+        <p>Best regards,<br/>Intersnack Cashew Company</p>
       </div>
     </div>
   </div>
@@ -138,7 +138,7 @@ Provide the Trip ID when contacting Admin for faster processing.
 Admin will review and process your request as soon as possible.
 
 Best regards,
-Intersnack Trips Management Team
+Intersnack Cashew Company
   `.trim();
 
   await emailService.sendEmail({

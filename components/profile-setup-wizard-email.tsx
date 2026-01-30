@@ -139,40 +139,46 @@ export function ProfileSetupWizardEmail({ currentUser, onComplete }: ProfileSetu
 
         {/* Progress Steps */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-rose-100">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-center">
             {STEPS.map((step, index) => {
               const Icon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
 
               return (
-                <div key={step.id} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center flex-1">
+                <div key={step.id} className="flex items-center">
+                  {/* Step Circle and Label */}
+                  <div className="flex flex-col items-center" style={{ width: '120px' }}>
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCompleted
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        isCompleted
                           ? 'bg-green-500 text-white'
                           : isActive
                             ? 'bg-[#C00000] text-white ring-4 ring-rose-100'
                             : 'bg-gray-200 text-gray-500'
-                        }`}
+                      }`}
                     >
                       {isCompleted ? <Check className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
                     </div>
-                    <div className="text-center mt-2">
+                    <div className="text-center mt-2 w-full">
                       <div
-                        className={`text-sm font-medium ${isActive ? 'text-[#C00000]' : isCompleted ? 'text-green-600' : 'text-gray-500'
-                          }`}
+                        className={`text-sm font-medium whitespace-nowrap ${
+                          isActive ? 'text-[#C00000]' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                        }`}
                       >
                         Step {step.id}
                       </div>
-                      <div className="text-xs text-gray-600 mt-0.5">{step.title}</div>
+                      <div className="text-xs text-gray-600 mt-0.5 whitespace-nowrap">{step.title}</div>
                     </div>
                   </div>
 
+                  {/* Connector Line */}
                   {index < STEPS.length - 1 && (
                     <div
-                      className={`flex-1 h-1 mx-4 transition-all ${currentStep > step.id ? 'bg-green-500' : 'bg-gray-200'
-                        }`}
+                      className={`h-1 transition-all ${
+                        currentStep > step.id ? 'bg-green-500' : 'bg-gray-200'
+                      }`}
+                      style={{ width: '60px', marginLeft: '8px', marginRight: '8px', marginTop: '-50px' }}
                     />
                   )}
                 </div>

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Invalid Request</title>
   <style>
     body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; margin: 0; }
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
         `,
         {
           status: 400,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
         }
       );
     }
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Confirmation Failed</title>
   <style>
     body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; margin: 0; }
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
         `,
         {
           status: 400,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
         }
       );
     }
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Manager Confirmed</title>
   <meta http-equiv="refresh" content="3;url=${result.redirect || '/'}">
   <style>
@@ -110,7 +113,7 @@ export async function GET(request: NextRequest) {
         `,
         {
           status: 200,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
         }
       );
     } else {
@@ -120,6 +123,7 @@ export async function GET(request: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Manager Relationship Rejected</title>
   <style>
     body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; margin: 0; }
@@ -141,7 +145,7 @@ export async function GET(request: NextRequest) {
         `,
         {
           status: 200,
-          headers: { 'Content-Type': 'text/html' },
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
         }
       );
     }
@@ -152,6 +156,7 @@ export async function GET(request: NextRequest) {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Error</title>
   <style>
     body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; margin: 0; }
@@ -171,7 +176,7 @@ export async function GET(request: NextRequest) {
       `,
       {
         status: 500,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
         }
       );
   }
