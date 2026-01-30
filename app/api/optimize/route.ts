@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
     const allTrips = await fabricService.getTrips({ dataType: 'raw' });
 
     // Filter trips that are eligible for optimization
-    // ✅ CRITICAL: Only 'approved' and 'auto_approved' can be optimized
-    // ✅ Exclude 'approved_solo' - these are final solo trips
+    // ✅ Include 'approved', 'auto_approved', and 'approved_solo'
+    // ✅ 'approved_solo' can still be optimized with other trips if opportunities arise
     // ✅ Exclude trips that already have optimizedGroupId
-    const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved'];
+    const eligibleStatuses: TripStatus[] = ['approved', 'auto_approved', 'approved_solo'];
     const tripsToOptimize = allTrips.filter(trip =>
       eligibleStatuses.includes(trip.status as TripStatus) &&
       !trip.optimizedGroupId // ✅ Don't re-optimize trips already in a group

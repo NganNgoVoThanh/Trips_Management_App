@@ -186,8 +186,12 @@ export const authOptions: NextAuthOptions = {
             console.log('✅ Database user ID:', databaseUserId);
           }
           } // Close else block
-        } catch (error) {
-          console.error('❌ Error creating/updating user:', error);
+        } catch (error: any) {
+          console.error('❌ Error creating/updating user in JWT callback:');
+          console.error('Error message:', error.message);
+          console.error('Error code:', error.code);
+          console.error('Error stack:', error.stack);
+          console.error('Full error:', error);
         }
 
         token.id = databaseUserId; // Use database user ID, not Azure ID
@@ -401,9 +405,9 @@ export const authOptions: NextAuthOptions = {
 
       // ✅ Tạo/cập nhật user record trong database
       if (user.email) {
+        const normalizedEmail = normalizeEmail(user.email);
         try {
           const azureProfile = profile as any;
-          const normalizedEmail = normalizeEmail(user.email);
           const role = await determineRole(normalizedEmail);
           const azureId = azureProfile?.oid || azureProfile?.sub || user.id;
           const employeeId = azureProfile?.oid ? `EMP${azureProfile.oid.slice(0, 6).toUpperCase()}` : stableEmployeeIdFromEmail(normalizedEmail);
@@ -424,7 +428,12 @@ export const authOptions: NextAuthOptions = {
 
           console.log(`✅ User record created/updated for ${normalizedEmail}`);
         } catch (error: any) {
-          console.error(`❌ Failed to create/update user record:`, error.message);
+          console.error(`❌ Failed to create/update user record in signIn event:`);
+          console.error('Email:', normalizedEmail);
+          console.error('Error message:', error.message);
+          console.error('Error code:', error.code);
+          console.error('Error stack:', error.stack);
+          console.error('Full error:', error);
           // Không throw error để không block login
         }
       }

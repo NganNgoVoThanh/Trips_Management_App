@@ -3,12 +3,12 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AdminHeader } from "@/components/admin/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, CheckCircle, XCircle, Clock, MapPin, Loader2 } from "lucide-react"
+import { ChevronLeft, Clock, MapPin, Loader2, AlertTriangle, CheckCircle } from "lucide-react"
 import { fabricService, Trip } from "@/lib/fabric-client"
-import { emailService } from "@/lib/email-service"
 import { getLocationName, formatCurrency } from "@/lib/config"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,7 +21,6 @@ export default function ApprovalsPage() {
   const { data: session, status } = useSession()
   const [pendingTrips, setPendingTrips] = useState<Trip[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [processingId, setProcessingId] = useState<string | null>(null)
 
   useEffect(() => {
     // Only load data when session is ready
@@ -84,56 +83,16 @@ export default function ApprovalsPage() {
     }
   }
 
-  const handleApprove = async (trip: Trip) => {
-    setProcessingId(trip.id)
-    try {
-      await fabricService.updateTrip(trip.id, {
-        status: 'approved',
-        notified: true
-      })
-      await emailService.sendApprovalNotification(trip)
+  // ❌ REMOVED: Admin should NOT approve/reject from this page
+  // Admin should only approve/reject via Manual Override page for proper audit trail
+  // This ensures:
+  // - Proper status: 'approved_solo' instead of 'approved' (different from manager approval)
+  // - Required reason/notes for audit
+  // - Full logging in admin_override_log table
+  // - Clear distinction between manager approval (green) and admin override (white)
 
-      toast({
-        title: "Trip Approved",
-        description: `Trip for ${trip.userName} has been approved`,
-      })
-
-      await loadPendingTrips()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to approve trip",
-        variant: "destructive"
-      })
-    } finally {
-      setProcessingId(null)
-    }
-  }
-
-  const handleReject = async (trip: Trip) => {
-    setProcessingId(trip.id)
-    try {
-      await fabricService.updateTrip(trip.id, {
-        status: 'cancelled',
-        notified: true
-      })
-      await emailService.sendCancellationNotification(trip)
-
-      toast({
-        title: "Trip Rejected",
-        description: `Trip for ${trip.userName} has been rejected`,
-      })
-
-      await loadPendingTrips()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to reject trip",
-        variant: "destructive"
-      })
-    } finally {
-      setProcessingId(null)
-    }
+  const handleGoToOverride = () => {
+    router.push('/admin/manual-override')
   }
 
   if (isLoading) {
@@ -167,13 +126,38 @@ export default function ApprovalsPage() {
                 <Clock className="h-6 w-6 text-yellow-600" />
                 Pending Approvals
               </h1>
-              <p className="text-gray-500">Review and approve trip requests</p>
+              <p className="text-gray-500">View pending trip requests</p>
             </div>
           </div>
-          <Badge variant="outline" className="bg-yellow-50">
-            {pendingTrips.length} pending
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="bg-yellow-50">
+              {pendingTrips.length} pending
+            </Badge>
+            <Button
+              onClick={handleGoToOverride}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Go to Manual Override
+            </Button>
+          </div>
         </div>
+
+        {/* Alert: Admin must use Manual Override */}
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-900">Admin Override Required</AlertTitle>
+          <AlertDescription className="text-blue-700">
+            This page is for viewing only. To approve or reject trips, please use the{" "}
+            <button
+              onClick={handleGoToOverride}
+              className="underline font-medium hover:text-blue-900"
+            >
+              Manual Override
+            </button>{" "}
+            page. This ensures proper audit logging and maintains clear distinction between manager approvals and admin overrides.
+          </AlertDescription>
+        </Alert>
 
         {pendingTrips.length === 0 ? (
           <Card>
@@ -227,34 +211,11 @@ export default function ApprovalsPage() {
                     <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50"
-                        onClick={() => handleReject(trip)}
-                        disabled={processingId === trip.id}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={handleGoToOverride}
                       >
-                        {processingId === trip.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <XCircle className="mr-1 h-4 w-4" />
-                            Reject
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handleApprove(trip)}
-                        disabled={processingId === trip.id}
-                      >
-                        {processingId === trip.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <CheckCircle className="mr-1 h-4 w-4" />
-                            Approve
-                          </>
-                        )}
+                        <Clock className="mr-1 h-4 w-4" />
+                        Process Override
                       </Button>
                     </div>
                   </div>

@@ -128,17 +128,23 @@ export async function POST(request: NextRequest) {
           ]
         );
 
-        // Send confirmation email to manager
-        await sendManagerConfirmationEmail({
-          userId: user.id,
-          userEmail: userEmail,
-          userName: userName,
-          managerEmail: managerEmailLower,
-          type: 'initial',
-        });
+        // Send confirmation email to manager (with error handling)
+        try {
+          await sendManagerConfirmationEmail({
+            userId: user.id,
+            userEmail: userEmail,
+            userName: userName,
+            managerEmail: managerEmailLower,
+            type: 'initial',
+          });
+          console.log(`✅ Profile saved, confirmation email sent to ${managerEmailLower}`);
+        } catch (emailError: any) {
+          // Log email error but don't fail the whole operation
+          console.error(`⚠️  Failed to send confirmation email to ${managerEmailLower}:`, emailError.message);
+          console.error('Email service may not be configured. Profile was saved successfully.');
+        }
 
         pendingManagerConfirmation = true;
-        console.log(`✅ Profile saved, confirmation email sent to ${managerEmailLower}`);
       } else {
         // No manager (CEO/C-Level) - auto-approve AND admin fields
         await connection.query(
@@ -196,10 +202,20 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('❌ Error in profile setup:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      sqlMessage: error.sqlMessage,
+      sql: error.sql
+    });
+
     return NextResponse.json(
       {
         error: 'Failed to save profile',
         details: error.message,
+        code: error.code || 'UNKNOWN_ERROR'
       },
       { status: 500 }
     );

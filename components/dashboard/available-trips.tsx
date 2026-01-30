@@ -132,7 +132,8 @@ export function AvailableTrips() {
       })
 
       // Group trips by optimization group to show available seats
-      const groupedTrips = await groupTrips(availableTrips)
+      // Pass allTrips for counting ALL participants (including pending)
+      const groupedTrips = await groupTrips(availableTrips, allTrips)
 
       setTrips(groupedTrips)
     } catch (error) {
@@ -168,7 +169,7 @@ export function AvailableTrips() {
     }
   }, [session?.user])
 
-  const groupTrips = async (trips: Trip[]): Promise<Trip[]> => {
+  const groupTrips = async (trips: Trip[], allTrips: Trip[]): Promise<Trip[]> => {
     const groups = new Map<string, Trip[]>()
 
     trips.forEach(trip => {
@@ -186,16 +187,36 @@ export function AvailableTrips() {
     // Create aggregated trip objects
     const aggregatedTrips: Trip[] = []
 
-    groups.forEach((groupTrips, groupId) => {
+    // ✅ FIX: Use for...of loop instead of forEach to support async operations
+    for (const [groupId, groupTrips] of groups.entries()) {
       const baseTrip = groupTrips[0]
       const vehicle = config.vehicles[baseTrip.vehicleType as keyof typeof config.vehicles] || config.vehicles['car-4']
 
-      // Total passengers = group size only
-      // NOTE: When admin approves a join request, a new trip is created in the database
-      // with the same optimizedGroupId, so groupTrips.length already includes:
-      // - Original participants who submitted trips
-      // - Users who joined via approved join requests (they now have trips in DB)
-      const totalPassengers = groupTrips.length
+      let totalPassengers = groupTrips.length
+      let pendingPassengers = 0
+
+      // ✅ FIX: For optimized groups, count ALL trips with same optimizedGroupId (including pending)
+      // This fixes the issue where join requests create trips with 'pending_approval' status
+      // which were not being counted in the participant count
+      if (baseTrip.optimizedGroupId) {
+        // Filter from allTrips (already loaded) instead of querying database again
+        const allGroupTrips = allTrips.filter((t: Trip) =>
+          t.optimizedGroupId === baseTrip.optimizedGroupId
+        )
+
+        // Count trips by status
+        const pendingTrips = allGroupTrips.filter((t: Trip) =>
+          ['pending_approval', 'pending_urgent'].includes(t.status)
+        )
+
+        totalPassengers = allGroupTrips.length
+        pendingPassengers = pendingTrips.length
+
+        if (pendingPassengers > 0) {
+          console.log(`📊 Group ${groupId}: ${totalPassengers - pendingPassengers} confirmed, ${pendingPassengers} pending, total ${totalPassengers}`)
+        }
+      }
+
       // ✅ FIX: Passenger capacity excludes driver seat
       const passengerCapacity = vehicle.capacity - 1
       const availableSeats = passengerCapacity - totalPassengers
@@ -205,17 +226,18 @@ export function AvailableTrips() {
         aggregatedTrips.push({
           ...baseTrip,
           id: groupId,
-          userName: `${groupTrips.length} employees`,
+          userName: `${totalPassengers} employee${totalPassengers > 1 ? 's' : ''}${pendingPassengers > 0 ? ` (${pendingPassengers} pending)` : ''}`,
           userEmail: '',
           userId: '',
           // Add custom properties for display
           availableSeats,
           totalSeats: passengerCapacity, // ✅ FIX: Show passenger capacity, not total capacity
-          groupSize: totalPassengers, // Updated to include join requests
-          participants: groupTrips // Keep list of original participants
+          groupSize: totalPassengers, // ✅ FIX: Now includes ALL participants (confirmed + pending)
+          pendingCount: pendingPassengers, // Track pending count separately
+          participants: groupTrips // Keep list of visible participants (approved/optimized only)
         } as any)
       }
-    })
+    }
 
     return aggregatedTrips
   }
@@ -300,7 +322,7 @@ export function AvailableTrips() {
 
   const hasApprovedRequest = (tripIdOrGroupId: string): boolean => {
     // Check if any approved request matches this trip ID or has the same optimized group ID
-    return userRequests.some(req => {
+    const approvedRequest = userRequests.find(req => {
       // Only check approved requests
       if (req.status !== 'approved') return false
 
@@ -314,6 +336,67 @@ export function AvailableTrips() {
 
       return false
     })
+
+    if (!approvedRequest) return false
+
+    // ✅ CRITICAL FIX: Also check if the actual trip created from this request still exists and is not rejected/cancelled
+    // When join request is approved, a new trip is created with parentTripId = original trip id
+    const hasActiveTrip = userTrips.some(userTrip => {
+      // Check if this trip was created from the join request (parentTripId matches)
+      if (userTrip.parentTripId === approvedRequest.tripId) {
+        // Only count as "approved" if trip is not rejected or cancelled
+        const validStatuses = ['pending_approval', 'pending_urgent', 'approved', 'approved_solo', 'auto_approved', 'optimized']
+        return validStatuses.includes(userTrip.status)
+      }
+      return false
+    })
+
+    return hasActiveTrip
+  }
+
+  const hasRejectedRequest = (tripIdOrGroupId: string): boolean => {
+    // Check if any rejected request matches this trip ID or has the same optimized group ID
+    const hasDirectRejection = userRequests.some(req => {
+      // Only check rejected requests
+      if (req.status !== 'rejected') return false
+
+      // Direct match with trip ID
+      if (req.tripId === tripIdOrGroupId) return true
+
+      // Match by optimized group ID (for grouped trips)
+      if (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId) {
+        return true
+      }
+
+      return false
+    })
+
+    if (hasDirectRejection) return true
+
+    // ✅ ALSO CHECK: Join request was approved, but the created trip was rejected/cancelled
+    const approvedRequest = userRequests.find(req => {
+      if (req.status !== 'approved') return false
+      if (req.tripId === tripIdOrGroupId) return true
+      if (req.tripDetails?.optimizedGroupId && req.tripDetails.optimizedGroupId === tripIdOrGroupId) {
+        return true
+      }
+      return false
+    })
+
+    if (approvedRequest) {
+      // Check if the trip created from this request is rejected/cancelled
+      const hasRejectedTrip = userTrips.some(userTrip => {
+        if (userTrip.parentTripId === approvedRequest.tripId) {
+          const rejectedStatuses = ['rejected', 'cancelled']
+          return rejectedStatuses.includes(userTrip.status)
+        }
+        return false
+      })
+
+      if (hasRejectedTrip) return true
+    }
+
+    return false
   }
 
   // Check if user has trip on same date
@@ -513,18 +596,30 @@ export function AvailableTrips() {
                             {getLocationName(trip.departureLocation)} → {getLocationName(trip.destination)}
                           </h3>
 
-                          {/* Trip Status Badge */}
-                          {trip.status === 'optimized' && (
-                            <Badge className="bg-blue-500 text-white hover:bg-blue-600">
-                              ⚡ Instant Join
+                          {/* Join Request Status Badge - Higher priority */}
+                          {requestStatus === 'rejected' && (
+                            <Badge className="bg-red-500 text-white hover:bg-red-600">
+                              ✗ Request Rejected
                             </Badge>
                           )}
-                          {trip.status === 'approved' && (
+                          {requestStatus === 'pending' && (
+                            <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+                              ⏳ Request Pending
+                            </Badge>
+                          )}
+                          {requestStatus === 'approved' && (
                             <Badge className="bg-green-500 text-white hover:bg-green-600">
-                              ✓ Approved
+                              ✓ Request Approved
                             </Badge>
                           )}
-                          {trip.status === 'auto_approved' && (
+
+                          {/* Trip Status Badge - Only show if no active request */}
+                          {!requestStatus && (trip.status === 'optimized' || trip.status === 'approved' || trip.status === 'approved_solo') && (
+                            <Badge className="bg-green-500 text-white hover:bg-green-600">
+                              ✓ Available to Join
+                            </Badge>
+                          )}
+                          {!requestStatus && trip.status === 'auto_approved' && (
                             <Badge className="bg-teal-500 text-white hover:bg-teal-600">
                               ✓ Auto-Approved
                             </Badge>
@@ -558,7 +653,14 @@ export function AvailableTrips() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            <span>{trip.groupSize}/{trip.totalSeats} passengers</span>
+                            <span>
+                              {trip.groupSize}/{trip.totalSeats} passengers
+                              {(trip as any).pendingCount > 0 && (
+                                <span className="ml-1 text-xs text-orange-600">
+                                  ({(trip as any).pendingCount} pending approval)
+                                </span>
+                              )}
+                            </span>
                           </div>
                         </div>
                         
@@ -575,15 +677,10 @@ export function AvailableTrips() {
                             </Badge>
                           )}
                         </div>
-                        
-                        {trip.status === 'optimized' && (
-                          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            ⚡ Instant Join: This optimized trip is confirmed immediately upon admin approval (no manager approval needed)
-                          </div>
-                        )}
-                        {trip.status === 'approved' && (
+
+                        {(trip.status === 'optimized' || trip.status === 'approved' || trip.status === 'approved_solo') && !requestStatus && (
                           <div className="text-xs text-green-600 dark:text-green-400">
-                            ✓ Approved Trip: Manager approval will be required after admin approves your join request
+                            ℹ️ Join Request Flow: Admin approval → Manager approval → Trip confirmed
                           </div>
                         )}
 
@@ -602,6 +699,44 @@ export function AvailableTrips() {
                       <div className="flex flex-col gap-2">
                         {(() => {
                           const joinCheck = canRequestToJoin(trip)
+
+                          // Show Rejected status
+                          if (hasRejectedRequest(trip.id)) {
+                            const requestDetails = getRequestDetails(trip.id)
+
+                            // Check if this is a trip rejection (approved request but rejected trip)
+                            const isApprovedRequest = requestDetails?.status === 'approved'
+                            const rejectedTrip = isApprovedRequest ? userTrips.find(t =>
+                              t.parentTripId === requestDetails.tripId &&
+                              ['rejected', 'cancelled'].includes(t.status)
+                            ) : null
+
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="bg-red-600 hover:bg-red-700"
+                                  disabled
+                                >
+                                  ✗ Rejected
+                                </Button>
+                                {requestDetails?.adminNotes && requestDetails?.status === 'rejected' && (
+                                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                                    <p className="font-medium text-red-800 mb-1">Rejection Reason:</p>
+                                    <p className="text-red-700">{requestDetails.adminNotes}</p>
+                                  </div>
+                                )}
+                                <p className="text-xs text-red-600 mt-1">
+                                  {isApprovedRequest && rejectedTrip
+                                    ? rejectedTrip.status === 'cancelled'
+                                      ? 'Your trip was cancelled after join request approval.'
+                                      : 'Your trip was rejected after join request approval.'
+                                    : 'Your join request was rejected by admin.'}
+                                </p>
+                              </div>
+                            )
+                          }
 
                           // Show Request Pending for pending requests
                           if (hasExistingRequest(trip.id)) {

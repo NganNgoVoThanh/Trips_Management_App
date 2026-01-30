@@ -126,9 +126,9 @@ class AIOptimizer {
     }
 
     // Select appropriate vehicle based on passenger capacity (excluding driver)
-    // Car 4-seater: 3 passengers, Car 7-seater: 6 passengers, Van 16-seater: 15 passengers
+    // Car 4-seater: 3 passengers max, Car 7-seater: 6 passengers max, Van 16-seater: 15 passengers max
     const totalPassengers = validTrips.length;
-    let vehicleType = 'car-4';
+    let vehicleType = 'car-4'; // Default for 1-3 passengers
     if (totalPassengers > 3 && totalPassengers <= 6) {
       vehicleType = 'car-7';
     } else if (totalPassengers > 6 && totalPassengers <= 15) {
@@ -477,13 +477,14 @@ Do not include any text outside the JSON array.`;
       return trip.departureTime < min ? trip.departureTime : min;
     }, validTrips[0].departureTime);
     
-    // Select vehicle based on group size
+    // Select vehicle based on group size (each trip = 1 passenger)
+    // Passenger capacity EXCLUDES driver seat
     let vehicleType = 'car-4';
-    if (validTrips.length > 4 && validTrips.length <= 7) {
-      vehicleType = 'car-7';
-    } else if (validTrips.length > 7 && validTrips.length <= 16) {
-      vehicleType = 'van-16';
-    } else if (validTrips.length > 16) {
+    if (validTrips.length > 3 && validTrips.length <= 6) {
+      vehicleType = 'car-7'; // car-7 can hold 6 passengers (7 seats - 1 driver)
+    } else if (validTrips.length > 6 && validTrips.length <= 15) {
+      vehicleType = 'van-16'; // van-16 can hold 15 passengers (16 seats - 1 driver)
+    } else if (validTrips.length > 15) {
       // Too many passengers for a single vehicle
       return null;
     }

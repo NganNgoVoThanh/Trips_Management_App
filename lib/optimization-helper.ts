@@ -27,9 +27,9 @@ export async function checkOptimizationPotential(tripId: string): Promise<boolea
       t.departureDate === trip.departureDate
     );
 
-    // Filter for approved trips (including auto_approved)
+    // Filter for approved trips (including auto_approved and approved_solo)
     const approvedSimilarTrips = similarTrips.filter(t =>
-      (t.status === 'approved' || t.status === 'auto_approved') &&
+      (t.status === 'approved' || t.status === 'auto_approved' || t.status === 'approved_solo') &&
       t.dataType === 'raw'
     );
 
@@ -66,7 +66,7 @@ export async function getSimilarTripsForOptimization(
 
     // Filter for approved trips that can be optimized
     return trips.filter(t =>
-      (t.status === 'approved' || t.status === 'auto_approved') &&
+      (t.status === 'approved' || t.status === 'auto_approved' || t.status === 'approved_solo') &&
       t.dataType === 'raw' &&
       !t.optimizedGroupId
     );

@@ -62,7 +62,7 @@ export function TripOptimization({ onOptimizationChange, adminLocationId, adminT
         if (response.ok) {
           const data = await response.json()
           // Filter for trips eligible for optimization
-          const eligibleStatuses = ['approved', 'auto_approved', 'manager_approved']
+          const eligibleStatuses = ['approved', 'auto_approved', 'approved_solo', 'manager_approved']
           trips = (data.trips || []).filter((t: Trip) =>
             eligibleStatuses.includes(t.status) && !t.optimizedGroupId
           )
@@ -81,7 +81,7 @@ export function TripOptimization({ onOptimizationChange, adminLocationId, adminT
       } else {
         // Super Admin: Load all trips
         const allTrips = await fabricService.getTrips({ includeTemp: false })
-        const eligibleStatuses = ['approved', 'auto_approved', 'manager_approved']
+        const eligibleStatuses = ['approved', 'auto_approved', 'approved_solo', 'manager_approved']
         trips = allTrips.filter(t => eligibleStatuses.includes(t.status) && !t.optimizedGroupId)
       }
 

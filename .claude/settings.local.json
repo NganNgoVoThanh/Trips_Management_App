@@ -6,7 +6,15 @@
       "Bash(node scripts/debug-location-filter.js:*)",
       "Bash(grep:*)",
       "Bash(git checkout:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node scripts/fix-admin-audit-log.js:*)",
+      "Bash(chmod:*)",
+      "Bash(git show:*)",
+      "Bash(mysql:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run build:production:*)",
+      "Bash(npx next build)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
